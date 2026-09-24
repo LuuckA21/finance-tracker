@@ -98,6 +98,10 @@ Integration tests start PostgreSQL with Testcontainers and exercise the real sec
 login/CSRF/session rotation, lockout, forced password change, session revocation, admin rules,
 2FA enrolment + replay protection + recovery codes, per-user data isolation, dashboard math.
 
+GitHub Actions (`.github/workflows/ci.yml`) runs the same checks on every pull request and on
+pushes to `master`: `mvn verify` on JDK 25 (Testcontainers uses the runner's Docker) and the
+frontend typecheck + build.
+
 ## Deploy with Docker Compose
 
 ```bash
