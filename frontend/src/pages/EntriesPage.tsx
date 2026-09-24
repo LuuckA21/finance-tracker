@@ -4,6 +4,7 @@ import { errorMessage } from '../api/client'
 import { useCategories, useDeleteEntry, useEntries, type EntryFilter } from '../api/hooks'
 import type { CashEntry, EntryKind } from '../api/types'
 import { Button, Card, EmptyState, ErrorAlert, PageHeader, Spinner } from '../components/ui'
+import { useI18n } from '../i18n'
 import { date, money } from '../lib/format'
 import { EntryFormModal } from './EntryForm'
 
@@ -17,12 +18,13 @@ export function EntriesPage() {
   const categories = useCategories().data ?? []
   const remove = useDeleteEntry()
   const [error, setError] = useState<string | null>(null)
+  const { t } = useI18n()
 
   const byId = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
   const update = (patch: Partial<EntryFilter>) => setFilter((f) => ({ ...f, ...patch, page: 0 }))
 
   async function onDelete(entry: CashEntry) {
-    if (!confirm('Eliminare questo movimento?')) return
+    if (!confirm(t('entries.confirmDelete'))) return
     try {
       setError(null)
       await remove.mutateAsync(entry.id)
@@ -36,49 +38,49 @@ export function EntriesPage() {
   return (
     <>
       <PageHeader
-        title="Movimenti"
-        subtitle="Tutte le entrate e le uscite registrate"
+        title={t('entries.title')}
+        subtitle={t('entries.subtitle')}
         actions={
           <Button variant="primary" onClick={() => { setEditing(null); setFormOpen(true) }}>
-            <Plus className="size-4" /> Nuovo movimento
+            <Plus className="size-4" /> {t('entries.new')}
           </Button>
         }
       />
 
       <Card>
         <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-5">
-          <input type="date" className="input" aria-label="Dal" value={filter.from ?? ''} onChange={(e) => update({ from: e.target.value || undefined })} />
-          <input type="date" className="input" aria-label="Al" value={filter.to ?? ''} onChange={(e) => update({ to: e.target.value || undefined })} />
-          <select className="input" aria-label="Tipo" value={filter.kind} onChange={(e) => update({ kind: e.target.value as EntryKind | '', categoryId: '' })}>
-            <option value="">Entrate e uscite</option>
-            <option value="INCOME">Solo entrate</option>
-            <option value="EXPENSE">Solo uscite</option>
+          <input type="date" className="input" aria-label={t('entries.from')} value={filter.from ?? ''} onChange={(e) => update({ from: e.target.value || undefined })} />
+          <input type="date" className="input" aria-label={t('entries.to')} value={filter.to ?? ''} onChange={(e) => update({ to: e.target.value || undefined })} />
+          <select className="input" aria-label={t('entries.kind')} value={filter.kind} onChange={(e) => update({ kind: e.target.value as EntryKind | '', categoryId: '' })}>
+            <option value="">{t('entries.kindAll')}</option>
+            <option value="INCOME">{t('entries.kindIncome')}</option>
+            <option value="EXPENSE">{t('entries.kindExpense')}</option>
           </select>
-          <select className="input" aria-label="Categoria" value={filter.categoryId}
+          <select className="input" aria-label={t('entries.category')} value={filter.categoryId}
             onChange={(e) => update({ categoryId: e.target.value ? Number(e.target.value) : '' })}>
-            <option value="">Tutte le categorie</option>
+            <option value="">{t('entries.allCategories')}</option>
             {categories.filter((c) => !filter.kind || c.kind === filter.kind).map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
-          <input type="search" className="input col-span-2 md:col-span-1" placeholder="Cerca descrizione…" aria-label="Cerca"
+          <input type="search" className="input col-span-2 md:col-span-1" placeholder={t('entries.searchPlaceholder')} aria-label={t('entries.search')}
             value={filter.q} onChange={(e) => update({ q: e.target.value })} />
         </div>
 
         <ErrorAlert message={error} />
 
         {entries.isPending ? <Spinner /> : !page || page.content.length === 0 ? (
-          <EmptyState title="Nessun movimento">Aggiungi la prima entrata o uscita con “Nuovo movimento”.</EmptyState>
+          <EmptyState title={t('entries.emptyTitle')}>{t('entries.emptyHelp')}</EmptyState>
         ) : (
           <div className="-mx-4 overflow-x-auto sm:mx-0">
             <table className="w-full min-w-[36rem] text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-xs text-muted">
-                  <th className="px-4 py-2 font-medium sm:px-2">Data</th>
-                  <th className="px-2 py-2 font-medium">Categoria</th>
-                  <th className="px-2 py-2 font-medium">Descrizione</th>
-                  <th className="px-2 py-2 text-right font-medium">Importo</th>
-                  <th className="w-20 px-2 py-2"><span className="sr-only">Azioni</span></th>
+                  <th className="px-4 py-2 font-medium sm:px-2">{t('common.date')}</th>
+                  <th className="px-2 py-2 font-medium">{t('entries.category')}</th>
+                  <th className="px-2 py-2 font-medium">{t('entries.description')}</th>
+                  <th className="px-2 py-2 text-right font-medium">{t('common.amount')}</th>
+                  <th className="w-20 px-2 py-2"><span className="sr-only">{t('entries.actions')}</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -99,11 +101,11 @@ export function EntriesPage() {
                       </td>
                       <td className="px-2 py-2">
                         <div className="flex justify-end gap-1">
-                          <button type="button" className="rounded p-1.5 text-muted hover:bg-surface hover:text-ink" aria-label="Modifica"
+                          <button type="button" className="rounded p-1.5 text-muted hover:bg-surface hover:text-ink" aria-label={t('common.edit')}
                             onClick={() => { setEditing(e); setFormOpen(true) }}>
                             <Pencil className="size-4" />
                           </button>
-                          <button type="button" className="rounded p-1.5 text-muted hover:bg-surface hover:text-bad" aria-label="Elimina"
+                          <button type="button" className="rounded p-1.5 text-muted hover:bg-surface hover:text-bad" aria-label={t('common.delete')}
                             onClick={() => onDelete(e)}>
                             <Trash2 className="size-4" />
                           </button>
@@ -119,13 +121,13 @@ export function EntriesPage() {
 
         {page && page.totalPages > 1 && (
           <div className="mt-4 flex items-center justify-between text-sm text-ink-2">
-            <span>{page.totalElements} movimenti</span>
+            <span>{t('entries.count', { count: page.totalElements })}</span>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" disabled={page.page === 0} onClick={() => setFilter((f) => ({ ...f, page: f.page - 1 }))} aria-label="Pagina precedente">
+              <Button variant="ghost" disabled={page.page === 0} onClick={() => setFilter((f) => ({ ...f, page: f.page - 1 }))} aria-label={t('entries.previousPage')}>
                 <ChevronLeft className="size-4" />
               </Button>
               <span className="tabular">{page.page + 1} / {page.totalPages}</span>
-              <Button variant="ghost" disabled={page.page + 1 >= page.totalPages} onClick={() => setFilter((f) => ({ ...f, page: f.page + 1 }))} aria-label="Pagina successiva">
+              <Button variant="ghost" disabled={page.page + 1 >= page.totalPages} onClick={() => setFilter((f) => ({ ...f, page: f.page + 1 }))} aria-label={t('entries.nextPage')}>
                 <ChevronRight className="size-4" />
               </Button>
             </div>

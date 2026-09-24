@@ -6,11 +6,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import me.luucka.finance.auth.AppPrincipal;
 import me.luucka.finance.auth.MfaService;
 import me.luucka.finance.common.CurrencyCode;
+import me.luucka.finance.user.Language;
+import me.luucka.finance.user.Theme;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,7 +33,8 @@ public class AccountController {
             @NotBlank @Size(max = 128) String newPassword) {
     }
 
-    public record SettingsRequest(@NotNull @CurrencyCode String baseCurrency) {
+    /** Partial update: omitted (null) fields keep their current value. */
+    public record SettingsRequest(@CurrencyCode String baseCurrency, Language language, Theme theme) {
     }
 
     public record MfaCodeRequest(@NotBlank @Size(max = 32) String code) {
@@ -63,7 +65,7 @@ public class AccountController {
 
     @PutMapping("/settings")
     public MeResponse updateSettings(@AuthenticationPrincipal AppPrincipal me, @Valid @RequestBody SettingsRequest body) {
-        return accountService.updateSettings(me.id(), body.baseCurrency());
+        return accountService.updateSettings(me.id(), body.baseCurrency(), body.language(), body.theme());
     }
 
     @GetMapping("/logins")

@@ -9,11 +9,13 @@ Self-hosted personal finance app for a small group of users (you and your family
   show total net worth per month/year and its split by asset class.
 - **Multi-currency** – each entry/position keeps its own currency; dashboards convert to the
   user's base currency with exchange rates you enter manually.
+- **Per-user preferences** – interface language (Italian / English) and theme (system, light,
+  dark) are saved to the account and follow the user on every device.
 
 | Layer    | Tech |
 |----------|------|
 | Backend  | Java 25, Spring Boot 4.1 (Web MVC, Security 7, Data JPA, Session JDBC), Flyway, PostgreSQL 18 |
-| Frontend | React 19, TypeScript, Vite, TanStack Query, Recharts, Tailwind CSS 4 (UI in Italian) |
+| Frontend | React 19, TypeScript, Vite, TanStack Query, Recharts, Tailwind CSS 4 (UI in Italian and English) |
 | Deploy   | Docker Compose: `db` (Postgres) + `backend` + `web` (Nginx serving the SPA and proxying `/api`) |
 
 ## Project layout
@@ -23,7 +25,7 @@ backend/
   src/main/java/me/luucka/finance/
     core/        pure Java: FX table, cash-flow & net-worth calculators, TOTP, AES-GCM, password policy
     auth/        security config, login + 2FA flow, rate limiting, session revocation
-    account/     self-service: password, base currency, 2FA, login history
+    account/     self-service: password, preferences (base currency, language, theme), 2FA, login history
     admin/       user management (no public sign-up) + bootstrap admin
     category/ cashflow/ position/ fx/ dashboard/
   src/main/resources/db/migration/   Flyway migrations
@@ -31,6 +33,8 @@ backend/
   src/test/java/…/*IT.java           integration tests (Testcontainers + MockMvc)
 frontend/
   src/api/       fetch client (CSRF), types, React Query hooks
+  src/i18n/      it.ts (reference) + en.ts messages, useI18n()
+  src/preferences/ language + theme: applied at startup, synced with the profile
   src/pages/     dashboards, entries, positions, bulk update, settings, admin
   default.conf.template   Nginx: SPA + reverse proxy + security headers
 docker-compose.yml, .env.example
@@ -150,7 +154,7 @@ decrypted (an admin can reset 2FA for affected users; no financial data is encry
 | Area | Endpoints |
 |------|-----------|
 | Auth | `GET /api/auth/csrf`, `POST /api/auth/login`, `POST /api/auth/login/mfa`, `POST /api/auth/logout`, `GET /api/auth/me` |
-| Account | `PUT /api/account/password`, `PUT /api/account/settings`, `GET /api/account/logins`, `POST /api/account/mfa/{setup,enable,disable,recovery-codes}` |
+| Account | `PUT /api/account/password`, `PUT /api/account/settings` (partial: `baseCurrency`, `language` `IT\|EN`, `theme` `SYSTEM\|LIGHT\|DARK`), `GET /api/account/logins`, `POST /api/account/mfa/{setup,enable,disable,recovery-codes}` |
 | Categories | `GET/POST /api/categories`, `PUT/DELETE /api/categories/{id}` |
 | Entries | `GET /api/cash-entries?from&to&kind&categoryId&q&page&size`, `POST`, `PUT/DELETE /{id}` |
 | Positions | `GET/POST /api/positions`, `GET/PUT/DELETE /{id}`, `GET/POST /{id}/snapshots`, `PUT/DELETE /{id}/snapshots/{sid}`, `POST /api/positions/snapshots/bulk` |

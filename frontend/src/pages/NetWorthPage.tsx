@@ -6,13 +6,15 @@ import { Card, EmptyState, MissingRatesNotice, PageHeader, Segmented, Spinner } 
 import { NetWorthLine, NetWorthStacked } from '../charts/NetWorthCharts'
 import { RankedBars } from '../charts/ChartParts'
 import { assetClassColor, useChartTheme } from '../charts/theme'
-import { ASSET_CLASS_LABEL, date, money, monthsAgo, number, percent, periodLabel, today } from '../lib/format'
+import { useI18n } from '../i18n'
+import { ASSET_CLASSES, assetClassLabel, date, money, monthsAgo, number, percent, periodLabel, today } from '../lib/format'
 
 type Range = '12' | '36' | 'ALL'
 
 export function NetWorthPage() {
   const me = useMe().data
   const theme = useChartTheme()
+  const { t } = useI18n()
   const [granularity, setGranularity] = useState<Granularity>('MONTH')
   const [range, setRange] = useState<Range>('12')
   const [at, setAt] = useState(today())
@@ -33,15 +35,15 @@ export function NetWorthPage() {
   return (
     <>
       <PageHeader
-        title="Patrimonio"
-        subtitle={`Valori convertiti in ${currency}`}
+        title={t('netWorth.title')}
+        subtitle={t('netWorth.convertedTo', { currency })}
         actions={
           <>
-            <Segmented label="Granularità" value={granularity} onChange={setGranularity}
-              options={[{ value: 'MONTH', label: 'Mensile' }, { value: 'YEAR', label: 'Annuale' }]} />
+            <Segmented label={t('netWorth.granularity')} value={granularity} onChange={setGranularity}
+              options={[{ value: 'MONTH', label: t('netWorth.monthly') }, { value: 'YEAR', label: t('netWorth.yearly') }]} />
             {granularity === 'MONTH' && (
-              <Segmented label="Periodo" value={range} onChange={setRange}
-                options={[{ value: '12', label: '12 mesi' }, { value: '36', label: '3 anni' }, { value: 'ALL', label: 'Tutto' }]} />
+              <Segmented label={t('netWorth.range')} value={range} onChange={setRange}
+                options={[{ value: '12', label: t('netWorth.range12') }, { value: '36', label: t('netWorth.range36') }, { value: 'ALL', label: t('netWorth.rangeAll') }]} />
             )}
           </>
         }
@@ -49,41 +51,41 @@ export function NetWorthPage() {
       <MissingRatesNotice currencies={missing} baseCurrency={currency} />
 
       {series.isPending ? <Spinner /> : points.length === 0 || !series.data?.firstSnapshotDate ? (
-        <EmptyState title="Nessun dato sul patrimonio">
-          Crea le tue <Link className="text-accent underline" to="/posizioni">posizioni</Link> e registra quantità e prezzo a una data.
+        <EmptyState title={t('netWorth.emptyTitle')}>
+          {t('netWorth.emptyBefore')} <Link className="text-accent underline" to="/posizioni">{t('netWorth.emptyLink')}</Link> {t('netWorth.emptyAfter')}
         </EmptyState>
       ) : (
         <>
           <div className="mb-4 grid gap-4 lg:grid-cols-2">
-            <Card title="Patrimonio totale">
+            <Card title={t('netWorth.total')}>
               <NetWorthLine points={points} currency={currency} />
             </Card>
-            <Card title="Composizione per tipologia">
+            <Card title={t('netWorth.composition')}>
               <NetWorthStacked points={points} currency={currency} height={260} />
             </Card>
           </div>
 
-          <Card className="mb-4" title="Dati del grafico"
+          <Card className="mb-4" title={t('netWorth.chartData')}
             actions={<button type="button" className="text-sm text-accent hover:underline" aria-expanded={showTable}
-              onClick={() => setShowTable((v) => !v)}>{showTable ? 'Nascondi tabella' : 'Mostra tabella'}</button>}>
+              onClick={() => setShowTable((v) => !v)}>{showTable ? t('netWorth.hideTable') : t('netWorth.showTable')}</button>}>
             {showTable && (
               <div className="-mx-4 overflow-x-auto sm:mx-0">
                 <table className="w-full min-w-[32rem] text-sm">
                   <thead>
                     <tr className="border-b border-line text-left text-xs text-muted">
-                      <th className="px-4 py-2 font-medium sm:px-2">Periodo</th>
-                      {Object.keys(ASSET_CLASS_LABEL).filter((c) => points.some((p) => p.byClass[c as AssetClass])).map((c) => (
-                        <th key={c} className="px-2 py-2 text-right font-medium">{ASSET_CLASS_LABEL[c as AssetClass]}</th>
+                      <th className="px-4 py-2 font-medium sm:px-2">{t('netWorth.period')}</th>
+                      {ASSET_CLASSES.filter((c) => points.some((p) => p.byClass[c])).map((c) => (
+                        <th key={c} className="px-2 py-2 text-right font-medium">{assetClassLabel(c)}</th>
                       ))}
-                      <th className="px-2 py-2 text-right font-medium">Totale</th>
+                      <th className="px-2 py-2 text-right font-medium">{t('common.total')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {[...points].reverse().map((p) => (
                       <tr key={p.period} className="border-b border-line last:border-0">
                         <td className="px-4 py-2 sm:px-2">{periodLabel(p.period)}</td>
-                        {Object.keys(ASSET_CLASS_LABEL).filter((c) => points.some((q) => q.byClass[c as AssetClass])).map((c) => (
-                          <td key={c} className="tabular px-2 py-2 text-right text-ink-2">{money(p.byClass[c as AssetClass] ?? 0, currency, 0)}</td>
+                        {ASSET_CLASSES.filter((c) => points.some((q) => q.byClass[c])).map((c) => (
+                          <td key={c} className="tabular px-2 py-2 text-right text-ink-2">{money(p.byClass[c] ?? 0, currency, 0)}</td>
                         ))}
                         <td className="tabular px-2 py-2 text-right font-medium">{money(p.total, currency, 0)}</td>
                       </tr>
@@ -97,33 +99,33 @@ export function NetWorthPage() {
       )}
 
       <div className="grid gap-4 lg:grid-cols-[1fr_2fr]">
-        <Card title="Ripartizione">
-          <p className="mb-1 text-xs text-ink-2">Totale al {date(detail.data?.date)}</p>
+        <Card title={t('netWorth.breakdown')}>
+          <p className="mb-1 text-xs text-ink-2">{t('netWorth.totalAt', { date: date(detail.data?.date) })}</p>
           <p className="mb-4 text-3xl font-semibold tracking-tight">{money(detail.data?.total ?? 0, currency, 0)}</p>
-          <RankedBars currency={currency} emptyText="Nessuna posizione valorizzata"
+          <RankedBars currency={currency} emptyText={t('netWorth.noValuedPositions')}
             rows={byClass.map(({ c, v }) => ({
-              key: c, label: ASSET_CLASS_LABEL[c], swatch: assetClassColor(theme, c), value: v,
+              key: c, label: assetClassLabel(c), swatch: assetClassColor(theme, c), value: v,
               share: detail.data && detail.data.total ? (v / detail.data.total) * 100 : null,
             }))} />
         </Card>
 
-        <Card title="Posizioni" actions={
+        <Card title={t('netWorth.positions')} actions={
           <label className="flex items-center gap-2 whitespace-nowrap text-xs text-ink-2">
-            Valore al
+            {t('netWorth.valueAt')}
             <input type="date" className="input w-auto py-1" value={at} max={today()} onChange={(e) => setAt(e.target.value || today())} />
           </label>
         }>
           {detail.isPending ? <Spinner /> : (detail.data?.positions.length ?? 0) === 0 ? (
-            <EmptyState title="Nessuna posizione a questa data" />
+            <EmptyState title={t('netWorth.noPositionsAtDate')} />
           ) : (
             <div className="-mx-4 overflow-x-auto sm:mx-0">
               <table className="w-full min-w-[36rem] text-sm">
                 <thead>
                   <tr className="border-b border-line text-left text-xs text-muted">
-                    <th className="px-4 py-2 font-medium sm:px-2">Posizione</th>
-                    <th className="px-2 py-2 text-right font-medium">Quantità × prezzo</th>
-                    <th className="px-2 py-2 text-right font-medium">Valore</th>
-                    <th className="px-2 py-2 text-right font-medium">Quota</th>
+                    <th className="px-4 py-2 font-medium sm:px-2">{t('netWorth.colPosition')}</th>
+                    <th className="px-2 py-2 text-right font-medium">{t('netWorth.colQuantityPrice')}</th>
+                    <th className="px-2 py-2 text-right font-medium">{t('netWorth.colValue')}</th>
+                    <th className="px-2 py-2 text-right font-medium">{t('netWorth.colShare')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -135,7 +137,7 @@ export function NetWorthPage() {
                           <span className="font-medium">{p.name}</span>
                           {p.symbol && <span className="text-xs text-muted">{p.symbol}</span>}
                         </Link>
-                        <span className="ml-4.5 text-xs text-muted">{ASSET_CLASS_LABEL[p.assetClass]} · aggiornato {date(p.asOf)}</span>
+                        <span className="ml-4.5 text-xs text-muted">{assetClassLabel(p.assetClass)} · {t('netWorth.updated', { date: date(p.asOf) })}</span>
                       </td>
                       <td className="tabular px-2 py-2 text-right text-ink-2">
                         {p.assetClass === 'CASH' ? money(p.valueLocal, p.currency) : `${number(p.quantity)} × ${money(p.unitPrice, p.currency)}`}

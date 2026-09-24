@@ -3,7 +3,8 @@ import { ApiError, errorMessage } from '../api/client'
 import { useMe, useSavePosition } from '../api/hooks'
 import type { AssetClass, Position } from '../api/types'
 import { Button, ErrorAlert, Field, Modal } from '../components/ui'
-import { ASSET_CLASSES, ASSET_CLASS_LABEL, COMMON_CURRENCIES } from '../lib/format'
+import { useI18n } from '../i18n'
+import { ASSET_CLASSES, assetClassLabel, COMMON_CURRENCIES } from '../lib/format'
 
 export function PositionFormModal({ position, open, onClose, onSaved }: {
   position: Position | null
@@ -11,8 +12,9 @@ export function PositionFormModal({ position, open, onClose, onSaved }: {
   onClose: () => void
   onSaved?: (p: Position) => void
 }) {
+  const { t } = useI18n()
   return (
-    <Modal title={position ? 'Modifica posizione' : 'Nuova posizione'} open={open} onClose={onClose}>
+    <Modal title={position ? t('positions.edit') : t('positions.new')} open={open} onClose={onClose}>
       {open && <PositionForm position={position} onDone={(p) => { onSaved?.(p); onClose() }} />}
     </Modal>
   )
@@ -21,6 +23,7 @@ export function PositionFormModal({ position, open, onClose, onSaved }: {
 function PositionForm({ position, onDone }: { position: Position | null; onDone: (p: Position) => void }) {
   const me = useMe().data
   const save = useSavePosition()
+  const { t } = useI18n()
   const [name, setName] = useState(position?.name ?? '')
   const [symbol, setSymbol] = useState(position?.symbol ?? '')
   const [assetClass, setAssetClass] = useState<AssetClass>(position?.assetClass ?? 'CASH')
@@ -45,18 +48,18 @@ function PositionForm({ position, onDone }: { position: Position | null; onDone:
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
-      <Field label="Nome" error={fieldErrors.name} hint="Es. “Conto UBS”, “Wallet Bitcoin”, “VWCE”">
+      <Field label={t('common.name')} error={fieldErrors.name} hint={t('positionForm.nameHint')}>
         {(id) => <input id={id} className="input" required maxLength={100} autoFocus value={name} onChange={(e) => setName(e.target.value)} />}
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Tipologia" error={fieldErrors.assetClass}>
+        <Field label={t('positionForm.assetClass')} error={fieldErrors.assetClass}>
           {(id) => (
             <select id={id} className="input" value={assetClass} onChange={(e) => setAssetClass(e.target.value as AssetClass)}>
-              {ASSET_CLASSES.map((c) => <option key={c} value={c}>{ASSET_CLASS_LABEL[c]}</option>)}
+              {ASSET_CLASSES.map((c) => <option key={c} value={c}>{assetClassLabel(c)}</option>)}
             </select>
           )}
         </Field>
-        <Field label="Valuta del prezzo" error={fieldErrors.currency}>
+        <Field label={t('positionForm.priceCurrency')} error={fieldErrors.currency}>
           {(id) => (
             <>
               <input id={id} className="input uppercase" list="position-currencies" maxLength={3} required value={currency}
@@ -67,22 +70,22 @@ function PositionForm({ position, onDone }: { position: Position | null; onDone:
         </Field>
       </div>
       {assetClass !== 'CASH' && (
-        <Field label="Simbolo / ticker (facoltativo)" error={fieldErrors.symbol}>
+        <Field label={t('positionForm.symbol')} error={fieldErrors.symbol}>
           {(id) => <input id={id} className="input uppercase" maxLength={32} value={symbol} onChange={(e) => setSymbol(e.target.value)} />}
         </Field>
       )}
-      <Field label="Note (facoltative)" error={fieldErrors.notes}>
+      <Field label={t('positionForm.notes')} error={fieldErrors.notes}>
         {(id) => <textarea id={id} className="input" rows={2} maxLength={1000} value={notes} onChange={(e) => setNotes(e.target.value)} />}
       </Field>
       {position && (
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={archived} onChange={(e) => setArchived(e.target.checked)} />
-          Archiviata (chiusa: resta nello storico, non compare negli aggiornamenti)
+          {t('positionForm.archived')}
         </label>
       )}
       <ErrorAlert message={error} />
       <div className="flex justify-end">
-        <Button type="submit" variant="primary" loading={save.isPending}>Salva</Button>
+        <Button type="submit" variant="primary" loading={save.isPending}>{t('common.save')}</Button>
       </div>
     </form>
   )

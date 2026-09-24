@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { KeyRound, LockKeyhole } from 'lucide-react'
 import { ApiError, errorMessage, post, refreshCsrf } from '../api/client'
 import { Button, ErrorAlert, Field } from '../components/ui'
+import { useI18n } from '../i18n'
 
 export function LoginPage() {
   const [step, setStep] = useState<'password' | 'mfa'>('password')
@@ -15,6 +16,7 @@ export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const qc = useQueryClient()
+  const { t } = useI18n()
 
   const from = (location.state as { from?: string } | null)?.from ?? '/'
 
@@ -71,39 +73,39 @@ export function LoginPage() {
             {step === 'password' ? <LockKeyhole className="size-5" /> : <KeyRound className="size-5" />}
           </div>
           <div>
-            <h1 className="text-lg font-semibold">Finanze</h1>
-            <p className="text-sm text-ink-2">{step === 'password' ? 'Accedi al tuo account' : 'Verifica in due passaggi'}</p>
+            <h1 className="text-lg font-semibold">{t('app.name')}</h1>
+            <p className="text-sm text-ink-2">{step === 'password' ? t('login.subtitle') : t('login.mfaSubtitle')}</p>
           </div>
         </div>
 
         {step === 'password' ? (
           <form onSubmit={submitPassword} className="flex flex-col gap-4">
-            <Field label="Nome utente">
+            <Field label={t('login.username')}>
               {(id) => (
                 <input id={id} className="input" autoComplete="username" autoCapitalize="none" required
                   value={username} onChange={(e) => setUsername(e.target.value)} />
               )}
             </Field>
-            <Field label="Password">
+            <Field label={t('login.password')}>
               {(id) => (
                 <input id={id} className="input" type="password" autoComplete="current-password" required
                   value={password} onChange={(e) => setPassword(e.target.value)} />
               )}
             </Field>
             <ErrorAlert message={error} />
-            <Button type="submit" variant="primary" loading={busy}>Accedi</Button>
+            <Button type="submit" variant="primary" loading={busy}>{t('login.submit')}</Button>
           </form>
         ) : (
           <form onSubmit={submitCode} className="flex flex-col gap-4">
-            <Field label="Codice dell'app di autenticazione" hint="In alternativa puoi usare un codice di recupero.">
+            <Field label={t('login.code')} hint={t('login.codeHint')}>
               {(id) => (
                 <input id={id} className="input tabular text-center text-lg tracking-widest" autoComplete="one-time-code"
                   inputMode="text" required autoFocus maxLength={16} value={code} onChange={(e) => setCode(e.target.value)} />
               )}
             </Field>
             <ErrorAlert message={error} />
-            <Button type="submit" variant="primary" loading={busy}>Verifica</Button>
-            <Button variant="ghost" onClick={() => { setStep('password'); setError(null) }}>Torna indietro</Button>
+            <Button type="submit" variant="primary" loading={busy}>{t('login.verify')}</Button>
+            <Button variant="ghost" onClick={() => { setStep('password'); setError(null) }}>{t('login.back')}</Button>
           </form>
         )}
       </div>

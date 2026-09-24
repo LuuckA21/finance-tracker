@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { refreshCsrf, errorMessage } from '../../api/client'
 import { useChangePassword } from '../../api/hooks'
 import { Button, ErrorAlert, Field } from '../../components/ui'
+import { useI18n } from '../../i18n'
 
 export function ChangePasswordForm({ onDone }: { onDone?: () => void }) {
   const change = useChangePassword()
@@ -10,17 +11,18 @@ export function ChangePasswordForm({ onDone }: { onDone?: () => void }) {
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [ok, setOk] = useState(false)
+  const { t } = useI18n()
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     setOk(false)
     if (next !== confirm) {
-      setError('Le due password non coincidono.')
+      setError(t('password.mismatch'))
       return
     }
     if (next.length < 12) {
-      setError('La password deve avere almeno 12 caratteri.')
+      setError(t('password.tooShort'))
       return
     }
     try {
@@ -38,19 +40,19 @@ export function ChangePasswordForm({ onDone }: { onDone?: () => void }) {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">
-      <Field label="Password attuale">
+      <Field label={t('password.current')}>
         {(id) => <input id={id} type="password" className="input" autoComplete="current-password" required value={current} onChange={(e) => setCurrent(e.target.value)} />}
       </Field>
-      <Field label="Nuova password" hint="Almeno 12 caratteri. Una frase di più parole è facile da ricordare e sicura.">
+      <Field label={t('password.new')} hint={t('password.newHint')}>
         {(id) => <input id={id} type="password" className="input" autoComplete="new-password" required minLength={12} maxLength={128} value={next} onChange={(e) => setNext(e.target.value)} />}
       </Field>
-      <Field label="Conferma nuova password">
+      <Field label={t('password.confirm')}>
         {(id) => <input id={id} type="password" className="input" autoComplete="new-password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} />}
       </Field>
       <ErrorAlert message={error} />
-      {ok && <p className="text-sm text-good">Password aggiornata. Le altre sessioni sono state disconnesse.</p>}
+      {ok && <p className="text-sm text-good">{t('password.changed')}</p>}
       <div>
-        <Button type="submit" variant="primary" loading={change.isPending}>Cambia password</Button>
+        <Button type="submit" variant="primary" loading={change.isPending}>{t('password.submit')}</Button>
       </div>
     </form>
   )
