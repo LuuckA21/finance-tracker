@@ -3,6 +3,7 @@ package me.luucka.finance;
 import static me.luucka.finance.support.ApiClient.json;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import me.luucka.finance.support.ApiClient;
 import me.luucka.finance.support.IntegrationTest;
@@ -29,6 +30,15 @@ class AuthFlowIT {
         assertEquals(401, anonymous.get("/api/auth/me").getResponse().getStatus());
         assertEquals(401, anonymous.get("/api/cash-entries").getResponse().getStatus());
         assertEquals(401, anonymous.get("/api/dashboard/net-worth").getResponse().getStatus());
+    }
+
+    @Test
+    void sessionCookieHasProductionAttributes() throws Exception {
+        String cookie = new ApiClient(mvc).get("/api/auth/csrf").getResponse().getHeader("Set-Cookie");
+        assertTrue(cookie.startsWith(ApiClient.SESSION_COOKIE + "="), cookie);
+        assertTrue(cookie.contains("Secure"), cookie);
+        assertTrue(cookie.contains("HttpOnly"), cookie);
+        assertTrue(cookie.contains("SameSite=Strict"), cookie);
     }
 
     @Test
