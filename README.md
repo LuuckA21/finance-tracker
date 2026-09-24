@@ -108,25 +108,16 @@ The app must be served over HTTPS: the session cookie is `Secure`.
 
 ### Updates with `deploy.sh`
 
-On the server, update the code and restart the containers with:
+On the server, from the repository directory:
 
 ```bash
 ./deploy.sh master      # switch to and deploy a branch
 ./deploy.sh             # update the current branch
-./deploy.sh --rollback  # go back to the code used before the last deploy
 ```
 
-Before touching the code the script refuses local tracked changes and non fast-forward updates
-and checks that the branch exists on `origin`. It then rebuilds with
-`docker compose up -d --build --wait` and checks backend readiness and the web container.
-The previous and deployed commits are saved in `../.finance-tracker-last-deploy`.
-
-`--rollback` is refused when the deploy changed a Flyway migration: the old code may not work
-with the migrated database.
-
-If the script is placed outside the repository, it clones the project into `./finance-tracker`
-on first run. Options: `FINANCE_ROOT`, `FINANCE_REPO`, `FINANCE_HEALTH_TIMEOUT` (seconds,
-default 300).
+The script refuses local tracked changes, fetches `origin`, fast-forwards the branch, rebuilds and
+restarts the containers (`docker compose up -d --build --wait`) and waits until the backend is
+ready (`FINANCE_HEALTH_TIMEOUT`, seconds, default 300).
 
 **Back up** the Postgres volume *and* `APP_ENCRYPTION_KEY`. Without the key, 2FA secrets cannot be
 decrypted (an admin can reset 2FA for affected users; no financial data is encrypted with it).
