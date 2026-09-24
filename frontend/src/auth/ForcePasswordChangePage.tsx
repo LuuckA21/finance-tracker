@@ -2,10 +2,12 @@ import { ShieldAlert } from 'lucide-react'
 import { ChangePasswordForm } from '../pages/settings/ChangePasswordForm'
 import { useLogout } from './useLogout'
 import { Button } from '../components/ui'
+import { useI18n } from '../i18n'
 
 /** Shown instead of the app while the account still has a temporary password. */
 export function ForcePasswordChangePage() {
   const logout = useLogout()
+  const { t } = useI18n()
   return (
     <main className="flex min-h-dvh items-center justify-center px-4">
       <div className="card w-full max-w-md p-6">
@@ -14,14 +16,14 @@ export function ForcePasswordChangePage() {
             <ShieldAlert className="size-5" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold">Imposta una nuova password</h1>
+            <h1 className="text-lg font-semibold">{t('forcePassword.title')}</h1>
             <p className="text-sm text-ink-2">
-              Stai usando una password temporanea. Scegline una personale di almeno 12 caratteri per continuare.
+              {t('forcePassword.help')}
             </p>
           </div>
         </div>
         <ChangePasswordForm />
-        <Button variant="ghost" className="mt-3 w-full" onClick={logout}>Esci</Button>
+        <Button variant="ghost" className="mt-3 w-full" onClick={logout}>{t('nav.logout')}</Button>
       </div>
     </main>
   )

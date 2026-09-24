@@ -19,6 +19,8 @@ import type {
   Snapshot,
   UserWithPassword,
 } from './types'
+import type { Language } from '../i18n'
+import type { Theme } from '../preferences/theme'
 
 // Every mutation that changes financial data invalidates the dashboards too.
 const FINANCE_KEYS = [['entries'], ['dashboard'], ['positions'], ['fx']] as const
@@ -45,10 +47,12 @@ export function useChangePassword() {
 export function useUpdateSettings() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (body: { baseCurrency: string }) => put<Me>('/api/account/settings', body),
-    onSuccess: async (me) => {
+    mutationFn: (body: { baseCurrency?: string; language?: Language; theme?: Theme }) =>
+      put<Me>('/api/account/settings', body),
+    onSuccess: async (me, body) => {
       qc.setQueryData(['me'], me)
-      await qc.invalidateQueries()
+      // Only the base currency changes the numbers shown everywhere
+      if (body.baseCurrency) await qc.invalidateQueries()
     },
   })
 }

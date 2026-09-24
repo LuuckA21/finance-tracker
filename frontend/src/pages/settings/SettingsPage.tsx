@@ -14,27 +14,31 @@ import {
   useUpdateSettings,
 } from '../../api/hooks'
 import type { Category, EntryKind } from '../../api/types'
-import { Badge, Button, Card, EmptyState, ErrorAlert, Field, Modal, PageHeader, Spinner } from '../../components/ui'
+import { Badge, Button, Card, EmptyState, ErrorAlert, Field, Modal, PageHeader, Segmented, Spinner } from '../../components/ui'
+import { LANGUAGES, useI18n, type Language, type MessageKey } from '../../i18n'
+import { applyPreferences } from '../../preferences'
+import { THEMES, type Theme } from '../../preferences/theme'
 import { COMMON_CURRENCIES, date, dateTime, number, parseDecimal, today } from '../../lib/format'
 import { ChangePasswordForm } from './ChangePasswordForm'
 import { MfaSection } from './MfaSection'
 
 const TABS = [
-  { id: 'account', label: 'Account e sicurezza' },
-  { id: 'categorie', label: 'Categorie' },
-  { id: 'cambi', label: 'Tassi di cambio' },
-]
+  { id: 'account', label: 'settings.tabAccount' },
+  { id: 'categorie', label: 'settings.tabCategories' },
+  { id: 'cambi', label: 'settings.tabFx' },
+] as const
 
 export function SettingsPage() {
   const tab = useParams().tab ?? 'account'
+  const { t } = useI18n()
   return (
     <>
-      <PageHeader title="Impostazioni" />
-      <nav className="mb-5 flex gap-1 overflow-x-auto border-b border-line" aria-label="Sezioni impostazioni">
-        {TABS.map((t) => (
-          <NavLink key={t.id} to={`/impostazioni/${t.id}`}
-            className={() => `whitespace-nowrap border-b-2 px-3 py-2 text-sm ${tab === t.id ? 'border-accent font-medium text-ink' : 'border-transparent text-ink-2 hover:text-ink'}`}>
-            {t.label}
+      <PageHeader title={t('settings.title')} />
+      <nav className="mb-5 flex gap-1 overflow-x-auto border-b border-line" aria-label={t('settings.sections')}>
+        {TABS.map((item) => (
+          <NavLink key={item.id} to={`/impostazioni/${item.id}`}
+            className={() => `whitespace-nowrap border-b-2 px-3 py-2 text-sm ${tab === item.id ? 'border-accent font-medium text-ink' : 'border-transparent text-ink-2 hover:text-ink'}`}>
+            {t(item.label)}
           </NavLink>
         ))}
       </nav>
@@ -46,12 +50,55 @@ export function SettingsPage() {
 // ------------------------------------------------------------------ account
 
 function AccountTab() {
+  const { t } = useI18n()
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Card title="Valuta di base"><BaseCurrencyForm /></Card>
-      <Card title="Verifica in due passaggi"><MfaSection /></Card>
-      <Card title="Cambia password"><ChangePasswordForm /></Card>
-      <Card title="Accessi recenti"><LoginHistory /></Card>
+      <Card title={t('settings.preferences')}><PreferencesForm /></Card>
+      <Card title={t('settings.baseCurrency')}><BaseCurrencyForm /></Card>
+      <Card title={t('settings.twoFactor')}><MfaSection /></Card>
+      <Card title={t('settings.changePassword')}><ChangePasswordForm /></Card>
+      <Card title={t('settings.recentLogins')}><LoginHistory /></Card>
+    </div>
+  )
+}
+
+const LANGUAGE_NAMES: Record<Language, string> = { IT: 'Italiano', EN: 'English' }
+
+/** Applied at once, then saved to the profile; a failed save puts the previous values back. */
+function PreferencesForm() {
+  const me = useMe().data
+  const update = useUpdateSettings()
+  const { t } = useI18n()
+  const [error, setError] = useState<string | null>(null)
+  if (!me) return null
+
+  async function change(prefs: { language?: Language; theme?: Theme }) {
+    if (!me) return
+    const previous = { language: me.language, theme: me.theme }
+    setError(null)
+    applyPreferences({ ...previous, ...prefs })
+    try {
+      await update.mutateAsync(prefs)
+    } catch (err) {
+      applyPreferences(previous)
+      setError(errorMessage(err))
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-sm text-ink-2">{t('settings.preferencesHelp')}</p>
+      <div className="flex flex-col gap-1">
+        <span className="text-xs font-medium text-ink-2">{t('settings.language')}</span>
+        <Segmented label={t('settings.language')} value={me.language} onChange={(language) => change({ language })}
+          options={LANGUAGES.map((l) => ({ value: l, label: LANGUAGE_NAMES[l] }))} />
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-xs font-medium text-ink-2">{t('settings.theme')}</span>
+        <Segmented label={t('settings.theme')} value={me.theme} onChange={(theme) => change({ theme })}
+          options={THEMES.map((th) => ({ value: th, label: t(`settings.theme${th}` as MessageKey) }))} />
+      </div>
+      <ErrorAlert message={error} />
     </div>
   )
 }
@@ -59,6 +106,7 @@ function AccountTab() {
 function BaseCurrencyForm() {
   const me = useMe().data
   const update = useUpdateSettings()
+  const { t } = useI18n()
   const [currency, setCurrency] = useState(me?.baseCurrency ?? 'CHF')
   const [error, setError] = useState<string | null>(null)
 
@@ -74,43 +122,37 @@ function BaseCurrencyForm() {
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">
       <p className="text-sm text-ink-2">
-        Tutte le dashboard sono convertite in questa valuta. I tassi di cambio sono legati alla valuta di base: se la cambi, dovrai inserire i tassi verso la nuova.
+        {t('settings.baseCurrencyHelp')}
       </p>
       <div className="flex gap-2">
-        <input className="input w-28 uppercase" list="base-currencies" maxLength={3} aria-label="Valuta di base" value={currency}
+        <input className="input w-28 uppercase" list="base-currencies" maxLength={3} aria-label={t('settings.baseCurrency')} value={currency}
           onChange={(e) => setCurrency(e.target.value.toUpperCase())} />
         <datalist id="base-currencies">{COMMON_CURRENCIES.map((c) => <option key={c} value={c} />)}</datalist>
-        <Button type="submit" loading={update.isPending} disabled={currency === me?.baseCurrency}>Salva</Button>
+        <Button type="submit" loading={update.isPending} disabled={currency === me?.baseCurrency}>{t('common.save')}</Button>
       </div>
       <ErrorAlert message={error} />
     </form>
   )
 }
 
-const REASONS: Record<string, string> = {
-  SUCCESS: 'Accesso riuscito',
-  MFA_REQUIRED: 'Password corretta, in attesa del codice',
-  BAD_CREDENTIALS: 'Password errata',
-  BAD_MFA_CODE: 'Codice 2FA errato',
-  RECOVERY_CODE_USED: 'Accesso con codice di recupero',
-  LOCKED: 'Account bloccato temporaneamente',
-  DISABLED: 'Account disattivato',
-  RATE_LIMITED: 'Troppi tentativi',
-  UNKNOWN_USER: 'Utente sconosciuto',
-}
+const REASONS = [
+  'SUCCESS', 'MFA_REQUIRED', 'BAD_CREDENTIALS', 'BAD_MFA_CODE', 'RECOVERY_CODE_USED',
+  'LOCKED', 'DISABLED', 'RATE_LIMITED', 'UNKNOWN_USER',
+]
 
 function LoginHistory() {
   const history = useLoginHistory()
+  const { t } = useI18n()
   if (history.isPending) return <Spinner />
   const events = history.data ?? []
-  if (events.length === 0) return <p className="text-sm text-muted">Nessun accesso registrato.</p>
+  if (events.length === 0) return <p className="text-sm text-muted">{t('settings.noLogins')}</p>
   return (
     <ul className="divide-y divide-line text-sm">
       {events.map((e, i) => (
         <li key={i} className="flex items-start justify-between gap-3 py-2">
           <div className="min-w-0">
-            <p className={e.success ? 'text-ink' : e.reason === 'MFA_REQUIRED' ? 'text-ink-2' : 'text-bad'}>{REASONS[e.reason] ?? e.reason}</p>
-            <p className="truncate text-xs text-muted" title={e.userAgent ?? ''}>{e.ipAddress} · {e.userAgent ?? 'browser sconosciuto'}</p>
+            <p className={e.success ? 'text-ink' : e.reason === 'MFA_REQUIRED' ? 'text-ink-2' : 'text-bad'}>{REASONS.includes(e.reason) ? t(`reason.${e.reason}` as MessageKey) : e.reason}</p>
+            <p className="truncate text-xs text-muted" title={e.userAgent ?? ''}>{e.ipAddress} · {e.userAgent ?? t('settings.unknownBrowser')}</p>
           </div>
           <span className="shrink-0 text-xs text-muted">{dateTime(e.at)}</span>
         </li>
@@ -126,9 +168,10 @@ function CategoriesTab() {
   const remove = useDeleteCategory()
   const [editing, setEditing] = useState<Category | { kind: EntryKind } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const { t } = useI18n()
 
   async function onDelete(c: Category) {
-    if (!confirm(`Eliminare la categoria “${c.name}”?`)) return
+    if (!confirm(t('categories.confirmDelete', { name: c.name }))) return
     setError(null)
     try {
       await remove.mutateAsync(c.id)
@@ -143,8 +186,8 @@ function CategoriesTab() {
       <ErrorAlert message={error} />
       <div className="mt-2 grid gap-4 lg:grid-cols-2">
         {(['EXPENSE', 'INCOME'] as EntryKind[]).map((kind) => (
-          <Card key={kind} title={kind === 'EXPENSE' ? 'Categorie di uscita' : 'Categorie di entrata'}
-            actions={<Button onClick={() => setEditing({ kind })}>Aggiungi</Button>}>
+          <Card key={kind} title={kind === 'EXPENSE' ? t('categories.expense') : t('categories.income')}
+            actions={<Button onClick={() => setEditing({ kind })}>{t('common.add')}</Button>}>
             <ul className="divide-y divide-line">
               {(categories.data ?? []).filter((c) => c.kind === kind).map((c) => (
                 <li key={c.id} className="flex items-center justify-between py-2 text-sm">
@@ -152,10 +195,10 @@ function CategoriesTab() {
                     <span className="size-3 rounded-full" style={{ background: c.color }} aria-hidden />{c.name}
                   </span>
                   <span className="flex gap-1">
-                    <button type="button" className="rounded p-1.5 text-muted hover:text-ink" aria-label={`Modifica ${c.name}`} onClick={() => setEditing(c)}>
+                    <button type="button" className="rounded p-1.5 text-muted hover:text-ink" aria-label={t('categories.editName', { name: c.name })} onClick={() => setEditing(c)}>
                       <Pencil className="size-4" />
                     </button>
-                    <button type="button" className="rounded p-1.5 text-muted hover:text-bad" aria-label={`Elimina ${c.name}`} onClick={() => onDelete(c)}>
+                    <button type="button" className="rounded p-1.5 text-muted hover:text-bad" aria-label={t('categories.deleteName', { name: c.name })} onClick={() => onDelete(c)}>
                       <Trash2 className="size-4" />
                     </button>
                   </span>
@@ -165,7 +208,7 @@ function CategoriesTab() {
           </Card>
         ))}
       </div>
-      <Modal title={editing && 'id' in editing ? 'Modifica categoria' : 'Nuova categoria'} open={editing !== null} onClose={() => setEditing(null)}>
+      <Modal title={editing && 'id' in editing ? t('categories.edit') : t('categories.new')} open={editing !== null} onClose={() => setEditing(null)}>
         {editing && <CategoryForm initial={editing} onDone={() => setEditing(null)} />}
       </Modal>
     </>
@@ -174,6 +217,7 @@ function CategoriesTab() {
 
 function CategoryForm({ initial, onDone }: { initial: Category | { kind: EntryKind }; onDone: () => void }) {
   const save = useSaveCategory()
+  const { t } = useI18n()
   const existing = 'id' in initial ? initial : null
   const [name, setName] = useState(existing?.name ?? '')
   const [color, setColor] = useState(existing?.color ?? '#2a78d6')
@@ -190,14 +234,14 @@ function CategoryForm({ initial, onDone }: { initial: Category | { kind: EntryKi
   }
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">
-      <Field label="Nome">
+      <Field label={t('common.name')}>
         {(id) => <input id={id} className="input" required maxLength={64} autoFocus value={name} onChange={(e) => setName(e.target.value)} />}
       </Field>
-      <Field label="Colore">
+      <Field label={t('categories.color')}>
         {(id) => <input id={id} type="color" className="h-10 w-20 cursor-pointer rounded border border-line bg-surface" value={color} onChange={(e) => setColor(e.target.value)} />}
       </Field>
       <ErrorAlert message={error} />
-      <div className="flex justify-end"><Button type="submit" variant="primary" loading={save.isPending}>Salva</Button></div>
+      <div className="flex justify-end"><Button type="submit" variant="primary" loading={save.isPending}>{t('common.save')}</Button></div>
     </form>
   )
 }
@@ -209,6 +253,7 @@ function FxTab() {
   const rates = useFxRates()
   const save = useSaveFxRate()
   const remove = useDeleteFxRate()
+  const { t } = useI18n()
   const base = me?.baseCurrency ?? 'CHF'
   const [currency, setCurrency] = useState(base === 'EUR' ? 'USD' : 'EUR')
   const [day, setDay] = useState(today())
@@ -220,7 +265,7 @@ function FxTab() {
     setError(null)
     const value = parseDecimal(rate)
     if (value === null || value <= 0) {
-      setError('Inserisci un tasso positivo.')
+      setError(t('fx.ratePositive'))
       return
     }
     try {
@@ -236,14 +281,13 @@ function FxTab() {
 
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_2fr]">
-      <Card title="Aggiungi tasso">
+      <Card title={t('fx.addRate')}>
         <form onSubmit={submit} className="flex flex-col gap-3">
           <p className="text-sm text-ink-2">
-            Indica quanto vale <strong>1 unità</strong> della valuta in {base}. Per ogni data viene usato l'ultimo tasso disponibile
-            (o il primo, per date precedenti).
+            {t('fx.helpBefore')} <strong>{t('fx.helpUnit')}</strong> {t('fx.helpAfter', { base })}
           </p>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Valuta">
+            <Field label={t('common.currency')}>
               {(id) => (
                 <>
                   <input id={id} className="input uppercase" list="fx-currencies" maxLength={3} required value={currency}
@@ -252,7 +296,7 @@ function FxTab() {
                 </>
               )}
             </Field>
-            <Field label="Data">
+            <Field label={t('common.date')}>
               {(id) => <input id={id} type="date" className="input" required value={day} onChange={(e) => setDay(e.target.value)} />}
             </Field>
           </div>
@@ -260,12 +304,12 @@ function FxTab() {
             {(id) => <input id={id} className="input tabular" inputMode="decimal" required placeholder="0.95" value={rate} onChange={(e) => setRate(e.target.value)} />}
           </Field>
           <ErrorAlert message={error} />
-          <div><Button type="submit" variant="primary" loading={save.isPending}>Salva tasso</Button></div>
+          <div><Button type="submit" variant="primary" loading={save.isPending}>{t('fx.saveRate')}</Button></div>
         </form>
       </Card>
-      <Card title={`Tassi verso ${base}`}>
+      <Card title={t('fx.ratesTo', { base })}>
         {rates.isPending ? <Spinner /> : grouped.size === 0 ? (
-          <EmptyState title="Nessun tasso">Servono solo se registri movimenti o posizioni in valute diverse da {base}.</EmptyState>
+          <EmptyState title={t('fx.emptyTitle')}>{t('fx.emptyHelp', { base })}</EmptyState>
         ) : (
           <div className="flex flex-col gap-4">
             {[...grouped.entries()].map(([ccy, list]) => (
@@ -277,7 +321,7 @@ function FxTab() {
                       <span className="tabular text-ink-2">{date(r.date)}</span>
                       <span className="flex items-center gap-2">
                         <span className="tabular">1 {ccy} = {number(r.rate, 6)} {base}</span>
-                        <button type="button" className="rounded p-1 text-muted hover:text-bad" aria-label="Elimina tasso"
+                        <button type="button" className="rounded p-1 text-muted hover:text-bad" aria-label={t('fx.deleteRate')}
                           onClick={() => remove.mutate(r.id)}>
                           <Trash2 className="size-4" />
                         </button>

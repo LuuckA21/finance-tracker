@@ -1,5 +1,8 @@
 // Types mirroring the backend JSON responses.
 
+import type { Language } from '../i18n'
+import type { Theme } from '../preferences/theme'
+
 export type Role = 'ADMIN' | 'USER'
 export type EntryKind = 'INCOME' | 'EXPENSE'
 export type AssetClass =
@@ -19,6 +22,8 @@ export interface Me {
   username: string
   role: Role
   baseCurrency: string
+  language: Language
+  theme: Theme
   mfaEnabled: boolean
   recoveryCodesRemaining: number
   passwordChangeRequired: boolean

@@ -39,6 +39,14 @@ public class AppUser {
     @Column(name = "base_currency", nullable = false, length = 3)
     private String baseCurrency = "CHF";
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 2)
+    private Language language = Language.IT;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 8)
+    private Theme theme = Theme.SYSTEM;
+
     @Column(name = "password_change_required", nullable = false)
     private boolean passwordChangeRequired;
 
@@ -153,6 +161,22 @@ public class AppUser {
 
     public void setBaseCurrency(String baseCurrency) {
         this.baseCurrency = baseCurrency;
+    }
+
+    public Language getLanguage() {
+        return language;
+    }
+
+    public void setLanguage(Language language) {
+        this.language = language;
+    }
+
+    public Theme getTheme() {
+        return theme;
+    }
+
+    public void setTheme(Theme theme) {
+        this.theme = theme;
     }
 
     public boolean isPasswordChangeRequired() {

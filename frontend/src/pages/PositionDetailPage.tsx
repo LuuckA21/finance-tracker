@@ -8,7 +8,8 @@ import type { Position, Snapshot } from '../api/types'
 import { Badge, Button, Card, EmptyState, ErrorAlert, Field, Modal, PageHeader, Spinner } from '../components/ui'
 import { TooltipCard } from '../charts/ChartParts'
 import { useChartTheme } from '../charts/theme'
-import { ASSET_CLASS_LABEL, compact, date, money, number, parseDecimal, today } from '../lib/format'
+import { useI18n } from '../i18n'
+import { assetClassLabel, compact, date, money, number, parseDecimal, today } from '../lib/format'
 import { PositionFormModal } from './PositionForm'
 
 export function PositionDetailPage() {
@@ -21,16 +22,17 @@ export function PositionDetailPage() {
   const [editOpen, setEditOpen] = useState(false)
   const [snapshotEdit, setSnapshotEdit] = useState<Snapshot | null | 'new'>(null)
   const [error, setError] = useState<string | null>(null)
+  const { t } = useI18n()
 
   if (position.isPending) return <Spinner />
   if (!position.data) {
-    return <EmptyState title="Posizione non trovata"><Link to="/posizioni" className="text-accent underline">Torna alle posizioni</Link></EmptyState>
+    return <EmptyState title={t('position.notFound')}><Link to="/posizioni" className="text-accent underline">{t('position.backToList')}</Link></EmptyState>
   }
   const p = position.data
   const isCash = p.assetClass === 'CASH'
 
   async function onDeletePosition() {
-    if (!confirm(`Eliminare “${p.name}” e tutte le sue rilevazioni? L'operazione non si può annullare.`)) return
+    if (!confirm(t('position.confirmDelete', { name: p.name }))) return
     try {
       await removePosition.mutateAsync(p.id)
       navigate('/posizioni', { replace: true })
@@ -40,7 +42,7 @@ export function PositionDetailPage() {
   }
 
   async function onDeleteSnapshot(s: Snapshot) {
-    if (!confirm(`Eliminare la rilevazione del ${date(s.date)}?`)) return
+    if (!confirm(t('position.confirmDeleteSnapshot', { date: date(s.date) }))) return
     try {
       await removeSnapshot.mutateAsync(s.id)
     } catch (err) {
@@ -51,21 +53,21 @@ export function PositionDetailPage() {
   return (
     <>
       <Link to="/posizioni" className="mb-3 inline-flex items-center gap-1 text-sm text-ink-2 hover:text-ink">
-        <ArrowLeft className="size-4" /> Posizioni
+        <ArrowLeft className="size-4" /> {t('positions.title')}
       </Link>
       <PageHeader
         title={p.name}
         subtitle={
           <span className="flex flex-wrap items-center gap-2">
-            {ASSET_CLASS_LABEL[p.assetClass]} · prezzi in {p.currency}
+            {assetClassLabel(p.assetClass)} · {t('position.pricesIn', { currency: p.currency })}
             {p.symbol && <Badge>{p.symbol}</Badge>}
-            {p.archived && <Badge>archiviata</Badge>}
+            {p.archived && <Badge>{t('positions.archivedBadge')}</Badge>}
           </span>
         }
         actions={
           <>
-            <Button onClick={() => setEditOpen(true)}><Pencil className="size-4" /> Modifica</Button>
-            <Button variant="danger" onClick={onDeletePosition}><Trash2 className="size-4" /> Elimina</Button>
+            <Button onClick={() => setEditOpen(true)}><Pencil className="size-4" /> {t('common.edit')}</Button>
+            <Button variant="danger" onClick={onDeletePosition}><Trash2 className="size-4" /> {t('common.delete')}</Button>
           </>
         }
       />
@@ -73,37 +75,37 @@ export function PositionDetailPage() {
       {p.notes && <p className="mb-4 whitespace-pre-line text-sm text-ink-2">{p.notes}</p>}
 
       <div className="mb-4 grid gap-4 lg:grid-cols-[1fr_2fr]">
-        <Card title="Valore attuale">
+        <Card title={t('position.currentValue')}>
           <p className="text-3xl font-semibold tracking-tight">{p.latest ? money(p.latest.value, p.currency) : '—'}</p>
           {p.latest && (
             <p className="mt-1 text-sm text-ink-2">
-              {isCash ? 'Saldo' : `${number(p.latest.quantity)} × ${money(p.latest.unitPrice, p.currency)}`} al {date(p.latest.date)}
+              {t('position.atDate', { value: isCash ? t('position.balance') : `${number(p.latest.quantity)} × ${money(p.latest.unitPrice, p.currency)}`, date: date(p.latest.date) })}
             </p>
           )}
         </Card>
-        <Card title="Andamento del valore">
+        <Card title={t('position.valueTrend')}>
           {(snapshots.data?.length ?? 0) < 2
-            ? <p className="py-6 text-center text-sm text-muted">Servono almeno due rilevazioni per il grafico.</p>
+            ? <p className="py-6 text-center text-sm text-muted">{t('position.chartNeedsTwo')}</p>
             : <ValueChart snapshots={snapshots.data!} currency={p.currency} />}
         </Card>
       </div>
 
-      <Card title="Rilevazioni" actions={<Button variant="primary" onClick={() => setSnapshotEdit('new')}><Plus className="size-4" /> Nuova rilevazione</Button>}>
+      <Card title={t('position.snapshots')} actions={<Button variant="primary" onClick={() => setSnapshotEdit('new')}><Plus className="size-4" /> {t('position.newSnapshot')}</Button>}>
         {snapshots.isPending ? <Spinner /> : (snapshots.data?.length ?? 0) === 0 ? (
-          <EmptyState title="Nessuna rilevazione">
-            {isCash ? 'Registra il saldo del conto a una data.' : 'Registra quantità posseduta e prezzo unitario a una data.'}
+          <EmptyState title={t('position.noSnapshots')}>
+            {isCash ? t('position.noSnapshotsCash') : t('position.noSnapshotsOther')}
           </EmptyState>
         ) : (
           <div className="-mx-4 overflow-x-auto sm:mx-0">
             <table className="w-full min-w-[32rem] text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-xs text-muted">
-                  <th className="px-4 py-2 font-medium sm:px-2">Data</th>
-                  {!isCash && <th className="px-2 py-2 text-right font-medium">Quantità</th>}
-                  {!isCash && <th className="px-2 py-2 text-right font-medium">Prezzo</th>}
-                  <th className="px-2 py-2 text-right font-medium">{isCash ? 'Saldo' : 'Valore'}</th>
-                  <th className="px-2 py-2 font-medium">Nota</th>
-                  <th className="w-20 px-2 py-2"><span className="sr-only">Azioni</span></th>
+                  <th className="px-4 py-2 font-medium sm:px-2">{t('common.date')}</th>
+                  {!isCash && <th className="px-2 py-2 text-right font-medium">{t('position.quantity')}</th>}
+                  {!isCash && <th className="px-2 py-2 text-right font-medium">{t('position.price')}</th>}
+                  <th className="px-2 py-2 text-right font-medium">{isCash ? t('position.balance') : t('position.value')}</th>
+                  <th className="px-2 py-2 font-medium">{t('common.note')}</th>
+                  <th className="w-20 px-2 py-2"><span className="sr-only">{t('entries.actions')}</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -116,10 +118,10 @@ export function PositionDetailPage() {
                     <td className="max-w-48 truncate px-2 py-2 text-ink-2">{s.note}</td>
                     <td className="px-2 py-2">
                       <div className="flex justify-end gap-1">
-                        <button type="button" className="rounded p-1.5 text-muted hover:text-ink" aria-label="Modifica" onClick={() => setSnapshotEdit(s)}>
+                        <button type="button" className="rounded p-1.5 text-muted hover:text-ink" aria-label={t('common.edit')} onClick={() => setSnapshotEdit(s)}>
                           <Pencil className="size-4" />
                         </button>
-                        <button type="button" className="rounded p-1.5 text-muted hover:text-bad" aria-label="Elimina" onClick={() => onDeleteSnapshot(s)}>
+                        <button type="button" className="rounded p-1.5 text-muted hover:text-bad" aria-label={t('common.delete')} onClick={() => onDeleteSnapshot(s)}>
                           <Trash2 className="size-4" />
                         </button>
                       </div>
@@ -133,7 +135,7 @@ export function PositionDetailPage() {
       </Card>
 
       <PositionFormModal position={p} open={editOpen} onClose={() => setEditOpen(false)} />
-      <Modal title={snapshotEdit === 'new' ? 'Nuova rilevazione' : 'Modifica rilevazione'} open={snapshotEdit !== null} onClose={() => setSnapshotEdit(null)}>
+      <Modal title={snapshotEdit === 'new' ? t('position.newSnapshot') : t('position.editSnapshot')} open={snapshotEdit !== null} onClose={() => setSnapshotEdit(null)}>
         {snapshotEdit !== null && (
           <SnapshotForm position={p} snapshot={snapshotEdit === 'new' ? null : snapshotEdit} onDone={() => setSnapshotEdit(null)} />
         )}
@@ -145,6 +147,7 @@ export function PositionDetailPage() {
 function SnapshotForm({ position, snapshot, onDone }: { position: Position; snapshot: Snapshot | null; onDone: () => void }) {
   const isCash = position.assetClass === 'CASH'
   const save = useSaveSnapshot(position.id)
+  const { t } = useI18n()
   const base = snapshot ?? position.latest
   const [date, setDate] = useState(snapshot?.date ?? today())
   const [quantity, setQuantity] = useState(base ? String(base.quantity) : '')
@@ -160,7 +163,7 @@ function SnapshotForm({ position, snapshot, onDone }: { position: Position; snap
     e.preventDefault()
     setError(null)
     if (q === null || q < 0 || up === null || up < 0) {
-      setError('Inserisci valori numerici non negativi.')
+      setError(t('snapshotForm.invalidNumbers'))
       return
     }
     try {
@@ -173,26 +176,26 @@ function SnapshotForm({ position, snapshot, onDone }: { position: Position; snap
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
-      <Field label="Data" hint={!snapshot ? 'Se esiste già una rilevazione in questa data verrà sovrascritta.' : undefined}>
+      <Field label={t('common.date')} hint={!snapshot ? t('snapshotForm.dateHint') : undefined}>
         {(id) => <input id={id} type="date" className="input" required value={date} onChange={(e) => setDate(e.target.value)} />}
       </Field>
       <div className={`grid gap-3 ${isCash ? '' : 'grid-cols-2'}`}>
-        <Field label={isCash ? `Saldo (${position.currency})` : 'Quantità'} hint={!isCash ? 'Metti 0 se hai venduto tutto' : undefined}>
+        <Field label={isCash ? t('snapshotForm.balance', { currency: position.currency }) : t('position.quantity')} hint={!isCash ? t('snapshotForm.quantityHint') : undefined}>
           {(id) => <input id={id} className="input tabular" inputMode="decimal" required autoFocus value={quantity} onChange={(e) => setQuantity(e.target.value)} />}
         </Field>
         {!isCash && (
-          <Field label={`Prezzo unitario (${position.currency})`}>
+          <Field label={t('snapshotForm.unitPrice', { currency: position.currency })}>
             {(id) => <input id={id} className="input tabular" inputMode="decimal" required value={price} onChange={(e) => setPrice(e.target.value)} />}
           </Field>
         )}
       </div>
-      {!isCash && <p className="text-sm text-ink-2">Valore: <span className="tabular font-medium text-ink">{money(value, position.currency)}</span></p>}
-      <Field label="Nota (facoltativa)">
+      {!isCash && <p className="text-sm text-ink-2">{t('snapshotForm.value')} <span className="tabular font-medium text-ink">{money(value, position.currency)}</span></p>}
+      <Field label={t('snapshotForm.noteOptional')}>
         {(id) => <input id={id} className="input" maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} />}
       </Field>
       <ErrorAlert message={error} />
       <div className="flex justify-end">
-        <Button type="submit" variant="primary" loading={save.isPending}>Salva</Button>
+        <Button type="submit" variant="primary" loading={save.isPending}>{t('common.save')}</Button>
       </div>
     </form>
   )
@@ -200,6 +203,7 @@ function SnapshotForm({ position, snapshot, onDone }: { position: Position; snap
 
 function ValueChart({ snapshots, currency }: { snapshots: Snapshot[]; currency: string }) {
   const theme = useChartTheme()
+  const { t } = useI18n()
   const color = theme.series[0]
   const data = [...snapshots].reverse().map((s) => ({ ...s, label: date(s.date) }))
   return (
@@ -211,7 +215,7 @@ function ValueChart({ snapshots, currency }: { snapshots: Snapshot[]; currency: 
           <YAxis width={56} tickLine={false} axisLine={false} tick={{ fill: theme.muted, fontSize: 12 }} tickFormatter={(v: number) => compact(v)} />
           <Tooltip cursor={{ stroke: theme.axis }} content={({ active, payload }) => {
             const s = active && payload && payload.length ? (payload[0].payload as Snapshot) : null
-            return s ? <TooltipCard title={date(s.date)} currency={currency} rows={[{ key: 'v', label: 'Valore', color, value: s.value }]} /> : null
+            return s ? <TooltipCard title={date(s.date)} currency={currency} rows={[{ key: 'v', label: t('position.value'), color, value: s.value }]} /> : null
           }} />
           <Area type="linear" dataKey="value" stroke={color} strokeWidth={2} fill={color} fillOpacity={0.1}
             dot={{ r: 3, fill: color, stroke: theme.surface, strokeWidth: 2 }} isAnimationActive={false} />

@@ -13,8 +13,10 @@ import me.luucka.finance.core.Currencies;
 import me.luucka.finance.core.security.PasswordPolicy;
 import me.luucka.finance.user.AppUser;
 import me.luucka.finance.user.AppUserRepository;
+import me.luucka.finance.user.Language;
 import me.luucka.finance.user.LoginEvent;
 import me.luucka.finance.user.LoginEventRepository;
+import me.luucka.finance.user.Theme;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,6 +53,7 @@ public class AccountService {
     public MeResponse me(long userId) {
         AppUser user = load(userId);
         return new MeResponse(user.getId(), user.getUsername(), user.getRole(), user.getBaseCurrency(),
+                user.getLanguage(), user.getTheme(),
                 user.isTotpEnabled(), user.isTotpEnabled() ? mfaService.remainingRecoveryCodes(userId) : 0,
                 user.isPasswordChangeRequired());
     }
@@ -82,10 +85,19 @@ public class AccountService {
         return me(userId);
     }
 
+    /** Updates the preferences that are present; {@code null} leaves a preference unchanged. */
     @Transactional
-    public MeResponse updateSettings(long userId, String baseCurrency) {
+    public MeResponse updateSettings(long userId, String baseCurrency, Language language, Theme theme) {
         AppUser user = load(userId);
-        user.setBaseCurrency(Currencies.normalize(baseCurrency));
+        if (baseCurrency != null) {
+            user.setBaseCurrency(Currencies.normalize(baseCurrency));
+        }
+        if (language != null) {
+            user.setLanguage(language);
+        }
+        if (theme != null) {
+            user.setTheme(theme);
+        }
         return me(userId);
     }
 

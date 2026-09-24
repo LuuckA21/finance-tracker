@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { AlertTriangle, Loader2, X } from 'lucide-react'
+import { useI18n } from '../i18n'
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
 
@@ -98,24 +99,25 @@ export function ErrorAlert({ message }: { message: string | null | undefined }) 
 
 /** Warns that some amounts are excluded from totals because an exchange rate is missing. */
 export function MissingRatesNotice({ currencies, baseCurrency }: { currencies: string[] | undefined; baseCurrency?: string }) {
+  const { t } = useI18n()
   if (!currencies || currencies.length === 0) return null
   return (
     <div role="status" className="mb-4 flex items-start gap-2 rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn-ink">
       <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
       <span>
-        Mancano i tassi di cambio per <strong>{currencies.join(', ')}</strong>
-        {baseCurrency ? ` → ${baseCurrency}` : ''}: questi importi sono esclusi dai totali. Aggiungili in{' '}
-        <Link className="underline" to="/impostazioni/cambi">Impostazioni › Tassi di cambio</Link>.
+        {t('ui.missingRates', { currencies: currencies.join(', '), base: baseCurrency ? ` → ${baseCurrency}` : '' })}{' '}
+        <Link className="underline" to="/impostazioni/cambi">{t('ui.missingRatesLink')}</Link>.
       </span>
     </div>
   )
 }
 
-export function Spinner({ label = 'Caricamento…' }: { label?: string }) {
+export function Spinner({ label }: { label?: string }) {
+  const { t } = useI18n()
   return (
     <div className="flex items-center gap-2 py-8 text-sm text-muted" role="status">
       <Loader2 className="size-4 animate-spin" aria-hidden />
-      {label}
+      {label ?? t('common.loading')}
     </div>
   )
 }
@@ -154,6 +156,7 @@ export function Modal({ title, open, onClose, children, footer, wide = false }: 
   wide?: boolean
 }) {
   const ref = useRef<HTMLDialogElement>(null)
+  const { t } = useI18n()
   useEffect(() => {
     const dialog = ref.current
     if (!dialog) return
@@ -175,7 +178,7 @@ export function Modal({ title, open, onClose, children, footer, wide = false }: 
         <div className="flex max-h-[85vh] flex-col">
           <header className="flex items-center justify-between border-b border-line px-5 py-3">
             <h2 className="text-base font-semibold">{title}</h2>
-            <button type="button" onClick={onClose} className="rounded-md p-1 text-muted hover:bg-surface-2" aria-label="Chiudi">
+            <button type="button" onClick={onClose} className="rounded-md p-1 text-muted hover:bg-surface-2" aria-label={t('common.close')}>
               <X className="size-4" />
             </button>
           </header>

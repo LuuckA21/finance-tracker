@@ -1,5 +1,5 @@
-import { useSyncExternalStore } from 'react'
 import type { AssetClass } from '../api/types'
+import { useTheme } from '../preferences/theme'
 
 /**
  * Chart palette (validated categorical order, light and dark steps chosen separately).
@@ -29,17 +29,9 @@ const DARK = {
 
 export type ChartTheme = typeof LIGHT
 
-const query = '(prefers-color-scheme: dark)'
-
-function subscribe(callback: () => void) {
-  const mql = window.matchMedia(query)
-  mql.addEventListener('change', callback)
-  return () => mql.removeEventListener('change', callback)
-}
-
+/** Follows the user's theme preference (and the device when it is SYSTEM). */
 export function useChartTheme(): ChartTheme {
-  const dark = useSyncExternalStore(subscribe, () => window.matchMedia(query).matches, () => false)
-  return dark ? DARK : LIGHT
+  return useTheme().dark ? DARK : LIGHT
 }
 
 /**

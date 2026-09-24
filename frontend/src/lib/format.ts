@@ -1,30 +1,34 @@
 import type { AssetClass } from '../api/types'
+import { getLocale, translate, type MessageKey } from '../i18n'
 
-const LOCALE = 'it-CH'
+// Formatters follow the current interface language (both locales use Swiss grouping).
+const formatters = new Map<string, Intl.NumberFormat>()
 
-const moneyFormatters = new Map<string, Intl.NumberFormat>()
+function numberFormat(options: Intl.NumberFormatOptions): Intl.NumberFormat {
+  const key = `${getLocale()}:${JSON.stringify(options)}`
+  let f = formatters.get(key)
+  if (!f) {
+    f = new Intl.NumberFormat(getLocale(), options)
+    formatters.set(key, f)
+  }
+  return f
+}
 
-/** 12'345.67 CHF (Swiss Italian grouping). */
+/** 12'345.67 CHF (Swiss grouping). */
 export function money(value: number | null | undefined, currency: string, digits = 2): string {
   if (value === null || value === undefined) return '—'
-  const key = `${currency}:${digits}`
-  let f = moneyFormatters.get(key)
-  if (!f) {
-    f = new Intl.NumberFormat(LOCALE, {
-      style: 'currency',
-      currency,
-      minimumFractionDigits: digits,
-      maximumFractionDigits: digits,
-    })
-    moneyFormatters.set(key, f)
-  }
-  return f.format(value)
+  return numberFormat({
+    style: 'currency',
+    currency,
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(value)
 }
 
 /** Compact form for axis ticks: 950, 12.5k, 1.2M. */
 export function compact(value: number): string {
   const abs = Math.abs(value)
-  const fmt = (n: number) => new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 1 }).format(n)
+  const fmt = (n: number) => numberFormat({ maximumFractionDigits: 1 }).format(n)
   if (abs >= 1_000_000) return `${fmt(value / 1_000_000)}M`
   if (abs >= 10_000) return `${fmt(value / 1_000)}k`
   return fmt(value)
@@ -32,12 +36,12 @@ export function compact(value: number): string {
 
 export function number(value: number | null | undefined, maxDigits = 8): string {
   if (value === null || value === undefined) return '—'
-  return new Intl.NumberFormat(LOCALE, { maximumFractionDigits: maxDigits }).format(value)
+  return numberFormat({ maximumFractionDigits: maxDigits }).format(value)
 }
 
 export function percent(value: number | null | undefined): string {
   if (value === null || value === undefined) return '—'
-  return `${new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 1 }).format(value)} %`
+  return `${numberFormat({ maximumFractionDigits: 1 }).format(value)} %`
 }
 
 export function date(iso: string | null | undefined): string {
@@ -48,20 +52,29 @@ export function date(iso: string | null | undefined): string {
 
 export function dateTime(iso: string | null | undefined): string {
   if (!iso) return '—'
-  return new Intl.DateTimeFormat(LOCALE, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso))
+  return new Intl.DateTimeFormat(getLocale(), { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso))
 }
 
-export const MONTHS_SHORT = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic']
-export const MONTHS = [
-  'gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno',
-  'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre',
-]
+function monthNames(style: 'long' | 'short'): string[] {
+  const f = new Intl.DateTimeFormat(getLocale(), { month: style, timeZone: 'UTC' })
+  return Array.from({ length: 12 }, (_, i) => f.format(new Date(Date.UTC(2000, i, 1))).replace('.', ''))
+}
+
+/** Month name, 0-based: "marzo" / "March". */
+export function monthName(index: number): string {
+  return monthNames('long')[index]
+}
+
+/** Short month name, 0-based: "mar" / "Mar". */
+export function monthShort(index: number): string {
+  return monthNames('short')[index]
+}
 
 /** "2026-03" -> "mar 26" */
 export function periodLabel(period: string): string {
   if (/^\d{4}$/.test(period)) return period
   const [y, m] = period.split('-')
-  return `${MONTHS_SHORT[Number(m) - 1]} ${y.slice(2)}`
+  return `${monthShort(Number(m) - 1)} ${y.slice(2)}`
 }
 
 /** Local date as yyyy-MM-dd. */
@@ -79,26 +92,19 @@ export function monthsAgo(n: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
-export const ASSET_CLASS_LABEL: Record<AssetClass, string> = {
-  CASH: 'Conti e liquidità',
-  CRYPTO: 'Crypto',
-  ETF: 'ETF',
-  STOCK: 'Azioni',
-  BOND: 'Obbligazioni',
-  FUND: 'Fondi',
-  PENSION: 'Previdenza',
-  COMMODITY: 'Materie prime',
-  REAL_ESTATE: 'Immobili',
-  OTHER: 'Altro',
-}
+export const ASSET_CLASSES: AssetClass[] = [
+  'CASH', 'CRYPTO', 'ETF', 'STOCK', 'BOND', 'FUND', 'PENSION', 'COMMODITY', 'REAL_ESTATE', 'OTHER',
+]
 
-export const ASSET_CLASSES = Object.keys(ASSET_CLASS_LABEL) as AssetClass[]
+export function assetClassLabel(assetClass: AssetClass): string {
+  return translate(`assetClass.${assetClass}` as MessageKey)
+}
 
 export const COMMON_CURRENCIES = ['CHF', 'EUR', 'USD', 'GBP', 'JPY', 'CAD', 'AUD', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK']
 
 /** Parses user input that may use a comma as decimal separator or apostrophes as grouping. */
 export function parseDecimal(input: string): number | null {
-  const cleaned = input.trim().replace(/['\s]/g, '').replace(',', '.')
+  const cleaned = input.trim().replace(/['’\s]/g, '').replace(',', '.')
   if (cleaned === '' || !/^-?\d*\.?\d+$/.test(cleaned)) return null
   const n = Number(cleaned)
   return Number.isFinite(n) ? n : null

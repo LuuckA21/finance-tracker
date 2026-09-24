@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Semantic tokens. Light values here, dark values in the media query below. */
+/* Semantic tokens. Light values here, dark values in the two blocks below. */
 :root {
   color-scheme: light;
   --page: #f5f5f3;
@@ -22,8 +22,31 @@
   --axis: #c3c2b7;
 }
 
+/* Dark palette: chosen explicitly (data-theme="dark", set from the user's preference),
+   or following the device when no theme is forced. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --surface-2: #242423;
+  --border: rgba(255, 255, 255, 0.1);
+  --ink: #ffffff;
+  --ink-2: #c3c2b7;
+  --muted: #898781;
+  --accent: #3987e5;
+  --accent-hover: #5598e7;
+  --accent-soft: #16263a;
+  --good: #0ca30c;
+  --bad: #ef7070;
+  --bad-soft: #3a1818;
+  --warn-soft: #33290f;
+  --warn-ink: #f3c860;
+  --grid: #2c2c2a;
+  --axis: #383835;
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     color-scheme: dark;
     --page: #0d0d0d;
     --surface: #1a1a19;

@@ -4,10 +4,12 @@ import { useCashflowYear, useMe, useNetWorthDetail, useNetWorthSeries } from '..
 import { Card, MissingRatesNotice, PageHeader, Spinner, StatTile } from '../components/ui'
 import { CashflowChart } from '../charts/CashflowChart'
 import { NetWorthLine } from '../charts/NetWorthCharts'
-import { MONTHS, MONTHS_SHORT, money, monthsAgo, percent, date } from '../lib/format'
+import { useI18n } from '../i18n'
+import { money, monthName, monthShort, monthsAgo, percent, date } from '../lib/format'
 
 export function OverviewPage() {
   const me = useMe().data
+  const { t } = useI18n()
   const now = new Date()
   const year = now.getFullYear()
   const month = now.getMonth()
@@ -27,17 +29,17 @@ export function OverviewPage() {
 
   return (
     <>
-      <PageHeader title={`Ciao ${me?.username ?? ''}`} subtitle={`Situazione al ${date(detail.data?.date)}`} />
+      <PageHeader title={t('overview.greeting', { name: me?.username ?? '' })} subtitle={t('overview.asOf', { date: date(detail.data?.date) })} />
       <MissingRatesNotice currencies={missing} baseCurrency={currency} />
 
       <section className="card mb-4 p-5 sm:p-6">
-        <p className="text-sm font-medium text-ink-2">Patrimonio netto</p>
+        <p className="text-sm font-medium text-ink-2">{t('overview.netWorth')}</p>
         {detail.isPending ? <Spinner /> : (
           <>
             <p className="mt-1 text-4xl font-semibold tracking-tight sm:text-5xl">{money(detail.data?.total ?? 0, currency, 0)}</p>
             {delta !== null && (
               <p className={`mt-2 text-sm ${delta >= 0 ? 'text-good' : 'text-bad'}`}>
-                {delta >= 0 ? '▲' : '▼'} {money(Math.abs(delta), currency, 0)} rispetto a fine {MONTHS[new Date(previous!.date).getMonth()]}
+                {delta >= 0 ? '▲' : '▼'} {t('overview.sinceEndOf', { amount: money(Math.abs(delta), currency, 0), month: monthName(new Date(previous!.date).getMonth()) })}
               </p>
             )}
           </>
@@ -48,33 +50,33 @@ export function OverviewPage() {
           </div>
         )}
         <Link to="/patrimonio" className="mt-3 inline-flex items-center gap-1 text-sm text-accent hover:underline">
-          Dettaglio patrimonio <ArrowRight className="size-4" />
+          {t('overview.netWorthDetail')} <ArrowRight className="size-4" />
         </Link>
       </section>
 
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label={`Entrate ${MONTHS_SHORT[month]}`} value={money(thisMonth?.income ?? 0, currency, 0)} />
-        <StatTile label={`Uscite ${MONTHS_SHORT[month]}`} value={money(thisMonth?.expense ?? 0, currency, 0)} />
+        <StatTile label={t('overview.incomeMonth', { month: monthShort(month) })} value={money(thisMonth?.income ?? 0, currency, 0)} />
+        <StatTile label={t('overview.expenseMonth', { month: monthShort(month) })} value={money(thisMonth?.expense ?? 0, currency, 0)} />
         <StatTile
-          label={`Risultato ${MONTHS_SHORT[month]}`}
+          label={t('overview.netMonth', { month: monthShort(month) })}
           value={money(thisMonth?.net ?? 0, currency, 0)}
           tone={(thisMonth?.net ?? 0) >= 0 ? 'good' : 'bad'}
-          sub={thisMonth?.savingsRate != null ? `Tasso di risparmio ${percent(thisMonth.savingsRate)}` : undefined}
+          sub={thisMonth?.savingsRate != null ? t('overview.savingsRate', { rate: percent(thisMonth.savingsRate) }) : undefined}
         />
         <StatTile
-          label={`Risparmio ${year}`}
+          label={t('overview.savingsYear', { year })}
           value={money(ytd?.net ?? 0, currency, 0)}
-          sub={ytd?.savingsRate != null ? `${percent(ytd.savingsRate)} delle entrate` : 'Nessuna entrata registrata'}
+          sub={ytd?.savingsRate != null ? t('overview.shareOfIncome', { rate: percent(ytd.savingsRate) }) : t('overview.noIncome')}
         />
       </div>
 
-      <Card title={`Entrate e uscite ${year}`} actions={<Link to="/flussi" className="text-sm text-accent hover:underline">Dettaglio</Link>}>
+      <Card title={t('overview.cashflowYear', { year })} actions={<Link to="/flussi" className="text-sm text-accent hover:underline">{t('overview.details')}</Link>}>
         {cashflow.isPending ? <Spinner /> : (
           <CashflowChart
             currency={currency}
             data={(cashflow.data?.months ?? []).map((m) => ({
-              label: MONTHS_SHORT[m.month - 1],
-              title: `${MONTHS[m.month - 1]} ${year}`,
+              label: monthShort(m.month - 1),
+              title: `${monthName(m.month - 1)} ${year}`,
               ...m.totals,
             }))}
           />

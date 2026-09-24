@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { money } from '../lib/format'
+import { useI18n } from '../i18n'
+import { money, percent } from '../lib/format'
 
 export interface TooltipRow {
   key: string
@@ -15,6 +16,7 @@ export function TooltipCard({ title, rows, currency, total }: {
   currency: string
   total?: number
 }) {
+  const { t } = useI18n()
   return (
     <div className="min-w-44 rounded-lg border border-line bg-surface px-3 py-2 text-xs shadow-lg">
       <p className="mb-1.5 font-medium text-ink">{title}</p>
@@ -31,7 +33,7 @@ export function TooltipCard({ title, rows, currency, total }: {
       </ul>
       {total !== undefined && (
         <p className="mt-1.5 flex justify-between gap-4 border-t border-line pt-1.5 font-medium text-ink">
-          <span>Totale</span>
+          <span>{t('common.total')}</span>
           <span className="tabular">{money(total, currency)}</span>
         </p>
       )}
@@ -62,6 +64,7 @@ export function RankedBars({ rows, currency, emptyText }: {
   currency: string
   emptyText: string
 }) {
+  useI18n() // re-render the formatted amounts when the language changes
   if (rows.length === 0) return <p className="py-6 text-center text-sm text-muted">{emptyText}</p>
   const max = Math.max(...rows.map((r) => r.value), 0)
   return (
@@ -76,7 +79,7 @@ export function RankedBars({ rows, currency, emptyText }: {
             <span className="tabular shrink-0 text-ink">
               {money(r.value, currency)}
               {r.share !== undefined && r.share !== null && (
-                <span className="ml-2 text-xs text-muted">{r.share.toLocaleString('it-CH', { maximumFractionDigits: 1 })} %</span>
+                <span className="ml-2 text-xs text-muted">{percent(r.share)}</span>
               )}
             </span>
           </div>

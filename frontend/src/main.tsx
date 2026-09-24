@@ -4,7 +4,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router'
 import { ApiError } from './api/client'
 import { App } from './App'
+import { initPreferences } from './preferences'
 import './index.css'
+
+initPreferences()
 
 const queryClient = new QueryClient({
   defaultOptions: {

@@ -1,4 +1,5 @@
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { useI18n } from '../i18n'
 import { compact } from '../lib/format'
 import { Legend, TooltipCard } from './ChartParts'
 import { flowColors, useChartTheme } from './theme'
@@ -15,11 +16,12 @@ export interface FlowDatum {
 export function CashflowChart({ data, currency, height = 280 }: { data: FlowDatum[]; currency: string; height?: number }) {
   const theme = useChartTheme()
   const colors = flowColors(theme)
+  const { t } = useI18n()
   return (
     <div>
       <Legend items={[
-        { key: 'income', label: 'Entrate', color: colors.income },
-        { key: 'expense', label: 'Uscite', color: colors.expense },
+        { key: 'income', label: t('chart.income'), color: colors.income },
+        { key: 'expense', label: t('chart.expense'), color: colors.expense },
       ]} />
       <div style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
@@ -38,16 +40,16 @@ export function CashflowChart({ data, currency, height = 280 }: { data: FlowDatu
                     title={d.title}
                     currency={currency}
                     rows={[
-                      { key: 'i', label: 'Entrate', color: colors.income, value: d.income },
-                      { key: 'e', label: 'Uscite', color: colors.expense, value: d.expense },
+                      { key: 'i', label: t('chart.income'), color: colors.income, value: d.income },
+                      { key: 'e', label: t('chart.expense'), color: colors.expense, value: d.expense },
                     ]}
                     total={d.net}
                   />
                 )
               }}
             />
-            <Bar dataKey="income" name="Entrate" fill={colors.income} maxBarSize={20} radius={[4, 4, 0, 0]} isAnimationActive={false} />
-            <Bar dataKey="expense" name="Uscite" fill={colors.expense} maxBarSize={20} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+            <Bar dataKey="income" name={t('chart.income')} fill={colors.income} maxBarSize={20} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+            <Bar dataKey="expense" name={t('chart.expense')} fill={colors.expense} maxBarSize={20} radius={[4, 4, 0, 0]} isAnimationActive={false} />
           </BarChart>
         </ResponsiveContainer>
       </div>

@@ -4,12 +4,14 @@ import { ShieldCheck, ShieldOff } from 'lucide-react'
 import { errorMessage } from '../../api/client'
 import { useMe, useMfaDisable, useMfaEnable, useMfaSetup, useRegenerateRecoveryCodes } from '../../api/hooks'
 import { Badge, Button, ErrorAlert, Field, Modal } from '../../components/ui'
+import { useI18n } from '../../i18n'
 
 /** Two-factor authentication: enrolment with QR code, recovery codes, disabling. */
 export function MfaSection() {
   const me = useMe().data
   const [mode, setMode] = useState<'setup' | 'disable' | 'regenerate' | null>(null)
   const [codes, setCodes] = useState<string[] | null>(null)
+  const { t } = useI18n()
 
   if (!me) return null
   return (
@@ -17,38 +19,37 @@ export function MfaSection() {
       <div className="flex items-center gap-2">
         {me.mfaEnabled ? <ShieldCheck className="size-5 text-good" /> : <ShieldOff className="size-5 text-muted" />}
         <span className="text-sm">
-          {me.mfaEnabled ? 'Attiva' : 'Non attiva'}
+          {me.mfaEnabled ? t('mfa.enabled') : t('mfa.disabled')}
         </span>
         {me.mfaEnabled && (
-          <Badge tone={me.recoveryCodesRemaining < 3 ? 'bad' : 'neutral'}>{me.recoveryCodesRemaining} codici di recupero</Badge>
+          <Badge tone={me.recoveryCodesRemaining < 3 ? 'bad' : 'neutral'}>{t('mfa.recoveryRemaining', { count: me.recoveryCodesRemaining })}</Badge>
         )}
       </div>
       <p className="text-sm text-ink-2">
-        Oltre alla password viene chiesto un codice a 6 cifre generato da un'app come Aegis, 2FAS, Google Authenticator o 1Password.
-        Fortemente consigliata per un'app che contiene dati finanziari.
+        {t('mfa.help')}
       </p>
       <div className="flex flex-wrap gap-2">
         {me.mfaEnabled ? (
           <>
-            <Button onClick={() => setMode('regenerate')}>Nuovi codici di recupero</Button>
-            <Button variant="danger" onClick={() => setMode('disable')}>Disattiva</Button>
+            <Button onClick={() => setMode('regenerate')}>{t('mfa.newCodes')}</Button>
+            <Button variant="danger" onClick={() => setMode('disable')}>{t('mfa.disable')}</Button>
           </>
         ) : (
-          <Button variant="primary" onClick={() => setMode('setup')}>Attiva la verifica in due passaggi</Button>
+          <Button variant="primary" onClick={() => setMode('setup')}>{t('mfa.enableTitle')}</Button>
         )}
       </div>
 
-      <Modal title="Attiva la verifica in due passaggi" open={mode === 'setup'} onClose={() => setMode(null)}>
+      <Modal title={t('mfa.enableTitle')} open={mode === 'setup'} onClose={() => setMode(null)}>
         {mode === 'setup' && <SetupFlow onEnabled={(c) => { setMode(null); setCodes(c) }} />}
       </Modal>
-      <Modal title="Disattiva la verifica in due passaggi" open={mode === 'disable'} onClose={() => setMode(null)}>
+      <Modal title={t('mfa.disableTitle')} open={mode === 'disable'} onClose={() => setMode(null)}>
         {mode === 'disable' && <DisableForm onDone={() => setMode(null)} />}
       </Modal>
-      <Modal title="Nuovi codici di recupero" open={mode === 'regenerate'} onClose={() => setMode(null)}>
+      <Modal title={t('mfa.newCodes')} open={mode === 'regenerate'} onClose={() => setMode(null)}>
         {mode === 'regenerate' && <RegenerateForm onDone={(c) => { setMode(null); setCodes(c) }} />}
       </Modal>
-      <Modal title="Codici di recupero" open={codes !== null} onClose={() => setCodes(null)}
-        footer={<Button variant="primary" onClick={() => setCodes(null)}>Li ho salvati</Button>}>
+      <Modal title={t('mfa.codesTitle')} open={codes !== null} onClose={() => setCodes(null)}
+        footer={<Button variant="primary" onClick={() => setCodes(null)}>{t('mfa.codesSaved')}</Button>}>
         {codes && <RecoveryCodes codes={codes} />}
       </Modal>
     </div>
@@ -61,6 +62,7 @@ function SetupFlow({ onEnabled }: { onEnabled: (codes: string[]) => void }) {
   const [qr, setQr] = useState<string | null>(null)
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const { t } = useI18n()
   const { mutate } = setup
 
   useEffect(() => {
@@ -84,33 +86,34 @@ function SetupFlow({ onEnabled }: { onEnabled: (codes: string[]) => void }) {
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
       <ol className="list-decimal space-y-1 pl-5 text-sm text-ink-2">
-        <li>Scansiona il QR code con la tua app di autenticazione.</li>
-        <li>Inserisci il codice a 6 cifre che l'app mostra.</li>
+        <li>{t('mfa.stepScan')}</li>
+        <li>{t('mfa.stepCode')}</li>
       </ol>
       <div className="flex justify-center">
-        {qr ? <img src={qr} alt="QR code per l'app di autenticazione" className="rounded-lg bg-white p-2" width={200} height={200} /> :
+        {qr ? <img src={qr} alt={t('mfa.qrAlt')} className="rounded-lg bg-white p-2" width={200} height={200} /> :
           <div className="size-[200px] animate-pulse rounded-lg bg-surface-2" />}
       </div>
       {setup.data && (
         <details className="text-xs text-ink-2">
-          <summary className="cursor-pointer">Non riesci a scansionare? Inserisci la chiave a mano</summary>
+          <summary className="cursor-pointer">{t('mfa.manualKey')}</summary>
           <code className="mt-2 block break-all rounded bg-surface-2 p-2 font-mono text-ink">{setup.data.secret}</code>
         </details>
       )}
-      <Field label="Codice a 6 cifre">
+      <Field label={t('mfa.code')}>
         {(id) => (
           <input id={id} className="input tabular text-center text-lg tracking-widest" inputMode="numeric" autoComplete="one-time-code"
             maxLength={7} required value={code} onChange={(e) => setCode(e.target.value)} />
         )}
       </Field>
       <ErrorAlert message={error} />
-      <Button type="submit" variant="primary" loading={enable.isPending} disabled={!setup.data}>Attiva</Button>
+      <Button type="submit" variant="primary" loading={enable.isPending} disabled={!setup.data}>{t('mfa.enable')}</Button>
     </form>
   )
 }
 
 function DisableForm({ onDone }: { onDone: () => void }) {
   const disable = useMfaDisable()
+  const { t } = useI18n()
   const [password, setPassword] = useState('')
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -127,21 +130,22 @@ function DisableForm({ onDone }: { onDone: () => void }) {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">
-      <p className="text-sm text-ink-2">Il tuo account resterà protetto solo dalla password.</p>
-      <Field label="Password">
+      <p className="text-sm text-ink-2">{t('mfa.disableHelp')}</p>
+      <Field label={t('login.password')}>
         {(id) => <input id={id} type="password" className="input" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />}
       </Field>
-      <Field label="Codice dell'app o codice di recupero">
+      <Field label={t('mfa.codeOrRecovery')}>
         {(id) => <input id={id} className="input" autoComplete="one-time-code" required value={code} onChange={(e) => setCode(e.target.value)} />}
       </Field>
       <ErrorAlert message={error} />
-      <Button type="submit" variant="danger" loading={disable.isPending}>Disattiva</Button>
+      <Button type="submit" variant="danger" loading={disable.isPending}>{t('mfa.disable')}</Button>
     </form>
   )
 }
 
 function RegenerateForm({ onDone }: { onDone: (codes: string[]) => void }) {
   const regenerate = useRegenerateRecoveryCodes()
+  const { t } = useI18n()
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -157,29 +161,29 @@ function RegenerateForm({ onDone }: { onDone: (codes: string[]) => void }) {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">
-      <p className="text-sm text-ink-2">I codici attuali smetteranno di funzionare.</p>
-      <Field label="Codice a 6 cifre dall'app">
+      <p className="text-sm text-ink-2">{t('mfa.regenerateHelp')}</p>
+      <Field label={t('mfa.appCode')}>
         {(id) => <input id={id} className="input tabular" inputMode="numeric" autoComplete="one-time-code" required value={code} onChange={(e) => setCode(e.target.value)} />}
       </Field>
       <ErrorAlert message={error} />
-      <Button type="submit" variant="primary" loading={regenerate.isPending}>Genera</Button>
+      <Button type="submit" variant="primary" loading={regenerate.isPending}>{t('mfa.generate')}</Button>
     </form>
   )
 }
 
 function RecoveryCodes({ codes }: { codes: string[] }) {
   const [copied, setCopied] = useState(false)
+  const { t } = useI18n()
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-ink-2">
-        Conservali in un posto sicuro (es. password manager). Ognuno funziona una sola volta se perdi l'accesso all'app.
-        Non verranno più mostrati.
+        {t('mfa.codesHelp')}
       </p>
       <ul className="grid grid-cols-2 gap-2 rounded-lg bg-surface-2 p-3 font-mono text-sm">
         {codes.map((c) => <li key={c}>{c}</li>)}
       </ul>
       <Button onClick={async () => { await navigator.clipboard.writeText(codes.join('\n')); setCopied(true) }}>
-        {copied ? 'Copiati' : 'Copia negli appunti'}
+        {copied ? t('mfa.copied') : t('mfa.copy')}
       </Button>
     </div>
   )
