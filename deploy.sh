@@ -9,8 +9,6 @@
 #        FINANCE_ROOT=/opt ./deploy.sh master
 #
 # The script can live next to the project directory or in its repository root.
-# Before touching the code it dumps the database into $FINANCE_BACKUP_DIR
-# (default: <root>/finance-tracker-backups), keeping the last $FINANCE_BACKUP_KEEP.
 
 set -Eeuo pipefail
 umask 077
@@ -28,8 +26,6 @@ else
 fi
 REPO="${FINANCE_REPO:-https://github.com/LuuckA21/finance-tracker.git}"
 STATE_FILE="$ROOT/.finance-tracker-last-deploy"
-BACKUP_DIR_ROOT="${FINANCE_BACKUP_DIR:-$ROOT/finance-tracker-backups}"
-BACKUP_KEEP="${FINANCE_BACKUP_KEEP:-10}"
 HEALTH_TIMEOUT="${FINANCE_HEALTH_TIMEOUT:-300}"
 MIGRATION_DIR=backend/src/main/resources/db/migration
 
@@ -37,7 +33,6 @@ MODE=deploy
 REQUESTED_BRANCH=""
 DEPLOY_IN_PROGRESS=0
 ROLLBACK_AVAILABLE=0
-PARTIAL_BACKUP=""
 
 red()   { printf '\033[31m%s\033[0m\n' "$1" >&2; }
 green() { printf '\033[32m%s\033[0m\n' "$1"; }
@@ -48,13 +43,6 @@ usage() {
     printf '       %s --rollback\n' "${0##*/}"
     printf '\nWithout BRANCH, the current branch is updated.\n'
 }
-
-cleanup() {
-    if [[ -n "$PARTIAL_BACKUP" && -e "$PARTIAL_BACKUP" ]]; then
-        rm -rf -- "$PARTIAL_BACKUP"
-    fi
-}
-trap cleanup EXIT
 
 on_error() {
     local exit_code=$?
@@ -98,10 +86,6 @@ esac
 
 if ! [[ "$HEALTH_TIMEOUT" =~ ^[1-9][0-9]*$ ]]; then
     red "FINANCE_HEALTH_TIMEOUT must be a positive number of seconds."
-    exit 2
-fi
-if ! [[ "$BACKUP_KEEP" =~ ^[1-9][0-9]*$ ]]; then
-    red "FINANCE_BACKUP_KEEP must be a positive number."
     exit 2
 fi
 
@@ -199,8 +183,7 @@ write_state() {
     local previous_commit=$3
     local deployed_branch=$4
     local deployed_commit=$5
-    local backup_dir=$6
-    local migration_changed=$7
+    local migration_changed=$6
     local state_tmp
 
     state_tmp="$(mktemp "$ROOT/.finance-tracker-last-deploy.XXXXXX")"
@@ -210,39 +193,9 @@ write_state() {
         printf 'previous_commit=%s\n' "$previous_commit"
         printf 'deployed_branch=%s\n' "$deployed_branch"
         printf 'deployed_commit=%s\n' "$deployed_commit"
-        printf 'backup_dir=%s\n' "$backup_dir"
         printf 'migration_changed=%s\n' "$migration_changed"
     } > "$state_tmp"
     mv -- "$state_tmp" "$STATE_FILE"
-}
-
-# Dumps the database (custom format, restorable with pg_restore) together with
-# .env, which holds APP_ENCRYPTION_KEY. Sets BACKUP_DIR. Not meant for $(...):
-# bash drops errexit inside command substitutions.
-backup_database() {
-    local final
-
-    mkdir -p -- "$BACKUP_DIR_ROOT"
-    compose up -d --wait --wait-timeout "$HEALTH_TIMEOUT" db
-
-    PARTIAL_BACKUP="$(mktemp -d "$BACKUP_DIR_ROOT/.partial-XXXXXXXX")"
-    compose exec -T db pg_dump -U finance -d finance --format=custom \
-        > "$PARTIAL_BACKUP/finance.dump"
-    # An unreadable dump is no backup: make pg_restore parse its table of contents.
-    compose exec -T db pg_restore --list < "$PARTIAL_BACKUP/finance.dump" >/dev/null
-    install -m 600 -- .env "$PARTIAL_BACKUP/.env"
-    git rev-parse HEAD > "$PARTIAL_BACKUP/commit"
-    (cd -- "$PARTIAL_BACKUP" && sha256sum finance.dump .env commit > SHA256SUMS)
-
-    final="$BACKUP_DIR_ROOT/predeploy-$(date +%Y%m%d-%H%M%S-%N)"
-    mv -T -- "$PARTIAL_BACKUP" "$final"
-    PARTIAL_BACKUP=""
-
-    # Keep only the newest backups made by this script.
-    find "$BACKUP_DIR_ROOT" -mindepth 1 -maxdepth 1 -type d -name 'predeploy-*' -print0 |
-        sort -rz | tail -zn +"$((BACKUP_KEEP + 1))" | xargs -0r rm -rf --
-
-    BACKUP_DIR="$final"
 }
 
 retry_check() {
@@ -294,7 +247,7 @@ rebuild_and_verify() {
 
 rollback() {
     local status previous_branch previous_commit deployed_branch deployed_commit
-    local backup_dir migration_changed current_commit
+    local migration_changed current_commit
 
     if [[ ! -d "$PROJECT/.git" ]]; then
         red "No Finance Tracker git repository was found at $PROJECT."
@@ -313,7 +266,6 @@ rollback() {
     previous_commit="$(state_value previous_commit)"
     deployed_branch="$(state_value deployed_branch)"
     deployed_commit="$(state_value deployed_commit)"
-    backup_dir="$(state_value backup_dir)"
     migration_changed="$(state_value migration_changed)"
 
     if [[ "$status" == rolled_back ]]; then
@@ -340,9 +292,7 @@ rollback() {
     if [[ "$migration_changed" == 1 ]]; then
         red "Automatic code rollback is disabled because this deploy changed Flyway migrations:"
         red "the old code may not work with the migrated database."
-        red "The pre-deploy database dump is: $backup_dir/finance.dump"
-        red "Restore it only after checking it on a disposable copy, for example:"
-        red "  docker compose exec -T db pg_restore -U finance -d finance --clean --if-exists < $backup_dir/finance.dump"
+        red "Roll back by hand, together with a database restore from before the deploy."
         exit 1
     fi
 
@@ -361,7 +311,7 @@ rollback() {
     DEPLOY_IN_PROGRESS=0
 
     write_state rolled_back "$previous_branch" "$previous_commit" \
-        "$deployed_branch" "$deployed_commit" "$backup_dir" "$migration_changed"
+        "$deployed_branch" "$deployed_commit" "$migration_changed"
 
     info "Pruning dangling images"
     docker image prune -f >/dev/null
@@ -407,7 +357,6 @@ PREVIOUS_BRANCH=""
 PREVIOUS_COMMIT=""
 TARGET_BRANCH=""
 DEPLOYED_COMMIT=""
-BACKUP_DIR=""
 MIGRATION_CHANGED=0
 MIGRATION_FILES=""
 
@@ -437,10 +386,6 @@ else
         red "Remote branch not found: origin/$TARGET_BRANCH"
         exit 1
     fi
-
-    info "Creating the mandatory pre-deploy database backup"
-    backup_database
-    info "Backup completed: $BACKUP_DIR"
 
     if git show-ref --verify --quiet "refs/heads/$TARGET_BRANCH"; then
         git switch "$TARGET_BRANCH"
@@ -474,7 +419,7 @@ else
     fi
 
     write_state pending "$PREVIOUS_BRANCH" "$PREVIOUS_COMMIT" \
-        "$TARGET_BRANCH" "$DEPLOYED_COMMIT" "$BACKUP_DIR" "$MIGRATION_CHANGED"
+        "$TARGET_BRANCH" "$DEPLOYED_COMMIT" "$MIGRATION_CHANGED"
     ROLLBACK_AVAILABLE=1
 fi
 
@@ -484,7 +429,7 @@ DEPLOY_IN_PROGRESS=0
 
 if (( FIRST_RUN == 0 )); then
     write_state successful "$PREVIOUS_BRANCH" "$PREVIOUS_COMMIT" \
-        "$TARGET_BRANCH" "$DEPLOYED_COMMIT" "$BACKUP_DIR" "$MIGRATION_CHANGED"
+        "$TARGET_BRANCH" "$DEPLOYED_COMMIT" "$MIGRATION_CHANGED"
 fi
 
 info "Pruning dangling images"
