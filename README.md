@@ -106,6 +106,19 @@ docker compose logs backend | grep -A3 "temporary password"   # if APP_ADMIN_PAS
 Put the `web` service behind your TLS reverse proxy (e.g. Nginx Proxy Manager → `WEB_BIND:WEB_PORT`).
 The app must be served over HTTPS: the session cookie is `Secure`.
 
+### Updates with `deploy.sh`
+
+On the server, from the repository directory:
+
+```bash
+./deploy.sh master      # switch to and deploy a branch
+./deploy.sh             # update the current branch
+```
+
+The script refuses local tracked changes, fetches `origin`, fast-forwards the branch, rebuilds and
+restarts the containers (`docker compose up -d --build --wait`) and waits until the backend is
+ready (`FINANCE_HEALTH_TIMEOUT`, seconds, default 300).
+
 **Back up** the Postgres volume *and* `APP_ENCRYPTION_KEY`. Without the key, 2FA secrets cannot be
 decrypted (an admin can reset 2FA for affected users; no financial data is encrypted with it).
 
