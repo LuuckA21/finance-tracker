@@ -32,7 +32,7 @@ backend/
 frontend/
   src/api/       fetch client (CSRF), types, React Query hooks
   src/pages/     dashboards, entries, positions, bulk update, settings, admin
-  nginx.conf     SPA + reverse proxy + security headers
+  default.conf.template   Nginx: SPA + reverse proxy + security headers
 docker-compose.yml, .env.example
 ```
 
@@ -98,13 +98,24 @@ login/CSRF/session rotation, lockout, forced password change, session revocation
 
 ```bash
 cp .env.example .env
-# fill DB_PASSWORD and APP_ENCRYPTION_KEY (openssl rand -base64 32), set WEB_BIND/WEB_PORT
+# fill DB_PASSWORD and APP_ENCRYPTION_KEY (openssl rand -base64 32), set WEB_BIND/WEB_PORT/TRUSTED_PROXY
 docker compose up -d --build
 docker compose logs backend | grep -A3 "temporary password"   # if APP_ADMIN_PASSWORD was empty
 ```
 
-Put the `web` service behind your TLS reverse proxy (e.g. Nginx Proxy Manager → `WEB_BIND:WEB_PORT`).
-The app must be served over HTTPS: the session cookie is `Secure`.
+The app must be served over HTTPS (the session cookie is `Secure`) through Nginx Proxy Manager
+running on another host:
+
+- `WEB_BIND` is this server's LAN IP, `WEB_PORT` the port NPM forwards to. In NPM create a proxy
+  host with scheme `http`, forward hostname `WEB_BIND`, port `WEB_PORT`, and an SSL certificate
+  with "Force SSL".
+- `TRUSTED_PROXY` is the IP (or CIDR) of the NPM host. The `web` container trusts
+  `X-Forwarded-For`/`X-Forwarded-Proto` only from there, so login rate limiting and the login
+  history see the real client IP, and a client reaching the port directly cannot forge it.
+- Allow `WEB_PORT` only from the NPM host in your firewall. Ports published by Docker bypass
+  `ufw`: filter them in the `DOCKER-USER` iptables chain, or at the network level.
+- With rootless Docker the default port driver hides the source address, so NPM is not
+  recognised: set `DOCKERD_ROOTLESS_ROOTLESSKIT_PORT_DRIVER=slirp4netns`.
 
 ### Updates with `deploy.sh`
 

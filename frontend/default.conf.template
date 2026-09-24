@@ -1,6 +1,19 @@
 # Serves the SPA and proxies /api to the Spring backend on the internal docker network,
 # so browser and API share one origin (needed by the SameSite=Strict session cookie).
-# TLS is terminated in front of this container (e.g. Nginx Proxy Manager).
+# TLS is terminated in front of this container by Nginx Proxy Manager on another host.
+# Processed by envsubst at container startup (FT_* variables only).
+
+# Only the reverse proxy at FT_TRUSTED_PROXY may tell us the client's scheme. NPM talks
+# to us over plain HTTP, so $scheme alone would always be "http".
+geo $realip_remote_addr $from_trusted_proxy {
+    default 0;
+    ${FT_TRUSTED_PROXY} 1;
+}
+
+map "$from_trusted_proxy:$http_x_forwarded_proto" $forwarded_proto {
+    ~^1:(https|http)$ $1;
+    default           $scheme;
+}
 
 server {
     listen 8080;
@@ -9,6 +22,12 @@ server {
     server_tokens off;
 
     client_max_body_size 1m;
+
+    # NPM connects from its own address: take the client IP from the X-Forwarded-For it
+    # sends, and only from it. Anyone else reaching the port directly keeps their own IP.
+    set_real_ip_from ${FT_TRUSTED_PROXY};
+    real_ip_header X-Forwarded-For;
+    real_ip_recursive on;
 
     # Security headers for the SPA
     add_header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
@@ -22,10 +41,12 @@ server {
         proxy_pass http://backend:8080;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
-        # Behind another reverse proxy: keep the client IP it forwarded (needed for login rate limiting)
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+        # Send only the client IP resolved above: appending the client-supplied chain would
+        # let Tomcat trust forged private addresses and dodge the per-IP login limit.
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $forwarded_proto;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Forwarded "";
         proxy_read_timeout 60s;
     }
 
