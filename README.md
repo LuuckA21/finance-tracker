@@ -123,10 +123,16 @@ running on another host:
 - `TRUSTED_PROXY` is the IP (or CIDR) of the NPM host. The `web` container trusts
   `X-Forwarded-For`/`X-Forwarded-Proto` only from there, so login rate limiting and the login
   history see the real client IP, and a client reaching the port directly cannot forge it.
-- Allow `WEB_PORT` only from the NPM host in your firewall. Ports published by Docker bypass
-  `ufw`: filter them in the `DOCKER-USER` iptables chain, or at the network level.
-- With rootless Docker the default port driver hides the source address, so NPM is not
-  recognised: set `DOCKERD_ROOTLESS_ROOTLESSKIT_PORT_DRIVER=slirp4netns`.
+- Allow `WEB_PORT` only from the NPM host in your firewall. With rootless Docker the port is
+  opened by a user process, so `ufw` applies:
+  `ufw allow in on <iface> from <NPM IP> to <WEB_BIND> port <WEB_PORT> proto tcp`.
+  Rootful Docker publishes ports before `ufw` sees them: filter them in the `DOCKER-USER`
+  iptables chain instead.
+- Rootless Docker's default port driver (`builtin`) hides the source address, so requests do
+  not come from `TRUSTED_PROXY` and every client shares one IP. Check after opening the site
+  through NPM: `docker compose logs --tail=5 web` must show your public IP. If it shows an
+  internal address, set `DOCKERD_ROOTLESS_ROOTLESSKIT_PORT_DRIVER=slirp4netns` in a
+  `~/.config/systemd/user/docker.service.d/` drop-in and restart Docker.
 
 ### Updates with `deploy.sh`
 
