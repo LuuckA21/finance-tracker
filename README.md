@@ -106,6 +106,29 @@ docker compose logs backend | grep -A3 "temporary password"   # if APP_ADMIN_PAS
 Put the `web` service behind your TLS reverse proxy (e.g. Nginx Proxy Manager → `WEB_BIND:WEB_PORT`).
 The app must be served over HTTPS: the session cookie is `Secure`.
 
+### Updates with `deploy.sh`
+
+On the server, update the code and restart the containers with:
+
+```bash
+./deploy.sh master      # switch to and deploy a branch
+./deploy.sh             # update the current branch
+./deploy.sh --rollback  # go back to the code used before the last deploy
+```
+
+Before touching the code the script refuses local tracked changes and non fast-forward updates,
+checks that the branch exists on `origin`, and dumps the database (plus `.env`) into
+`../finance-tracker-backups/predeploy-*` (keeps the last 10). It then rebuilds with
+`docker compose up -d --build --wait` and checks backend readiness and the web container.
+The previous and deployed commits are saved in `../.finance-tracker-last-deploy`.
+
+`--rollback` is refused when the deploy changed a Flyway migration: the old code may not work
+with the migrated database. Restore the pre-deploy dump (after testing it on a copy) instead.
+
+If the script is placed outside the repository, it clones the project into `./finance-tracker`
+on first run. Options: `FINANCE_ROOT`, `FINANCE_REPO`, `FINANCE_BACKUP_DIR`,
+`FINANCE_BACKUP_KEEP` (default 10), `FINANCE_HEALTH_TIMEOUT` (seconds, default 300).
+
 **Back up** the Postgres volume *and* `APP_ENCRYPTION_KEY`. Without the key, 2FA secrets cannot be
 decrypted (an admin can reset 2FA for affected users; no financial data is encrypted with it).
 
