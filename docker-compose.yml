@@ -44,8 +44,12 @@ services:
     build: ./frontend
     restart: unless-stopped
     depends_on: [backend]
+    environment:
+      # IP or CIDR of the host running Nginx Proxy Manager: only its X-Forwarded-* are trusted
+      FT_TRUSTED_PROXY: ${TRUSTED_PROXY:?Set TRUSTED_PROXY in .env (IP of Nginx Proxy Manager)}
+      NGINX_ENVSUBST_FILTER: "FT_"
     ports:
-      # Bind to the private interface your reverse proxy (e.g. Nginx Proxy Manager) reaches
+      # NPM runs on another host, so publish on this server's LAN address (never 0.0.0.0)
       - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-8088}:8080"
     networks: [internal]
     security_opt: ["no-new-privileges:true"]
