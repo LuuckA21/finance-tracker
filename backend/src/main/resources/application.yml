@@ -1,0 +1,78 @@
+spring:
+  application:
+    name: finance-tracker
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/finance}
+    username: ${DB_USERNAME:finance}
+    password: ${DB_PASSWORD:finance}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+  session:
+    jdbc:
+      initialize-schema: never
+      cleanup-cron: "0 */10 * * * *"
+  mvc:
+    problemdetails:
+      enabled: true
+
+server:
+  port: 8080
+  shutdown: graceful
+  # Behind Nginx: trust X-Forwarded-* so request.getRemoteAddr() and isSecure() are correct
+  forward-headers-strategy: native
+  servlet:
+    session:
+      # Idle timeout of a login session
+      timeout: ${SESSION_TIMEOUT:2h}
+      cookie:
+        name: ${SESSION_COOKIE_NAME:FT_SESSION}
+        http-only: true
+        secure: ${SESSION_COOKIE_SECURE:true}
+        same-site: strict
+        path: /
+  error:
+    include-stacktrace: never
+    include-message: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+
+app:
+  # Name shown in authenticator apps
+  totp-issuer: ${APP_TOTP_ISSUER:Finance Tracker}
+  # Base64-encoded 32-byte key used to encrypt TOTP secrets at rest. Generate with: openssl rand -base64 32
+  encryption-key: ${APP_ENCRYPTION_KEY:}
+  bootstrap-admin:
+    username: ${APP_ADMIN_USERNAME:admin}
+    # When empty, a random password is generated and printed once in the log
+    password: ${APP_ADMIN_PASSWORD:}
+  login:
+    max-failed-attempts: 5
+    lock-duration: 15m
+    ip-max-attempts: 30
+    ip-window: 15m
+    mfa-timeout: 5m
+
+logging:
+  level:
+    root: INFO
+    org.hibernate.SQL: WARN

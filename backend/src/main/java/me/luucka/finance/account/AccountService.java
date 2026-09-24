@@ -1,0 +1,117 @@
+package me.luucka.finance.account;
+
+import java.util.List;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
+import me.luucka.finance.auth.AuthSession;
+import me.luucka.finance.auth.MfaService;
+import me.luucka.finance.auth.SessionRevoker;
+import me.luucka.finance.common.ApiException;
+import me.luucka.finance.core.Currencies;
+import me.luucka.finance.core.security.PasswordPolicy;
+import me.luucka.finance.user.AppUser;
+import me.luucka.finance.user.AppUserRepository;
+import me.luucka.finance.user.LoginEvent;
+import me.luucka.finance.user.LoginEventRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class AccountService {
+
+    public record LoginEventResponse(java.time.Instant at, String ipAddress, String userAgent, boolean success,
+                                     String reason) {
+        static LoginEventResponse of(LoginEvent e) {
+            return new LoginEventResponse(e.getCreatedAt(), e.getIpAddress(), e.getUserAgent(), e.isSuccess(),
+                    e.getReason());
+        }
+    }
+
+    private final AppUserRepository users;
+    private final LoginEventRepository loginEvents;
+    private final PasswordEncoder passwordEncoder;
+    private final MfaService mfaService;
+    private final SessionRevoker sessionRevoker;
+    private final AuthSession authSession;
+
+    public AccountService(AppUserRepository users, LoginEventRepository loginEvents, PasswordEncoder passwordEncoder,
+                          MfaService mfaService, SessionRevoker sessionRevoker, AuthSession authSession) {
+        this.users = users;
+        this.loginEvents = loginEvents;
+        this.passwordEncoder = passwordEncoder;
+        this.mfaService = mfaService;
+        this.sessionRevoker = sessionRevoker;
+        this.authSession = authSession;
+    }
+
+    @Transactional(readOnly = true)
+    public MeResponse me(long userId) {
+        AppUser user = load(userId);
+        return new MeResponse(user.getId(), user.getUsername(), user.getRole(), user.getBaseCurrency(),
+                user.isTotpEnabled(), user.isTotpEnabled() ? mfaService.remainingRecoveryCodes(userId) : 0,
+                user.isPasswordChangeRequired());
+    }
+
+    /**
+     * Changes the password after verifying the current one, then revokes every other
+     * session of the user and refreshes the current one.
+     */
+    public MeResponse changePassword(long userId, String currentPassword, String newPassword,
+                                     HttpServletRequest request, HttpServletResponse response) {
+        AppUser user = load(userId);
+        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            throw ApiException.badRequest("invalid_current_password", "Current password is wrong");
+        }
+        List<String> violations = PasswordPolicy.validate(newPassword, user.getUsername());
+        if (!violations.isEmpty()) {
+            throw ApiException.badRequest("weak_password", String.join("; ", violations));
+        }
+        if (passwordEncoder.matches(newPassword, user.getPasswordHash())) {
+            throw ApiException.badRequest("password_reused", "New password must differ from the current one");
+        }
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        user.setPasswordChangeRequired(false);
+        AppUser saved = users.save(user);
+
+        HttpSession session = request.getSession(false);
+        sessionRevoker.revokeAllExcept(saved.getUsername(), session == null ? null : session.getId());
+        authSession.refresh(saved, request, response);
+        return me(userId);
+    }
+
+    @Transactional
+    public MeResponse updateSettings(long userId, String baseCurrency) {
+        AppUser user = load(userId);
+        user.setBaseCurrency(Currencies.normalize(baseCurrency));
+        return me(userId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<LoginEventResponse> loginHistory(long userId) {
+        return loginEvents.findTop20ByUserIdOrderByCreatedAtDesc(userId).stream()
+                .map(LoginEventResponse::of)
+                .toList();
+    }
+
+    /** Disables 2FA; requires both the password and a valid second factor. */
+    public void disableMfa(long userId, String password, String code) {
+        AppUser user = load(userId);
+        if (!user.isTotpEnabled()) {
+            throw ApiException.badRequest("mfa_not_enabled", "Two-factor authentication is not enabled");
+        }
+        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+            throw ApiException.badRequest("invalid_current_password", "Password is wrong");
+        }
+        if (mfaService.verifySecondFactor(userId, code) == MfaService.Verification.INVALID) {
+            throw ApiException.badRequest("invalid_mfa_code", "Invalid code");
+        }
+        mfaService.disable(userId);
+    }
+
+    private AppUser load(long userId) {
+        return users.findById(userId).orElseThrow(() -> ApiException.notFound("User"));
+    }
+}

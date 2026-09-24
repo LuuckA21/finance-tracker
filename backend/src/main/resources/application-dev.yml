@@ -1,0 +1,17 @@
+# Local development profile: run with SPRING_PROFILES_ACTIVE=dev
+server:
+  servlet:
+    session:
+      cookie:
+        # Vite dev server runs on plain http://localhost
+        secure: false
+
+app:
+  # Development-only key. NEVER use in production.
+  encryption-key: ZGV2LW9ubHkta2V5LWRvLW5vdC11c2UtaW4tcHJvZCE=
+  bootstrap-admin:
+    password: dev-password-change-me
+
+logging:
+  level:
+    me.luucka.finance: DEBUG
