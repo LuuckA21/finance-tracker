@@ -1,4 +1,6 @@
 .env
+# local backups (scripts/backup.sh) when the project is not under /srv/apps
+backups/
 *.log
 .DS_Store
 .idea/

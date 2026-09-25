@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily Finance Tracker backup at 04:30 Europe/Zurich
+
+[Timer]
+OnCalendar=*-*-* 04:30:00 Europe/Zurich
+AccuracySec=1min
+# Run at the next boot when the server was off at 04:30
+Persistent=true
+Unit=finance-tracker-backup.service
+
+[Install]
+WantedBy=timers.target
