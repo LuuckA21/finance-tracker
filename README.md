@@ -41,6 +41,9 @@ frontend/
   src/pages/     dashboards, entries, positions, bulk update, settings, admin
   default.conf.template   Nginx: SPA + reverse proxy + security headers
 docker-compose.yml, .env.example
+deploy.sh        update the code and restart the containers
+scripts/         backup.sh, restore.sh, install-backup.sh (Restic + systemd timer)
+ops/systemd/     backup service and timer (user units)
 ```
 
 ## Security model
@@ -145,10 +148,65 @@ On the server, from the repository directory:
 
 The script refuses local tracked changes, fetches `origin`, fast-forwards the branch, rebuilds and
 restarts the containers (`docker compose up -d --build --wait`) and waits until the backend is
-ready (`FINANCE_HEALTH_TIMEOUT`, seconds, default 300).
+ready (`FINANCE_HEALTH_TIMEOUT`, seconds, default 300). Before updating the code it takes a local
+database backup (`scripts/backup.sh --local --reason predeploy`); skip it with
+`FINANCE_SKIP_BACKUP=1`.
 
-**Back up** the Postgres volume *and* `APP_ENCRYPTION_KEY`. Without the key, 2FA secrets cannot be
-decrypted (an admin can reset 2FA for affected users; no financial data is encrypted with it).
+## Backup and restore
+
+Each backup is a directory `<yyyyMMdd-HHmmss>-<reason>` with the database dump (`pg_dump`, custom
+format, checked with `pg_restore --list`), `.env`, `docker-compose.yml`, the Flyway schema version,
+the git commit and `SHA256SUMS`. It lives in `/srv/backups/finance-tracker` when the project is in
+`/srv/apps/finance-tracker`, otherwise in `./backups` (`FT_BACKUP_ROOT` overrides it); local copies
+are kept 14 days (`FT_LOCAL_RETENTION_DAYS`). The directories contain `.env` and its secrets:
+keep them private.
+
+The cloud copy uses [Restic](https://restic.net) on S3 (e.g. Infomaniak Swiss Backup), encrypted
+with its own password, in a dedicated repository ending in `/finance-tracker`: 14 daily, 8 weekly
+and 12 monthly snapshots, followed by `restic check`.
+
+**Install** (on the server, as the user running Docker, with `restic` installed):
+
+```bash
+# reuse the Swiss Backup credentials of another app: repository <same bucket>/finance-tracker
+scripts/install-backup.sh --cloud-from ~/.config/restic/mangashelf/env.sh
+# or give them explicitly
+RESTIC_REPOSITORY=s3:https://<swiss-backup-endpoint>/<bucket>/finance-tracker \
+AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=... scripts/install-backup.sh --cloud
+# or local backups only
+scripts/install-backup.sh --local
+```
+
+It writes `~/.config/restic/finance-tracker/{env.sh,password}`, initialises the repository if
+needed, installs the systemd user timer (daily at **04:30 Europe/Zurich**, catching up after
+downtime), runs a first backup and enables the timer. Keep the Restic password and the S3
+credentials in a password manager: without them the cloud copy cannot be read. With rootless Docker
+enable linger (`sudo loginctl enable-linger <user>`) so the timer runs without a login session.
+
+**Use:**
+
+```bash
+scripts/backup.sh                    # manual backup: local, then cloud if configured
+scripts/backup.sh --local            # local only
+scripts/cloud-backup.sh              # upload the latest local backup again
+systemctl --user start finance-tracker-backup.service   # the scheduled chain, now
+cat /srv/backups/finance-tracker/last-success /srv/backups/finance-tracker/last-cloud-success
+```
+
+**Restore** (takes a `prerestore` backup of the current data first):
+
+```bash
+scripts/restore.sh /srv/backups/finance-tracker/20260925-043000-scheduled --yes
+scripts/restore.sh --list-cloud
+scripts/restore.sh --from-cloud [SNAPSHOT] --yes     # default: latest snapshot
+```
+
+The dump is restored into a new database that replaces the current one only once complete, so a
+failed restore leaves the data untouched. A backup from a newer schema than the checked-out code
+is refused (deploy the newer code first); an older one is migrated by Flyway at startup. `.env` is
+not overwritten: if the backup's `APP_ENCRYPTION_KEY` differs the script says so. Without that key
+2FA secrets cannot be decrypted (an admin can reset 2FA for affected users; no financial data is
+encrypted with it).
 
 ## How values are computed
 

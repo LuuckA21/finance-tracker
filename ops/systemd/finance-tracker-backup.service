@@ -1,0 +1,17 @@
+[Unit]
+Description=Finance Tracker backup (PostgreSQL + configuration, local and cloud)
+# Rootless Docker runs as a user service; ignored when Docker is a system service
+Wants=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/apps/finance-tracker
+Environment="PATH=%h/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="FT_BACKUP_ROOT=/srv/backups/finance-tracker"
+ExecStart=/usr/bin/env bash /srv/apps/finance-tracker/scripts/backup.sh --reason scheduled
+UMask=0077
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+TimeoutStartSec=2h

@@ -5,10 +5,13 @@
 # Usage: ./deploy.sh                 # update the current branch
 #        ./deploy.sh master          # switch to and update master
 #        FINANCE_HEALTH_TIMEOUT=600 ./deploy.sh master
+#        FINANCE_SKIP_BACKUP=1 ./deploy.sh master   # skip the pre-deploy database backup
+#
+# Before touching the code it takes a local backup (scripts/backup.sh --local).
 
 set -Eeuo pipefail
 
-PROJECT="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 HEALTH_TIMEOUT="${FINANCE_HEALTH_TIMEOUT:-300}"
 
 red()   { printf '\033[31m%s\033[0m\n' "$1" >&2; }
@@ -77,6 +80,18 @@ git fetch --prune origin
 if ! git show-ref --verify --quiet "refs/remotes/origin/$BRANCH"; then
     red "Remote branch not found: origin/$BRANCH"
     exit 1
+fi
+
+# A local copy is enough to go back after a bad migration; the nightly timer handles the cloud
+if [[ "${FINANCE_SKIP_BACKUP:-}" == 1 ]]; then
+    info "Pre-deploy backup skipped (FINANCE_SKIP_BACKUP=1)"
+elif [[ ! -x scripts/backup.sh ]]; then
+    info "No scripts/backup.sh in this checkout: pre-deploy backup skipped"
+elif ! docker compose ps --status running --services 2>/dev/null | grep -qx db; then
+    info "Database not running (first install?): pre-deploy backup skipped"
+else
+    info "Backing up the database"
+    scripts/backup.sh --local --reason predeploy
 fi
 
 PREVIOUS_COMMIT="$(git rev-parse HEAD)"
