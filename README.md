@@ -168,16 +168,31 @@ and 12 monthly snapshots, followed by `restic check`.
 **Install** (on the server, as the user running Docker, with `restic` installed):
 
 ```bash
-# reuse the Swiss Backup credentials of another app: repository <same bucket>/finance-tracker
-scripts/install-backup.sh --cloud-from ~/.config/restic/mangashelf/env.sh
-# or give them explicitly
-RESTIC_REPOSITORY=s3:https://<swiss-backup-endpoint>/<bucket>/finance-tracker \
-AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=... scripts/install-backup.sh --cloud
-# or local backups only
-scripts/install-backup.sh --local
+scripts/install-backup.sh
 ```
 
-It writes `~/.config/restic/finance-tracker/{env.sh,password}`, initialises the repository if
+It asks whether to copy the backups to S3 and, if another app is already backed up with Restic
+(e.g. `~/.config/restic/mangashelf`), offers to reuse its credentials. Otherwise it asks for the
+details shown in the Infomaniak manager (Swiss Backup › backup space › S3 credentials), with an
+example for each, and shows a summary before saving:
+
+```text
+Also copy the backups to S3 (e.g. Infomaniak Swiss Backup)? [Y/n]: y
+  S3 endpoint (e.g. https://s3.swiss-backup03.infomaniak.com): https://s3.swiss-backup03.infomaniak.com
+  Bucket name (e.g. backups): backups
+  Access key ID (e.g. 4f1c0a9e2b7d4e8f): <access key>
+  Secret access key (hidden while you type):
+  Region [us-east-1]:
+  Repository:  s3:https://s3.swiss-backup03.infomaniak.com/backups/finance-tracker
+Save and test these settings? [Y/n]: y
+```
+
+Non-interactive alternatives: `--cloud-from ~/.config/restic/mangashelf/env.sh` (reuse another
+app's credentials), `--cloud` with `RESTIC_REPOSITORY`, `AWS_ACCESS_KEY_ID` and
+`AWS_SECRET_ACCESS_KEY` in the environment, or `--local` (no cloud copy).
+
+The S3 credentials are not stored in `.env` (which is copied into every backup and passed to the
+containers). The installer writes `~/.config/restic/finance-tracker/{env.sh,password}`, initialises the repository if
 needed, installs the systemd user timer (daily at **04:30 Europe/Zurich**, catching up after
 downtime), runs a first backup and enables the timer. Keep the Restic password and the S3
 credentials in a password manager: without them the cloud copy cannot be read. With rootless Docker
