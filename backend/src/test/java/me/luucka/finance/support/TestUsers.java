@@ -38,7 +38,7 @@ public class TestUsers {
         AppUser user = new AppUser(username, passwordEncoder.encode(PASSWORD), role);
         user.setPasswordChangeRequired(passwordChangeRequired);
         user = users.save(user);
-        categoryService.createDefaults(user.getId());
+        categoryService.createDefaults(user.getId(), user.getLanguage());
         return user;
     }
 }

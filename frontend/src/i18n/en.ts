@@ -390,4 +390,6 @@ export const en: Messages = {
   'admin.role': 'Role',
   'admin.createHelp': 'A temporary password will be generated, to be changed at the first sign-in.',
   'admin.create': 'Create user',
+  // Admin: new user language
+  'admin.languageHint': 'Language of the interface and of the starting categories, which the user can change later.',
 }

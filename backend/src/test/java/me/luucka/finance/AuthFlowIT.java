@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
+
 import me.luucka.finance.support.ApiClient;
 import me.luucka.finance.support.IntegrationTest;
 import me.luucka.finance.support.TestUsers;
@@ -184,5 +186,29 @@ class AuthFlowIT {
 
         MvcResult selfDemote = adminClient.patch("/api/admin/users/" + admin.getId(), "{\"role\":\"USER\"}");
         assertEquals(400, selfDemote.getResponse().getStatus());
+    }
+
+    @Test
+    void newUserGetsLanguageAndStartingCategoriesInIt() throws Exception {
+        AppUser admin = testUsers.create("admin", Role.ADMIN);
+        ApiClient adminClient = new ApiClient(mvc);
+        assertEquals(200, adminClient.login(admin.getUsername(), TestUsers.PASSWORD));
+
+        String username = "english-" + System.nanoTime() % 100_000;
+        MvcResult created = adminClient.post("/api/admin/users",
+                "{\"username\":\"%s\",\"role\":\"USER\",\"language\":\"EN\"}".formatted(username));
+        assertEquals(201, created.getResponse().getStatus());
+
+        String temporary = json(created, "$.temporaryPassword");
+        ApiClient newUser = new ApiClient(mvc);
+        assertEquals(200, newUser.login(username, temporary));
+        assertEquals("EN", json(newUser.get("/api/auth/me"), "$.language"));
+        assertEquals(200, newUser.put("/api/account/password",
+                "{\"currentPassword\":\"%s\",\"newPassword\":\"%s\"}".formatted(temporary, TestUsers.PASSWORD))
+                .getResponse().getStatus());
+        newUser.refreshCsrf();
+        List<String> names = json(newUser.get("/api/categories"), "$[*].name");
+        assertTrue(names.contains("Salary") && names.contains("Groceries"), names.toString());
+        assertTrue(!names.contains("Stipendio"), names.toString());
     }
 }

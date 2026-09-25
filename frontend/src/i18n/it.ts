@@ -388,4 +388,6 @@ export const it = {
   'admin.role': 'Ruolo',
   'admin.createHelp': 'Verrà generata una password temporanea da cambiare al primo accesso.',
   'admin.create': 'Crea utente',
+  // Admin: new user language
+  'admin.languageHint': 'Lingua dell\'interfaccia e delle categorie iniziali, che l\'utente potrà poi modificare.',
 }

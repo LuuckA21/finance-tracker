@@ -11,6 +11,9 @@ Self-hosted personal finance app for a small group of users (you and your family
   user's base currency with exchange rates you enter manually.
 - **Per-user preferences** – interface language (Italian / English) and theme (system, light,
   dark) are saved to the account and follow the user on every device.
+- **Personal categories** – each user starts with a set of categories named in the language chosen
+  when the account is created (`APP_ADMIN_LANGUAGE` for the first admin); from then on they are
+  the user's own to rename, recolour or delete.
 
 | Layer    | Tech |
 |----------|------|

@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import me.luucka.finance.auth.AppPrincipal;
+import me.luucka.finance.user.Language;
 import me.luucka.finance.user.Role;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -31,7 +32,8 @@ public class UserAdminController {
     public record CreateUserRequest(
             @NotBlank @Size(max = 64) String username,
             @NotNull Role role,
-            @Size(max = 128) String password) {
+            @Size(max = 128) String password,
+            /* optional, defaults to Italian */ Language language) {
     }
 
     public record UpdateUserRequest(Role role, Boolean enabled) {
@@ -52,7 +54,8 @@ public class UserAdminController {
     @ResponseStatus(HttpStatus.CREATED)
     public UserAdminService.UserWithPassword create(@Valid @RequestBody CreateUserRequest body) {
         String password = body.password() == null || body.password().isBlank() ? null : body.password();
-        return service.create(body.username(), body.role(), password);
+        return service.create(body.username(), body.role(), password,
+                body.language() == null ? Language.IT : body.language());
     }
 
     @PatchMapping("/{id}")

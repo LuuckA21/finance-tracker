@@ -6,6 +6,9 @@ import { it } from './it'
 export type Language = 'IT' | 'EN'
 export const LANGUAGES: Language[] = ['IT', 'EN']
 
+/** Each language named in itself, as shown in language pickers. */
+export const LANGUAGE_NAMES: Record<Language, string> = { IT: 'Italiano', EN: 'English' }
+
 export type MessageKey = keyof typeof it
 export type Messages = Record<MessageKey, string>
 type Vars = Record<string, string | number>

@@ -14,6 +14,7 @@ import me.luucka.finance.core.security.PasswordPolicy;
 import me.luucka.finance.core.security.SecureTokens;
 import me.luucka.finance.user.AppUser;
 import me.luucka.finance.user.AppUserRepository;
+import me.luucka.finance.user.Language;
 import me.luucka.finance.user.RecoveryCodeRepository;
 import me.luucka.finance.user.Role;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -74,7 +75,8 @@ public class UserAdminService {
      * generated. The user must change it at first login either way.
      */
     @Transactional
-    public UserWithPassword create(String rawUsername, Role role, String password) {
+    /** The language is the new user's interface language and names their starting categories. */
+    public UserWithPassword create(String rawUsername, Role role, String password, Language language) {
         String username = rawUsername.trim().toLowerCase(Locale.ROOT);
         if (!USERNAME.matcher(username).matches()) {
             throw ApiException.badRequest("invalid_username",
@@ -90,8 +92,9 @@ public class UserAdminService {
         }
         AppUser user = new AppUser(username, passwordEncoder.encode(initial), role);
         user.setPasswordChangeRequired(true);
+        user.setLanguage(language);
         user = users.save(user);
-        categoryService.createDefaults(user.getId());
+        categoryService.createDefaults(user.getId(), language);
         return new UserWithPassword(UserResponse.of(user, clock.instant()), password == null ? initial : null);
     }
 

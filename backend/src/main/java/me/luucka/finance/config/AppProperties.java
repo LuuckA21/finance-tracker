@@ -2,6 +2,7 @@ package me.luucka.finance.config;
 
 import java.time.Duration;
 
+import me.luucka.finance.user.Language;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -19,7 +20,7 @@ public record AppProperties(
         BootstrapAdmin bootstrapAdmin,
         Login login) {
 
-    public record BootstrapAdmin(String username, String password) {
+    public record BootstrapAdmin(String username, String password, Language language) {
     }
 
     /**

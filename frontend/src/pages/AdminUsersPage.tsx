@@ -4,7 +4,7 @@ import { errorMessage } from '../api/client'
 import { useAdminAction, useAdminUsers, useMe, type AdminActionInput } from '../api/hooks'
 import type { AdminUser, Role, UserWithPassword } from '../api/types'
 import { Badge, Button, Card, ErrorAlert, Field, Modal, PageHeader, Spinner } from '../components/ui'
-import { useI18n } from '../i18n'
+import { LANGUAGES, LANGUAGE_NAMES, useI18n, type Language } from '../i18n'
 import { dateTime } from '../lib/format'
 
 export function AdminUsersPage() {
@@ -133,13 +133,14 @@ function CreateUserForm({ onCreated }: { onCreated: (res: UserWithPassword) => v
   const [username, setUsername] = useState('')
   const [role, setRole] = useState<Role>('USER')
   const [error, setError] = useState<string | null>(null)
-  const { t } = useI18n()
+  const { t, language: current } = useI18n()
+  const [language, setLanguage] = useState<Language>(current)
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     try {
-      const res = await action.mutateAsync({ type: 'create', body: { username: username.trim().toLowerCase(), role } })
+      const res = await action.mutateAsync({ type: 'create', body: { username: username.trim().toLowerCase(), role, language } })
       onCreated(res as UserWithPassword)
     } catch (err) {
       setError(errorMessage(err))
@@ -157,6 +158,13 @@ function CreateUserForm({ onCreated }: { onCreated: (res: UserWithPassword) => v
           <select id={id} className="input" value={role} onChange={(e) => setRole(e.target.value as Role)}>
             <option value="USER">{t('admin.roleUSER')}</option>
             <option value="ADMIN">{t('admin.roleADMIN')}</option>
+          </select>
+        )}
+      </Field>
+      <Field label={t('settings.language')} hint={t('admin.languageHint')}>
+        {(id) => (
+          <select id={id} className="input" value={language} onChange={(e) => setLanguage(e.target.value as Language)}>
+            {LANGUAGES.map((l) => <option key={l} value={l}>{LANGUAGE_NAMES[l]}</option>)}
           </select>
         )}
       </Field>

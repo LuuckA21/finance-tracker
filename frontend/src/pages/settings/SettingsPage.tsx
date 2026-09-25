@@ -15,7 +15,7 @@ import {
 } from '../../api/hooks'
 import type { Category, EntryKind } from '../../api/types'
 import { Badge, Button, Card, EmptyState, ErrorAlert, Field, Modal, PageHeader, Segmented, Spinner } from '../../components/ui'
-import { LANGUAGES, useI18n, type Language, type MessageKey } from '../../i18n'
+import { LANGUAGES, LANGUAGE_NAMES, useI18n, type Language, type MessageKey } from '../../i18n'
 import { applyPreferences } from '../../preferences'
 import { THEMES, type Theme } from '../../preferences/theme'
 import { COMMON_CURRENCIES, date, dateTime, number, parseDecimal, today } from '../../lib/format'
@@ -61,8 +61,6 @@ function AccountTab() {
     </div>
   )
 }
-
-const LANGUAGE_NAMES: Record<Language, string> = { IT: 'Italiano', EN: 'English' }
 
 /** Applied at once, then saved to the profile; a failed save puts the previous values back. */
 function PreferencesForm() {
