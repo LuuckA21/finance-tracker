@@ -298,6 +298,6 @@ export function useAdminAction() {
 }
 
 export type AdminActionInput =
-  | { type: 'create'; body: { username: string; role: 'ADMIN' | 'USER'; password?: string } }
+  | { type: 'create'; body: { username: string; role: 'ADMIN' | 'USER'; password?: string; language?: Language } }
   | { type: 'update'; id: number; body: { role?: 'ADMIN' | 'USER'; enabled?: boolean } }
   | { type: 'reset-password' | 'unlock' | 'reset-mfa' | 'delete'; id: number }

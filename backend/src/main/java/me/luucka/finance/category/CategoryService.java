@@ -5,6 +5,7 @@ import java.util.List;
 import me.luucka.finance.cashflow.CashEntryRepository;
 import me.luucka.finance.common.ApiException;
 import me.luucka.finance.core.EntryKind;
+import me.luucka.finance.user.Language;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,26 +18,29 @@ public class CategoryService {
         }
     }
 
-    private record Default(String name, EntryKind kind, String color) {
+    private record Default(String italian, String english, EntryKind kind, String color) {
+        String name(Language language) {
+            return language == Language.EN ? english : italian;
+        }
     }
 
-    /** Categories every new user starts with. */
+    /** Categories every new user starts with, named in their language; afterwards they are the user's own. */
     private static final List<Default> DEFAULTS = List.of(
-            new Default("Stipendio", EntryKind.INCOME, "#16a34a"),
-            new Default("Bonus", EntryKind.INCOME, "#22c55e"),
-            new Default("Interessi e dividendi", EntryKind.INCOME, "#0d9488"),
-            new Default("Altre entrate", EntryKind.INCOME, "#65a30d"),
-            new Default("Casa", EntryKind.EXPENSE, "#2563eb"),
-            new Default("Spesa alimentare", EntryKind.EXPENSE, "#ea580c"),
-            new Default("Trasporti", EntryKind.EXPENSE, "#7c3aed"),
-            new Default("Assicurazioni", EntryKind.EXPENSE, "#0891b2"),
-            new Default("Salute", EntryKind.EXPENSE, "#db2777"),
-            new Default("Ristoranti", EntryKind.EXPENSE, "#d97706"),
-            new Default("Svago", EntryKind.EXPENSE, "#9333ea"),
-            new Default("Viaggi", EntryKind.EXPENSE, "#0284c7"),
-            new Default("Abbonamenti", EntryKind.EXPENSE, "#4f46e5"),
-            new Default("Tasse", EntryKind.EXPENSE, "#dc2626"),
-            new Default("Altre uscite", EntryKind.EXPENSE, "#6b7280"));
+            new Default("Stipendio", "Salary", EntryKind.INCOME, "#16a34a"),
+            new Default("Bonus", "Bonus", EntryKind.INCOME, "#22c55e"),
+            new Default("Interessi e dividendi", "Interest & dividends", EntryKind.INCOME, "#0d9488"),
+            new Default("Altre entrate", "Other income", EntryKind.INCOME, "#65a30d"),
+            new Default("Casa", "Housing", EntryKind.EXPENSE, "#2563eb"),
+            new Default("Spesa alimentare", "Groceries", EntryKind.EXPENSE, "#ea580c"),
+            new Default("Trasporti", "Transport", EntryKind.EXPENSE, "#7c3aed"),
+            new Default("Assicurazioni", "Insurance", EntryKind.EXPENSE, "#0891b2"),
+            new Default("Salute", "Health", EntryKind.EXPENSE, "#db2777"),
+            new Default("Ristoranti", "Restaurants", EntryKind.EXPENSE, "#d97706"),
+            new Default("Svago", "Leisure", EntryKind.EXPENSE, "#9333ea"),
+            new Default("Viaggi", "Travel", EntryKind.EXPENSE, "#0284c7"),
+            new Default("Abbonamenti", "Subscriptions", EntryKind.EXPENSE, "#4f46e5"),
+            new Default("Tasse", "Taxes", EntryKind.EXPENSE, "#dc2626"),
+            new Default("Altre uscite", "Other expenses", EntryKind.EXPENSE, "#6b7280"));
 
     private final CategoryRepository categories;
     private final CashEntryRepository entries;
@@ -47,9 +51,9 @@ public class CategoryService {
     }
 
     @Transactional
-    public void createDefaults(long userId) {
+    public void createDefaults(long userId, Language language) {
         for (Default d : DEFAULTS) {
-            categories.save(new Category(userId, d.name(), d.kind(), d.color()));
+            categories.save(new Category(userId, d.name(language), d.kind(), d.color()));
         }
     }
 

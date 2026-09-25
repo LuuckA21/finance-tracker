@@ -2,6 +2,7 @@ package me.luucka.finance.admin;
 
 import me.luucka.finance.config.AppProperties;
 import me.luucka.finance.user.AppUserRepository;
+import me.luucka.finance.user.Language;
 import me.luucka.finance.user.Role;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,7 +37,8 @@ public class BootstrapAdmin implements ApplicationRunner {
         }
         AppProperties.BootstrapAdmin config = properties.bootstrapAdmin();
         String password = config.password() == null || config.password().isBlank() ? null : config.password();
-        var created = userAdminService.create(config.username(), Role.ADMIN, password);
+        Language language = config.language() == null ? Language.IT : config.language();
+        var created = userAdminService.create(config.username(), Role.ADMIN, password, language);
         if (created.temporaryPassword() != null) {
             log.warn("""
 

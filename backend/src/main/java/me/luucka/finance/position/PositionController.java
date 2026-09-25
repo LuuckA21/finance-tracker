@@ -38,10 +38,11 @@ public class PositionController {
             @NotNull AssetClass assetClass,
             @NotNull @CurrencyCode String currency,
             @Size(max = 1000) String notes,
-            boolean archived) {
+            // Boxed: Jackson 3 rejects a missing primitive, and omitting it means "not archived"
+            Boolean archived) {
 
         PositionService.PositionData toData() {
-            return new PositionService.PositionData(name, symbol, assetClass, currency, notes, archived);
+            return new PositionService.PositionData(name, symbol, assetClass, currency, notes, Boolean.TRUE.equals(archived));
         }
     }
 

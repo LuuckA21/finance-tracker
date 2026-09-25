@@ -11,6 +11,9 @@ Self-hosted personal finance app for a small group of users (you and your family
   user's base currency with exchange rates you enter manually.
 - **Per-user preferences** – interface language (Italian / English) and theme (system, light,
   dark) are saved to the account and follow the user on every device.
+- **Personal categories** – each user starts with a set of categories named in the language chosen
+  when the account is created (`APP_ADMIN_LANGUAGE` for the first admin); from then on they are
+  the user's own to rename, recolour or delete.
 
 | Layer    | Tech |
 |----------|------|
@@ -97,6 +100,10 @@ npm run typecheck && npm run build
 Integration tests start PostgreSQL with Testcontainers and exercise the real security chain:
 login/CSRF/session rotation, lockout, forced password change, session revocation, admin rules,
 2FA enrolment + replay protection + recovery codes, per-user data isolation, dashboard math.
+
+GitHub Actions (`.github/workflows/ci.yml`) runs the same checks on every pull request and on
+pushes to `master`: `mvn verify` on JDK 25 (Testcontainers uses the runner's Docker) and the
+frontend typecheck + build.
 
 ## Deploy with Docker Compose
 
