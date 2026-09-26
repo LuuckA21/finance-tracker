@@ -390,4 +390,8 @@ export const it = {
   'admin.create': 'Crea utente',
   // Admin: new user language
   'admin.languageHint': 'Lingua dell\'interfaccia e delle categorie iniziali, che l\'utente potrà poi modificare.',
+  // Position: changes between records
+  'position.change': 'Variazione',
+  'position.changeHint': 'Rispetto alla rilevazione precedente',
+  'position.sinceFirst': 'Dalla prima rilevazione ({date})',
 }
