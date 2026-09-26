@@ -9,7 +9,7 @@ import { Badge, Button, Card, EmptyState, ErrorAlert, Field, Modal, PageHeader, 
 import { TooltipCard } from '../charts/ChartParts'
 import { useChartTheme } from '../charts/theme'
 import { useI18n } from '../i18n'
-import { assetClassLabel, compact, date, money, number, parseDecimal, today } from '../lib/format'
+import { assetClassLabel, change, compact, date, money, number, parseDecimal, signedMoney, signedPercent, today } from '../lib/format'
 import { PositionFormModal } from './PositionForm'
 
 export function PositionDetailPage() {
@@ -30,6 +30,10 @@ export function PositionDetailPage() {
   }
   const p = position.data
   const isCash = p.assetClass === 'CASH'
+  // Newest first, as the API returns them
+  const list = snapshots.data ?? []
+  const oldest = list.length >= 2 ? list[list.length - 1] : null
+  const overall = oldest ? change(list[0].value, oldest.value) : null
 
   async function onDeletePosition() {
     if (!confirm(t('position.confirmDelete', { name: p.name }))) return
@@ -82,6 +86,12 @@ export function PositionDetailPage() {
               {t('position.atDate', { value: isCash ? t('position.balance') : `${number(p.latest.quantity)} × ${money(p.latest.unitPrice, p.currency)}`, date: date(p.latest.date) })}
             </p>
           )}
+          {overall && oldest && (
+            <div className="mt-3 border-t border-line pt-3">
+              <p className="text-xs text-ink-2">{t('position.sinceFirst', { date: date(oldest.date) })}</p>
+              <ChangeText value={overall} currency={p.currency} className="text-base font-medium" />
+            </div>
+          )}
         </Card>
         <Card title={t('position.valueTrend')}>
           {(snapshots.data?.length ?? 0) < 2
@@ -97,24 +107,30 @@ export function PositionDetailPage() {
           </EmptyState>
         ) : (
           <div className="-mx-4 overflow-x-auto sm:mx-0">
-            <table className="w-full min-w-[32rem] text-sm">
+            <table className="w-full min-w-[38rem] text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-xs text-muted">
                   <th className="px-4 py-2 font-medium sm:px-2">{t('common.date')}</th>
                   {!isCash && <th className="px-2 py-2 text-right font-medium">{t('position.quantity')}</th>}
                   {!isCash && <th className="px-2 py-2 text-right font-medium">{t('position.price')}</th>}
                   <th className="px-2 py-2 text-right font-medium">{isCash ? t('position.balance') : t('position.value')}</th>
+                  <th className="px-2 py-2 text-right font-medium" title={t('position.changeHint')}>{t('position.change')}</th>
                   <th className="px-2 py-2 font-medium">{t('common.note')}</th>
                   <th className="w-20 px-2 py-2"><span className="sr-only">{t('entries.actions')}</span></th>
                 </tr>
               </thead>
               <tbody>
-                {snapshots.data!.map((s) => (
+                {list.map((s, i) => (
                   <tr key={s.id} className="border-b border-line last:border-0 hover:bg-surface-2">
                     <td className="tabular px-4 py-2 sm:px-2">{date(s.date)}</td>
                     {!isCash && <td className="tabular px-2 py-2 text-right text-ink-2">{number(s.quantity)}</td>}
                     {!isCash && <td className="tabular px-2 py-2 text-right text-ink-2">{money(s.unitPrice, p.currency, s.unitPrice < 1 ? 6 : 2)}</td>}
                     <td className="tabular px-2 py-2 text-right font-medium">{money(s.value, p.currency)}</td>
+                    <td className="px-2 py-2 text-right">
+                      {i + 1 < list.length
+                        ? <ChangeText value={change(s.value, list[i + 1].value)} currency={p.currency} stacked />
+                        : <span className="text-muted">—</span>}
+                    </td>
                     <td className="max-w-48 truncate px-2 py-2 text-ink-2">{s.note}</td>
                     <td className="px-2 py-2">
                       <div className="flex justify-end gap-1">
@@ -141,6 +157,22 @@ export function PositionDetailPage() {
         )}
       </Modal>
     </>
+  )
+}
+
+/** Signed amount and percentage, coloured by direction (never by colour alone: the sign stays). */
+function ChangeText({ value, currency, stacked = false, className = '' }: {
+  value: { amount: number; percent: number | null }
+  currency: string
+  stacked?: boolean
+  className?: string
+}) {
+  const tone = value.amount > 0 ? 'text-good' : value.amount < 0 ? 'text-bad' : 'text-muted'
+  return (
+    <span className={`tabular ${tone} ${stacked ? 'flex flex-col items-end leading-tight' : 'flex gap-2'} ${className}`}>
+      <span>{signedMoney(value.amount, currency)}</span>
+      <span className={stacked ? 'text-xs' : ''}>{signedPercent(value.percent)}</span>
+    </span>
   )
 }
 

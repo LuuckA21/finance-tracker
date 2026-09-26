@@ -392,4 +392,8 @@ export const en: Messages = {
   'admin.create': 'Create user',
   // Admin: new user language
   'admin.languageHint': 'Language of the interface and of the starting categories, which the user can change later.',
+  // Position: changes between records
+  'position.change': 'Change',
+  'position.changeHint': 'Compared with the previous record',
+  'position.sinceFirst': 'Since the first record ({date})',
 }

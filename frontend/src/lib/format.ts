@@ -34,6 +34,25 @@ export function compact(value: number): string {
   return fmt(value)
 }
 
+/** Money with an explicit sign in front, whatever the locale puts the symbol: +CHF 1'234.50, −CHF 80.00. */
+export function signedMoney(value: number, currency: string): string {
+  const sign = value > 0 ? '+' : value < 0 ? '−' : ''
+  return sign + money(Math.abs(value), currency)
+}
+
+/** Percentage with an explicit sign: +2.4 %, −0.8 %. */
+export function signedPercent(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—'
+  const sign = value > 0 ? '+' : value < 0 ? '−' : ''
+  return sign + percent(Math.abs(value))
+}
+
+/** Change from `previous` to `current`; the percentage is null when there is nothing to compare with. */
+export function change(current: number, previous: number): { amount: number; percent: number | null } {
+  const amount = current - previous
+  return { amount, percent: previous === 0 ? null : (amount / Math.abs(previous)) * 100 }
+}
+
 export function number(value: number | null | undefined, maxDigits = 8): string {
   if (value === null || value === undefined) return '—'
   return numberFormat({ maximumFractionDigits: maxDigits }).format(value)
