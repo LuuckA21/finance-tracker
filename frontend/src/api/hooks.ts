@@ -16,6 +16,7 @@ import type {
   NetWorthSeries,
   Page,
   Position,
+  RecurringEntry,
   Snapshot,
   UserWithPassword,
 } from './types'
@@ -135,7 +136,7 @@ export function useEntries(filter: EntryFilter) {
   })
 }
 
-export type EntryInput = Omit<CashEntry, 'id'> & { id?: number }
+export type EntryInput = Omit<CashEntry, 'id' | 'recurringEntryId'> & { id?: number }
 
 export function useSaveEntry() {
   const invalidate = useInvalidate()
@@ -149,6 +150,31 @@ export function useSaveEntry() {
 export function useDeleteEntry() {
   const invalidate = useInvalidate()
   return useMutation({ mutationFn: (id: number) => del(`/api/cash-entries/${id}`), onSuccess: () => invalidate() })
+}
+
+// ---------------------------------------------------------------- recurring entries
+
+export const useRecurringEntries = () =>
+  useQuery({ queryKey: ['recurring'], queryFn: () => get<RecurringEntry[]>('/api/recurring-entries') })
+
+export type RecurringInput = Omit<RecurringEntry, 'id' | 'lastGenerated' | 'nextDate'> & { id?: number }
+
+// Saving a rule may create entries right away, so the entries and dashboards are refreshed too
+export function useSaveRecurring() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: ({ id, ...body }: RecurringInput) =>
+      id ? put<RecurringEntry>(`/api/recurring-entries/${id}`, body) : post<RecurringEntry>('/api/recurring-entries', body),
+    onSuccess: () => invalidate([...FINANCE_KEYS, ['recurring']]),
+  })
+}
+
+export function useDeleteRecurring() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: (id: number) => del(`/api/recurring-entries/${id}`),
+    onSuccess: () => invalidate([['recurring'], ['entries']]),
+  })
 }
 
 // ---------------------------------------------------------------- positions

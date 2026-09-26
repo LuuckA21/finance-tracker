@@ -5,6 +5,7 @@ import java.util.List;
 import me.luucka.finance.cashflow.CashEntryRepository;
 import me.luucka.finance.common.ApiException;
 import me.luucka.finance.core.EntryKind;
+import me.luucka.finance.recurring.RecurringEntryRepository;
 import me.luucka.finance.user.Language;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,10 +45,13 @@ public class CategoryService {
 
     private final CategoryRepository categories;
     private final CashEntryRepository entries;
+    private final RecurringEntryRepository recurring;
 
-    public CategoryService(CategoryRepository categories, CashEntryRepository entries) {
+    public CategoryService(CategoryRepository categories, CashEntryRepository entries,
+                           RecurringEntryRepository recurring) {
         this.categories = categories;
         this.entries = entries;
+        this.recurring = recurring;
     }
 
     @Transactional
@@ -87,7 +91,7 @@ public class CategoryService {
     @Transactional
     public void delete(long userId, long id) {
         Category category = get(userId, id);
-        if (entries.existsByCategoryId(category.getId())) {
+        if (entries.existsByCategoryId(category.getId()) || recurring.existsByCategoryId(category.getId())) {
             throw ApiException.conflict("category_in_use", "The category is used by existing entries");
         }
         categories.delete(category);
