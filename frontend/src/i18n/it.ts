@@ -429,4 +429,7 @@ export const it = {
   'recurring.colDescription': 'Descrizione',
   'recurring.colSchedule': 'Frequenza',
   'error.end_before_start': 'La data di fine è precedente alla data di inizio.',
+  // Security hardening
+  'error.start_too_old': 'La data di inizio può essere al massimo 2 anni nel passato.',
+  'mfa.passwordHint': 'Per sicurezza conferma con la password attuale.',
 }

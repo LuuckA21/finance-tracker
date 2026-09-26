@@ -11,6 +11,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import me.luucka.finance.auth.AppPrincipal;
 import me.luucka.finance.common.CurrencyCode;
+import me.luucka.finance.common.ReasonableDate;
 import me.luucka.finance.common.PageResponse;
 import me.luucka.finance.core.EntryKind;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -33,7 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class CashEntryController {
 
     public record EntryRequest(
-            @NotNull LocalDate date,
+            @NotNull @ReasonableDate LocalDate date,
             @NotNull EntryKind kind,
             @NotNull Long categoryId,
             @NotNull @DecimalMin(value = "0.0001") @DecimalMax("999999999999999")

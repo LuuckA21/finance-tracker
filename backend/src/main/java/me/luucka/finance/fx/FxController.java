@@ -10,6 +10,7 @@ import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
 import me.luucka.finance.auth.AppPrincipal;
 import me.luucka.finance.common.CurrencyCode;
+import me.luucka.finance.common.ReasonableDate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -26,7 +27,7 @@ public class FxController {
 
     public record RateRequest(
             @NotNull @CurrencyCode String currency,
-            @NotNull LocalDate date,
+            @NotNull @ReasonableDate LocalDate date,
             @NotNull @DecimalMin(value = "0", inclusive = false) @Digits(integer = 16, fraction = 12) BigDecimal rate) {
     }
 

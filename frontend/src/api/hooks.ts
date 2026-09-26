@@ -67,7 +67,8 @@ export const useMfaSetup = () =>
 export function useMfaEnable() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (code: string) => post<{ recoveryCodes: string[] }>('/api/account/mfa/enable', { code }),
+    mutationFn: (body: { password: string; code: string }) =>
+      post<{ recoveryCodes: string[] }>('/api/account/mfa/enable', body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['me'] }),
   })
 }

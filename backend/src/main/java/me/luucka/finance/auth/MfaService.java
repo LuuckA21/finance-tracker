@@ -17,6 +17,7 @@ import me.luucka.finance.user.AppUserRepository;
 import me.luucka.finance.user.RecoveryCode;
 import me.luucka.finance.user.RecoveryCodeRepository;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,15 +46,20 @@ public class MfaService {
     private final SecureRandom random;
     private final Clock clock;
     private final String issuer;
+    private final PasswordEncoder passwordEncoder;
+    private final ReauthGuard reauthGuard;
 
     public MfaService(AppUserRepository users, RecoveryCodeRepository recoveryCodes, AesGcmCipher cipher,
-                      SecureRandom random, Clock clock, AppProperties properties) {
+                      SecureRandom random, Clock clock, AppProperties properties, PasswordEncoder passwordEncoder,
+                      ReauthGuard reauthGuard) {
         this.users = users;
         this.recoveryCodes = recoveryCodes;
         this.cipher = cipher;
         this.random = random;
         this.clock = clock;
         this.issuer = properties.totpIssuer();
+        this.passwordEncoder = passwordEncoder;
+        this.reauthGuard = reauthGuard;
     }
 
     /** Generates a new (not yet active) secret. Replaces any previous pending secret. */
@@ -71,12 +77,14 @@ public class MfaService {
     }
 
     /**
-     * Activates 2FA after the user proves the authenticator works.
+     * Activates 2FA after the user proves the authenticator works. The current password is
+     * required too: otherwise a stolen session could enrol the attacker's authenticator and lock
+     * the owner out of the account.
      *
      * @return freshly generated recovery codes (shown once)
      */
     @Transactional
-    public List<String> confirmSetup(long userId, String code) {
+    public List<String> confirmSetup(long userId, String password, String code) {
         AppUser user = load(userId);
         if (user.isTotpEnabled()) {
             throw ApiException.conflict("mfa_already_enabled", "Two-factor authentication is already enabled");
@@ -84,10 +92,17 @@ public class MfaService {
         if (user.getTotpSecretEncrypted() == null) {
             throw ApiException.badRequest("mfa_setup_not_started", "Start the setup first");
         }
+        reauthGuard.ensureNotLocked(user);
+        if (password == null || !passwordEncoder.matches(password, user.getPasswordHash())) {
+            throw reauthGuard.failure(userId,
+                    ApiException.badRequest("invalid_current_password", "Current password is wrong"));
+        }
         OptionalLong step = Totp.verify(secretOf(user), code, clock.instant());
         if (step.isEmpty()) {
-            throw ApiException.badRequest("invalid_mfa_code", "Invalid code");
+            throw reauthGuard.failure(userId, ApiException.badRequest("invalid_mfa_code", "Invalid code"));
         }
+        // Reset on the managed entity: a separate transaction would clash with its version
+        user.resetFailedLogins();
         user.setTotpEnabled(true);
         user.setTotpLastStep(step.getAsLong());
         return regenerateRecoveryCodes(user);
@@ -100,9 +115,11 @@ public class MfaService {
         if (!user.isTotpEnabled()) {
             throw ApiException.badRequest("mfa_not_enabled", "Two-factor authentication is not enabled");
         }
+        reauthGuard.ensureNotLocked(user);
         if (!verifyTotp(user, code)) {
-            throw ApiException.badRequest("invalid_mfa_code", "Invalid code");
+            throw reauthGuard.failure(userId, ApiException.badRequest("invalid_mfa_code", "Invalid code"));
         }
+        user.resetFailedLogins();
         return regenerateRecoveryCodes(user);
     }
 
@@ -110,6 +127,7 @@ public class MfaService {
     public void disable(long userId) {
         AppUser user = load(userId);
         user.clearTotp();
+        user.resetFailedLogins();
         recoveryCodes.deleteAllForUser(userId);
     }
 

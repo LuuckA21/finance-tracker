@@ -15,6 +15,13 @@ map "$from_trusted_proxy:$http_x_forwarded_proto" $forwarded_proto {
     default           $scheme;
 }
 
+# Throttle the endpoints reachable without a session, per client IP (resolved by real_ip below):
+# password and 2FA guessing, and session creation (each CSRF fetch stores a session row).
+# The backend also locks accounts and limits failures per IP; this caps the raw request rate.
+limit_req_zone $binary_remote_addr zone=ft_auth:1m rate=10r/m;
+limit_req_zone $binary_remote_addr zone=ft_session:1m rate=60r/m;
+limit_req_status 429;
+
 server {
     listen 8080;
     server_name _;
@@ -48,6 +55,27 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header Forwarded "";
         proxy_read_timeout 60s;
+
+        # proxy_pass is not inherited by nested locations; the headers above are
+        location = /api/auth/login {
+            limit_req zone=ft_auth burst=10 nodelay;
+            proxy_pass http://backend:8080;
+        }
+        location = /api/auth/login/mfa {
+            limit_req zone=ft_auth burst=10 nodelay;
+            proxy_pass http://backend:8080;
+        }
+        location = /api/auth/csrf {
+            limit_req zone=ft_session burst=30 nodelay;
+            proxy_pass http://backend:8080;
+        }
+        # Same JSON shape as the backend, so the SPA shows its "too many attempts" message
+        error_page 429 = @too_many_requests;
+    }
+
+    location @too_many_requests {
+        default_type application/problem+json;
+        return 429 '{"status":429,"title":"Too Many Requests","code":"too_many_attempts"}';
     }
 
     # Actuator is internal only

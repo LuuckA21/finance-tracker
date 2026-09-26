@@ -40,6 +40,11 @@ public class AccountController {
     public record MfaCodeRequest(@NotBlank @Size(max = 32) String code) {
     }
 
+    public record EnableMfaRequest(
+            @NotBlank @Size(max = 128) String password,
+            @NotBlank @Size(max = 32) String code) {
+    }
+
     public record DisableMfaRequest(
             @NotBlank @Size(max = 128) String password,
             @NotBlank @Size(max = 32) String code) {
@@ -80,8 +85,8 @@ public class AccountController {
 
     @PostMapping("/mfa/enable")
     public RecoveryCodesResponse enableMfa(@AuthenticationPrincipal AppPrincipal me,
-                                           @Valid @RequestBody MfaCodeRequest body) {
-        return new RecoveryCodesResponse(mfaService.confirmSetup(me.id(), body.code()));
+                                           @Valid @RequestBody EnableMfaRequest body) {
+        return new RecoveryCodesResponse(mfaService.confirmSetup(me.id(), body.password(), body.code()));
     }
 
     @PostMapping("/mfa/recovery-codes")

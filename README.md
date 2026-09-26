@@ -63,7 +63,10 @@ ops/systemd/     backup service and timer (user units)
   (stored as SHA-256 hashes).
 - **Brute force**: generic error for every login failure (no user enumeration, constant-ish time),
   account lock after 5 failures for 15 min, per-IP limit on failed attempts, audit log of logins
-  visible to the user.
+  visible to the user. Re-checks inside a session (change password, enable/disable 2FA, new
+  recovery codes) count towards the same lock, and locking revokes every session, so a stolen
+  cookie cannot be used to guess the password or a TOTP code. Enabling 2FA needs the current
+  password. Nginx rate-limits the login, 2FA and CSRF endpoints per client IP (HTTP 429).
 - **Sessions**: server-side sessions stored in PostgreSQL (Spring Session JDBC); cookie is
   `HttpOnly`, `Secure`, `SameSite=Strict`; session id rotated on login; 2 h idle timeout.
   Password change / reset, disabling or deleting a user revokes their other sessions immediately.

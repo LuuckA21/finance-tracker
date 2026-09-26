@@ -130,6 +130,16 @@ public class AuthService {
             }
             throw new ApiException(HttpStatus.UNAUTHORIZED, "mfa_expired", "Login expired, please sign in again");
         }
+        // Check the account before the code: a recovery code must not be used up on an account
+        // that was disabled or locked in the meantime
+        boolean usable = users.findById(pending.userId())
+                .filter(AppUser::isEnabled)
+                .filter(u -> !u.isLocked(now))
+                .isPresent();
+        if (!usable) {
+            session.removeAttribute(MfaPending.SESSION_ATTRIBUTE);
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "mfa_expired", "Login expired, please sign in again");
+        }
 
         MfaService.Verification result = mfaService.verifySecondFactor(pending.userId(), code);
         if (result == MfaService.Verification.INVALID) {
