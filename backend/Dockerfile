@@ -1,5 +1,5 @@
 # ---- build ----
-FROM maven:3.9-eclipse-temurin-25 AS build
+FROM maven:3-eclipse-temurin-24 AS build
 WORKDIR /src
 COPY pom.xml .
 RUN mvn -q -B dependency:go-offline
