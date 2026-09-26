@@ -38,6 +38,8 @@ services:
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
       SESSION_TIMEOUT: ${SESSION_TIMEOUT:-2h}
       SESSION_MAX_LIFETIME: ${SESSION_MAX_LIFETIME:-7d}
+      # Daily ECB exchange rates (outbound HTTPS to www.ecb.europa.eu)
+      APP_ECB_ENABLED: ${APP_ECB_ENABLED:-true}
     networks: [internal]
     read_only: true
     tmpfs: [/tmp]

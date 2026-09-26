@@ -13,7 +13,8 @@ Self-hosted personal finance app for a small group of users (you and your family
   at a date; the value of every position is carried forward until the next record. Dashboards
   show total net worth per month/year and its split by asset class.
 - **Multi-currency** – each entry/position keeps its own currency; dashboards convert to the
-  user's base currency with exchange rates you enter manually.
+  user's base currency with the ECB reference rates, downloaded automatically every working day
+  and shared by all users. A user's own manual rates take priority over them.
 - **Per-user preferences** – interface language (Italian / English) and theme (system, light,
   dark) are saved to the account and follow the user on every device.
 - **Personal categories** – each user starts with a set of categories named in the language chosen
@@ -242,13 +243,24 @@ encrypted with it).
 ## How values are computed
 
 - **Cash flow**: each entry is converted with the rate of its own date. Entries in a currency
-  with no rate are excluded from totals and the UI warns about it.
+  with no rate (neither manual nor ECB) are excluded from totals and the UI warns about it.
 - **Net worth at date D**: for each position, the latest record on or before D
   (`quantity × unit price`, in the position's currency), converted with the rate valid on D.
   Positions don't exist before their first record; a record with quantity 0 closes a position.
   Monthly series use month-end dates (today for the current month); yearly series use Dec 31.
-- **Exchange rates**: `1 <currency> = rate <base>`, tied to the base currency they were entered
-  for. The latest rate on or before the date is used; dates before the first rate use the first one.
+- **Exchange rates**, `1 <currency> = rate <base>`, looked up for each date in this order:
+  1. the user's latest manual rate on or before the date (manual rates are tied to the base
+     currency they were entered for, and always win);
+  2. the latest ECB rate on or before the date (weekends and holidays use the previous
+     publication), converted to any base currency through the euro: `1 USD = CHF/EUR ÷ USD/EUR`;
+  3. for dates before every known rate, the first manual rate, then the first ECB rate.
+- **ECB download**: the backend stores the ECB euro reference rates (about 30 currencies, since
+  1999) in `central_exchange_rate`. At startup and every hour it checks whether a newer
+  publication is due (~16:00 Frankfurt time on working days) and downloads only then: the full
+  history the first time, the last 90 days after a longer downtime, otherwise the daily file.
+  It needs outbound HTTPS to `www.ecb.europa.eu`; `APP_ECB_ENABLED=false` turns it off (manual
+  rates keep working). Admins see the last download and any error in Settings › Exchange rates,
+  with an "Update now" button.
 - Bank accounts (`CASH`): quantity is the balance, unit price 1.
 
 ## API overview
@@ -261,14 +273,14 @@ encrypted with it).
 | Entries | `GET /api/cash-entries?from&to&kind&categoryId&q&page&size`, `POST`, `PUT/DELETE /{id}` |
 | Recurring | `GET/POST /api/recurring-entries`, `PUT/DELETE /{id}` (frequency `DAILY\|WEEKLY\|MONTHLY\|QUARTERLY\|FOUR_MONTHLY\|SEMIANNUAL\|YEARLY`) |
 | Positions | `GET/POST /api/positions`, `GET/PUT/DELETE /{id}`, `GET/POST /{id}/snapshots`, `PUT/DELETE /{id}/snapshots/{sid}`, `POST /api/positions/snapshots/bulk` |
-| FX | `GET/POST /api/fx-rates`, `DELETE /{id}` |
+| FX | `GET/POST /api/fx-rates`, `DELETE /{id}` (manual rates), `GET /api/fx-rates/central` (ECB rates in the base currency) |
 | Dashboards | `GET /api/dashboard/cashflow?year`, `/cashflow/years`, `/net-worth?granularity=MONTH\|YEAR&from=yyyy-MM&to=yyyy-MM`, `/net-worth/detail?date` |
-| Admin | `GET/POST /api/admin/users`, `PATCH/DELETE /{id}`, `POST /{id}/{reset-password,unlock,reset-mfa}` |
+| Admin | `GET/POST /api/admin/users`, `PATCH/DELETE /{id}`, `POST /{id}/{reset-password,unlock,reset-mfa}`, `GET /api/admin/fx`, `POST /api/admin/fx/refresh` |
 
 Errors are RFC 9457 problem details with a stable `code` (e.g. `invalid_credentials`,
 `validation_failed` + `errors` map).
 
 ## Ideas for later
 
-CSV import/export of entries, automatic price and FX fetching (e.g. ECB rates, CoinGecko),
+CSV import/export of entries, automatic price fetching (e.g. CoinGecko),
 budgets per category, transfers between own accounts.

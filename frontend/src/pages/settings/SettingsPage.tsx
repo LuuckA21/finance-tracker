@@ -1,14 +1,17 @@
 import { useState, type FormEvent } from 'react'
 import { NavLink, useParams } from 'react-router'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Pencil, RefreshCw, Trash2 } from 'lucide-react'
 import { errorMessage } from '../../api/client'
 import {
   useCategories,
+  useCentralRates,
   useDeleteCategory,
   useDeleteFxRate,
+  useEcbStatus,
   useFxRates,
   useLoginHistory,
   useMe,
+  useRefreshEcb,
   useSaveCategory,
   useSaveFxRate,
   useUpdateSettings,
@@ -52,7 +55,7 @@ export function SettingsPage() {
 function AccountTab() {
   const { t } = useI18n()
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <Card title={t('settings.preferences')}><PreferencesForm /></Card>
       <Card title={t('settings.baseCurrency')}><BaseCurrencyForm /></Card>
       <Card title={t('settings.twoFactor')}><MfaSection /></Card>
@@ -332,6 +335,82 @@ function FxTab() {
           </div>
         )}
       </Card>
+      {/* min-w-0: the wide table scrolls inside the card instead of widening the grid on phones */}
+      <div className="min-w-0 lg:col-span-2">
+        <EcbRatesCard base={base} isAdmin={me?.role === 'ADMIN'} />
+      </div>
     </div>
+  )
+}
+
+function EcbRatesCard({ base, isAdmin }: { base: string; isAdmin: boolean }) {
+  const { t } = useI18n()
+  const central = useCentralRates()
+  const status = useEcbStatus(isAdmin)
+  const refresh = useRefreshEcb()
+  const [error, setError] = useState<string | null>(null)
+  const data = central.data
+
+  async function refreshNow() {
+    setError(null)
+    try {
+      await refresh.mutateAsync()
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
+  return (
+    <Card title={t('fx.ecbTitle', { base })}>
+      <p className="mb-3 text-sm text-ink-2">
+        {t('fx.ecbHelp')}{' '}
+        {data?.latestDate && <span className="text-muted">{t('fx.ecbLatest', { date: date(data.latestDate) })}</span>}
+      </p>
+      {isAdmin && (
+        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg bg-surface-2 px-3 py-2 text-xs text-ink-2">
+          <span>
+            {status.data?.autoUpdate ? t('fx.ecbAuto') : t('fx.ecbAutoOff')}
+            {status.data?.lastSuccess && <> · {t('fx.ecbLastSuccess', { date: dateTime(status.data.lastSuccess) })}</>}
+          </span>
+          {status.data?.lastError && <span className="text-bad">{t('fx.ecbLastError', { error: status.data.lastError })}</span>}
+          <Button variant="secondary" onClick={refreshNow} loading={refresh.isPending}>
+            <RefreshCw className="size-4" /> {t('fx.ecbRefresh')}
+          </Button>
+        </div>
+      )}
+      <ErrorAlert message={error} />
+      {central.isPending ? <Spinner /> : !data || data.rates.length === 0 ? (
+        <EmptyState title={t('fx.ecbEmptyTitle')}>{t('fx.ecbEmptyHelp')}</EmptyState>
+      ) : (
+        <div className="-mx-4 overflow-x-auto sm:mx-0">
+          <table className="w-full min-w-[32rem] text-sm">
+            <thead>
+              <tr className="border-b border-line text-left text-xs text-muted">
+                <th className="px-4 py-2 font-medium sm:px-2">{t('common.currency')}</th>
+                <th className="px-2 py-2 text-right font-medium">{t('fx.ecbRate', { base })}</th>
+                <th className="px-2 py-2 font-medium">{t('common.date')}</th>
+                <th className="px-2 py-2 font-medium">{t('fx.ecbUsed')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.rates.map((r) => (
+                <tr key={r.currency} className="border-b border-line last:border-0">
+                  <td className="px-4 py-1.5 font-medium sm:px-2">{r.currency}</td>
+                  <td className={`tabular px-2 py-1.5 text-right ${r.manualRate !== null ? 'text-muted line-through' : ''}`}>
+                    {number(r.rate, 6)}
+                  </td>
+                  <td className="tabular px-2 py-1.5 text-ink-2">{date(r.date)}</td>
+                  <td className="px-2 py-1.5">
+                    {r.manualRate !== null
+                      ? <Badge tone="accent">{t('fx.ecbManual', { rate: number(r.manualRate, 6) })}</Badge>
+                      : <Badge>{t('fx.ecbSource')}</Badge>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
   )
 }

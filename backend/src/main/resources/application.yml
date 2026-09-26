@@ -76,6 +76,14 @@ app:
   session:
     # A login ends after this time even if used continuously (idle timeout: server.servlet.session.timeout)
     max-lifetime: ${SESSION_MAX_LIFETIME:7d}
+  fx:
+    ecb:
+      # Download the ECB euro reference rates (needs outbound HTTPS to www.ecb.europa.eu).
+      # Users' own rates always take priority over them.
+      enabled: ${APP_ECB_ENABLED:true}
+      base-url: https://www.ecb.europa.eu/stats/eurofxref/
+      # Hourly check; a download happens only when a new publication is due (~16:00 CET)
+      cron: "0 7 * * * *"
 
 logging:
   level:
