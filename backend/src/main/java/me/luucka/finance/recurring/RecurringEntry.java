@@ -1,4 +1,4 @@
-package me.luucka.finance.cashflow;
+package me.luucka.finance.recurring;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -14,14 +14,17 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import me.luucka.finance.core.EntryKind;
+import me.luucka.finance.core.recurrence.Frequency;
+import me.luucka.finance.core.recurrence.RecurrenceSchedule;
 
 /**
- * A single income or expense.
+ * A rule that creates the same income or expense on a schedule (salary, rent, subscriptions...).
  */
 @Entity
-@Table(name = "cash_entry")
-public class CashEntry {
+@Table(name = "recurring_entry")
+public class RecurringEntry {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -29,9 +32,6 @@ public class CashEntry {
 
     @Column(name = "user_id", nullable = false, updatable = false)
     private Long userId;
-
-    @Column(name = "entry_date", nullable = false)
-    private LocalDate date;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
@@ -49,9 +49,22 @@ public class CashEntry {
     @Column(length = 500)
     private String description;
 
-    /** Rule that created the entry, if any (set to null when the rule is deleted). */
-    @Column(name = "recurring_entry_id")
-    private Long recurringEntryId;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private Frequency frequency;
+
+    @Column(name = "start_date", nullable = false)
+    private LocalDate startDate;
+
+    @Column(name = "end_date")
+    private LocalDate endDate;
+
+    /** Last occurrence already handled (created, or skipped while paused). */
+    @Column(name = "last_generated")
+    private LocalDate lastGenerated;
+
+    @Column(nullable = false)
+    private boolean active = true;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -59,10 +72,13 @@ public class CashEntry {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    protected CashEntry() {
+    @Version
+    private long version;
+
+    protected RecurringEntry() {
     }
 
-    public CashEntry(Long userId) {
+    public RecurringEntry(Long userId) {
         this.userId = userId;
     }
 
@@ -77,20 +93,21 @@ public class CashEntry {
         updatedAt = Instant.now();
     }
 
+    public RecurrenceSchedule schedule() {
+        return new RecurrenceSchedule(startDate, endDate, frequency);
+    }
+
+    /** Next date an entry will be created, or null when paused or past the end date. */
+    public LocalDate nextDate() {
+        return active ? schedule().nextAfter(lastGenerated) : null;
+    }
+
     public Long getId() {
         return id;
     }
 
     public Long getUserId() {
         return userId;
-    }
-
-    public LocalDate getDate() {
-        return date;
-    }
-
-    public void setDate(LocalDate date) {
-        this.date = date;
     }
 
     public EntryKind getKind() {
@@ -133,11 +150,43 @@ public class CashEntry {
         this.description = description;
     }
 
-    public Long getRecurringEntryId() {
-        return recurringEntryId;
+    public Frequency getFrequency() {
+        return frequency;
     }
 
-    public void setRecurringEntryId(Long recurringEntryId) {
-        this.recurringEntryId = recurringEntryId;
+    public void setFrequency(Frequency frequency) {
+        this.frequency = frequency;
+    }
+
+    public LocalDate getStartDate() {
+        return startDate;
+    }
+
+    public void setStartDate(LocalDate startDate) {
+        this.startDate = startDate;
+    }
+
+    public LocalDate getEndDate() {
+        return endDate;
+    }
+
+    public void setEndDate(LocalDate endDate) {
+        this.endDate = endDate;
+    }
+
+    public LocalDate getLastGenerated() {
+        return lastGenerated;
+    }
+
+    public void setLastGenerated(LocalDate lastGenerated) {
+        this.lastGenerated = lastGenerated;
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
     }
 }

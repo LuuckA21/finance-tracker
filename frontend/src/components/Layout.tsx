@@ -8,6 +8,7 @@ import {
   Menu,
   PiggyBank,
   RefreshCw,
+  Repeat,
   Settings,
   Users,
   Wallet,
@@ -20,6 +21,7 @@ import { useI18n } from '../i18n'
 const NAV = [
   { to: '/', label: 'nav.overview', icon: LayoutDashboard, end: true },
   { to: '/movimenti', label: 'nav.entries', icon: ArrowLeftRight },
+  { to: '/ricorrenti', label: 'nav.recurring', icon: Repeat },
   { to: '/flussi', label: 'nav.cashflow', icon: BarChart3 },
   { to: '/patrimonio', label: 'nav.netWorth', icon: PiggyBank },
   { to: '/posizioni', label: 'nav.positions', icon: Wallet },

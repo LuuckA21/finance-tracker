@@ -4,6 +4,11 @@ Self-hosted personal finance app for a small group of users (you and your family
 
 - **Cash flow** – record income and expenses (date, category, amount, currency, note) and see
   monthly and yearly dashboards: totals, savings rate, breakdown by category.
+- **Recurring entries** – salary, rent, subscriptions: daily, weekly, monthly, quarterly, every 4
+  or 6 months, yearly, with optional end date. The entries are created automatically when due
+  (just after midnight and at startup, catching up days the server was down) and are ordinary
+  entries you can edit or delete. Editing a rule affects future entries only; pausing skips what
+  falls due meanwhile; deleting it keeps the entries already created.
 - **Net worth** – bank accounts, crypto, ETFs, stocks, pension, … Record *quantity × unit price*
   at a date; the value of every position is carried forward until the next record. Dashboards
   show total net worth per month/year and its split by asset class.
@@ -30,7 +35,7 @@ backend/
     auth/        security config, login + 2FA flow, rate limiting, session revocation
     account/     self-service: password, preferences (base currency, language, theme), 2FA, login history
     admin/       user management (no public sign-up) + bootstrap admin
-    category/ cashflow/ position/ fx/ dashboard/
+    category/ cashflow/ recurring/ position/ fx/ dashboard/
   src/main/resources/db/migration/   Flyway migrations
   src/test/java/…/core/              unit tests (no Spring)
   src/test/java/…/*IT.java           integration tests (Testcontainers + MockMvc)
@@ -243,6 +248,7 @@ encrypted with it).
 | Account | `PUT /api/account/password`, `PUT /api/account/settings` (partial: `baseCurrency`, `language` `IT\|EN`, `theme` `SYSTEM\|LIGHT\|DARK`), `GET /api/account/logins`, `POST /api/account/mfa/{setup,enable,disable,recovery-codes}` |
 | Categories | `GET/POST /api/categories`, `PUT/DELETE /api/categories/{id}` |
 | Entries | `GET /api/cash-entries?from&to&kind&categoryId&q&page&size`, `POST`, `PUT/DELETE /{id}` |
+| Recurring | `GET/POST /api/recurring-entries`, `PUT/DELETE /{id}` (frequency `DAILY\|WEEKLY\|MONTHLY\|QUARTERLY\|FOUR_MONTHLY\|SEMIANNUAL\|YEARLY`) |
 | Positions | `GET/POST /api/positions`, `GET/PUT/DELETE /{id}`, `GET/POST /{id}/snapshots`, `PUT/DELETE /{id}/snapshots/{sid}`, `POST /api/positions/snapshots/bulk` |
 | FX | `GET/POST /api/fx-rates`, `DELETE /{id}` |
 | Dashboards | `GET /api/dashboard/cashflow?year`, `/cashflow/years`, `/net-worth?granularity=MONTH\|YEAR&from=yyyy-MM&to=yyyy-MM`, `/net-worth/detail?date` |
@@ -254,4 +260,4 @@ Errors are RFC 9457 problem details with a stable `code` (e.g. `invalid_credenti
 ## Ideas for later
 
 CSV import/export of entries, automatic price and FX fetching (e.g. ECB rates, CoinGecko),
-recurring entries, budgets per category, transfers between own accounts.
+budgets per category, transfers between own accounts.

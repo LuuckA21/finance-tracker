@@ -14,6 +14,8 @@ public interface CashEntryRepository extends JpaRepository<CashEntry, Long>, Jpa
 
     boolean existsByCategoryId(Long categoryId);
 
+    boolean existsByRecurringEntryIdAndDate(Long recurringEntryId, LocalDate date);
+
     List<CashEntry> findByUserIdAndDateBetween(Long userId, LocalDate from, LocalDate to);
 
     List<CashEntry> findByUserId(Long userId);

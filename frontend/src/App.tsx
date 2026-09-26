@@ -5,6 +5,7 @@ import { RequireAuth } from './auth/RequireAuth'
 import { Layout } from './components/Layout'
 import { OverviewPage } from './pages/OverviewPage'
 import { EntriesPage } from './pages/EntriesPage'
+import { RecurringPage } from './pages/RecurringPage'
 import { CashflowPage } from './pages/CashflowPage'
 import { NetWorthPage } from './pages/NetWorthPage'
 import { PositionsPage } from './pages/PositionsPage'
@@ -27,6 +28,7 @@ export function App() {
         <Route element={<Layout />}>
           <Route index element={<OverviewPage />} />
           <Route path="movimenti" element={<EntriesPage />} />
+          <Route path="ricorrenti" element={<RecurringPage />} />
           <Route path="flussi" element={<CashflowPage />} />
           <Route path="patrimonio" element={<NetWorthPage />} />
           <Route path="posizioni" element={<PositionsPage />} />

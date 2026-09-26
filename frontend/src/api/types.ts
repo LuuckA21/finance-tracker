@@ -44,6 +44,26 @@ export interface CashEntry {
   amount: number
   currency: string
   description: string | null
+  /** Set when a recurring rule created the entry */
+  recurringEntryId: number | null
+}
+
+export type Frequency = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'FOUR_MONTHLY' | 'SEMIANNUAL' | 'YEARLY'
+
+export interface RecurringEntry {
+  id: number
+  kind: EntryKind
+  categoryId: number
+  amount: number
+  currency: string
+  description: string | null
+  frequency: Frequency
+  startDate: string
+  endDate: string | null
+  active: boolean
+  lastGenerated: string | null
+  /** Null when paused or past the end date */
+  nextDate: string | null
 }
 
 export interface Page<T> {

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Pencil, Plus, Repeat, Trash2 } from 'lucide-react'
 import { errorMessage } from '../api/client'
 import { useCategories, useDeleteEntry, useEntries, type EntryFilter } from '../api/hooks'
 import type { CashEntry, EntryKind } from '../api/types'
@@ -95,7 +95,14 @@ export function EntriesPage() {
                           {cat?.name ?? '—'}
                         </span>
                       </td>
-                      <td className="max-w-64 truncate px-2 py-2 text-ink-2">{e.description}</td>
+                      <td className="max-w-64 truncate px-2 py-2 text-ink-2">
+                        {e.recurringEntryId !== null && (
+                          <Repeat className="mr-1.5 inline size-3.5 align-[-2px] text-muted" aria-label={t('recurring.generated')}>
+                            <title>{t('recurring.generated')}</title>
+                          </Repeat>
+                        )}
+                        {e.description}
+                      </td>
                       <td className={`tabular px-2 py-2 text-right font-medium ${e.kind === 'INCOME' ? 'text-good' : 'text-ink'}`}>
                         {e.kind === 'INCOME' ? '+' : '−'} {money(e.amount, e.currency)}
                       </td>

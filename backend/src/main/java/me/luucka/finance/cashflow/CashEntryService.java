@@ -33,11 +33,12 @@ public class CashEntryService {
     public record Filter(LocalDate from, LocalDate to, EntryKind kind, Long categoryId, String text) {
     }
 
+    /** {@code recurringEntryId} is set when a recurring rule created the entry. */
     public record EntryResponse(long id, LocalDate date, EntryKind kind, long categoryId, BigDecimal amount,
-                                String currency, String description) {
+                                String currency, String description, Long recurringEntryId) {
         static EntryResponse of(CashEntry e) {
             return new EntryResponse(e.getId(), e.getDate(), e.getKind(), e.getCategoryId(), e.getAmount(),
-                    e.getCurrency(), e.getDescription());
+                    e.getCurrency(), e.getDescription(), e.getRecurringEntryId());
         }
     }
 
