@@ -95,6 +95,9 @@ class SecurityPrimitivesTest {
         assertTrue(PasswordPolicy.validate("correct horse battery", "luca").isEmpty());
         assertEquals(1, PasswordPolicy.validate("short", "luca").size());
         assertTrue(PasswordPolicy.validate("password1234", "x").contains("Password is too common"));
+        // Entries from the bundled leak list, compared case-insensitively
+        assertTrue(PasswordPolicy.validate("ILoveYouForever", "x").contains("Password is too common"));
+        assertTrue(PasswordPolicy.validate("qwertyuiop123", "x").contains("Password is too common"));
         assertTrue(PasswordPolicy.validate("luca-is-the-best-1", "luca")
                 .contains("Password must not contain the username"));
         assertTrue(PasswordPolicy.validate("aaaaaaaaaaaaaaab", "x").contains("Password is too repetitive"));

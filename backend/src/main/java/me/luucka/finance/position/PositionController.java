@@ -14,6 +14,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import me.luucka.finance.auth.AppPrincipal;
 import me.luucka.finance.common.CurrencyCode;
+import me.luucka.finance.common.ReasonableDate;
 import me.luucka.finance.core.AssetClass;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -47,7 +48,7 @@ public class PositionController {
     }
 
     public record SnapshotRequest(
-            @NotNull LocalDate date,
+            @NotNull @ReasonableDate LocalDate date,
             @NotNull @DecimalMin("0") @Digits(integer = 26, fraction = 12) BigDecimal quantity,
             @NotNull @DecimalMin("0") @Digits(integer = 26, fraction = 12) BigDecimal unitPrice,
             @Size(max = 500) String note) {
@@ -64,7 +65,7 @@ public class PositionController {
     }
 
     public record BulkSnapshotRequest(
-            @NotNull LocalDate date,
+            @NotNull @ReasonableDate LocalDate date,
             @NotEmpty @Size(max = 500) List<@Valid BulkItemRequest> items) {
     }
 

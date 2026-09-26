@@ -38,11 +38,19 @@ class MfaFlowIT {
         String secret = json(setup, "$.secret");
         long step = Totp.stepAt(Instant.now());
 
-        MvcResult badEnable = client.post("/api/account/mfa/enable", "{\"code\":\"000000\"}");
-        assertEquals(400, badEnable.getResponse().getStatus());
+        MvcResult badEnable = client.post("/api/account/mfa/enable",
+                "{\"password\":\"%s\",\"code\":\"000000\"}".formatted(TestUsers.PASSWORD));
+        assertEquals("invalid_mfa_code", json(badEnable, "$.code"));
+        // The current password is required: a stolen session cannot enrol its own authenticator
+        MvcResult noPassword = client.post("/api/account/mfa/enable",
+                "{\"code\":\"%s\"}".formatted(Totp.codeAt(secret, step)));
+        assertEquals(400, noPassword.getResponse().getStatus());
+        MvcResult wrongPassword = client.post("/api/account/mfa/enable",
+                "{\"password\":\"wrong-password-123\",\"code\":\"%s\"}".formatted(Totp.codeAt(secret, step)));
+        assertEquals("invalid_current_password", json(wrongPassword, "$.code"));
 
         MvcResult enabled = client.post("/api/account/mfa/enable",
-                "{\"code\":\"%s\"}".formatted(Totp.codeAt(secret, step)));
+                "{\"password\":\"%s\",\"code\":\"%s\"}".formatted(TestUsers.PASSWORD, Totp.codeAt(secret, step)));
         assertEquals(200, enabled.getResponse().getStatus());
         List<String> recoveryCodes = json(enabled, "$.recoveryCodes");
         assertEquals(10, recoveryCodes.size());

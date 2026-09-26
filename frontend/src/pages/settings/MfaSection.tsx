@@ -61,6 +61,7 @@ function SetupFlow({ onEnabled }: { onEnabled: (codes: string[]) => void }) {
   const enable = useMfaEnable()
   const [qr, setQr] = useState<string | null>(null)
   const [code, setCode] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const { t } = useI18n()
   const { mutate } = setup
@@ -76,7 +77,7 @@ function SetupFlow({ onEnabled }: { onEnabled: (codes: string[]) => void }) {
     e.preventDefault()
     setError(null)
     try {
-      const res = await enable.mutateAsync(code.replace(/\s/g, ''))
+      const res = await enable.mutateAsync({ password, code: code.replace(/\s/g, '') })
       onEnabled(res.recoveryCodes)
     } catch (err) {
       setError(errorMessage(err))
@@ -99,6 +100,9 @@ function SetupFlow({ onEnabled }: { onEnabled: (codes: string[]) => void }) {
           <code className="mt-2 block break-all rounded bg-surface-2 p-2 font-mono text-ink">{setup.data.secret}</code>
         </details>
       )}
+      <Field label={t('password.current')} hint={t('mfa.passwordHint')}>
+        {(id) => <input id={id} type="password" className="input" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />}
+      </Field>
       <Field label={t('mfa.code')}>
         {(id) => (
           <input id={id} className="input tabular text-center text-lg tracking-widest" inputMode="numeric" autoComplete="one-time-code"

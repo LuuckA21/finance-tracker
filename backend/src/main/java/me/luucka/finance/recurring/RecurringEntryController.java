@@ -12,6 +12,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import me.luucka.finance.auth.AppPrincipal;
 import me.luucka.finance.common.CurrencyCode;
+import me.luucka.finance.common.ReasonableDate;
 import me.luucka.finance.core.EntryKind;
 import me.luucka.finance.core.recurrence.Frequency;
 import org.springframework.http.HttpStatus;
@@ -39,8 +40,8 @@ public class RecurringEntryController {
             @NotNull @CurrencyCode String currency,
             @Size(max = 500) String description,
             @NotNull Frequency frequency,
-            @NotNull LocalDate startDate,
-            LocalDate endDate,
+            @NotNull @ReasonableDate LocalDate startDate,
+            @ReasonableDate LocalDate endDate,
             // Omitted means active
             Boolean active) {
 

@@ -19,6 +19,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class RecurringEntryService {
 
+    /**
+     * How far back a start date may go: every past occurrence is created at once, so without a
+     * bound a daily rule starting in 1900 would insert ~46'000 entries in one request.
+     */
+    static final int MAX_BACKFILL_YEARS = 2;
+
     public record RuleData(EntryKind kind, long categoryId, BigDecimal amount, String currency, String description,
                            Frequency frequency, LocalDate startDate, LocalDate endDate, boolean active) {
     }
@@ -124,6 +130,12 @@ public class RecurringEntryService {
         if (category.getKind() != data.kind()) {
             throw ApiException.badRequest("category_kind_mismatch",
                     "The category does not match the entry type (income/expense)");
+        }
+        // Checked only when the start date is set or changed, so older rules stay editable
+        if (!data.startDate().equals(rule.getStartDate())
+                && data.startDate().isBefore(today().minusYears(MAX_BACKFILL_YEARS))) {
+            throw ApiException.badRequest("start_too_old",
+                    "The start date may be at most " + MAX_BACKFILL_YEARS + " years in the past");
         }
         if (data.endDate() != null && data.endDate().isBefore(data.startDate())) {
             throw ApiException.badRequest("end_before_start", "The end date is before the start date");

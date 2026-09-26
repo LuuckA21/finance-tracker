@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import me.luucka.finance.auth.AuthSession;
 import me.luucka.finance.auth.MfaService;
+import me.luucka.finance.auth.ReauthGuard;
 import me.luucka.finance.auth.SessionRevoker;
 import me.luucka.finance.common.ApiException;
 import me.luucka.finance.core.Currencies;
@@ -38,15 +39,18 @@ public class AccountService {
     private final MfaService mfaService;
     private final SessionRevoker sessionRevoker;
     private final AuthSession authSession;
+    private final ReauthGuard reauthGuard;
 
     public AccountService(AppUserRepository users, LoginEventRepository loginEvents, PasswordEncoder passwordEncoder,
-                          MfaService mfaService, SessionRevoker sessionRevoker, AuthSession authSession) {
+                          MfaService mfaService, SessionRevoker sessionRevoker, AuthSession authSession,
+                          ReauthGuard reauthGuard) {
         this.users = users;
         this.loginEvents = loginEvents;
         this.passwordEncoder = passwordEncoder;
         this.mfaService = mfaService;
         this.sessionRevoker = sessionRevoker;
         this.authSession = authSession;
+        this.reauthGuard = reauthGuard;
     }
 
     @Transactional(readOnly = true)
@@ -65,8 +69,10 @@ public class AccountService {
     public MeResponse changePassword(long userId, String currentPassword, String newPassword,
                                      HttpServletRequest request, HttpServletResponse response) {
         AppUser user = load(userId);
+        reauthGuard.ensureNotLocked(user);
         if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
-            throw ApiException.badRequest("invalid_current_password", "Current password is wrong");
+            throw reauthGuard.failure(userId,
+                    ApiException.badRequest("invalid_current_password", "Current password is wrong"));
         }
         List<String> violations = PasswordPolicy.validate(newPassword, user.getUsername());
         if (!violations.isEmpty()) {
@@ -77,6 +83,7 @@ public class AccountService {
         }
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         user.setPasswordChangeRequired(false);
+        user.resetFailedLogins();
         AppUser saved = users.save(user);
 
         HttpSession session = request.getSession(false);
@@ -114,11 +121,12 @@ public class AccountService {
         if (!user.isTotpEnabled()) {
             throw ApiException.badRequest("mfa_not_enabled", "Two-factor authentication is not enabled");
         }
+        reauthGuard.ensureNotLocked(user);
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
-            throw ApiException.badRequest("invalid_current_password", "Password is wrong");
+            throw reauthGuard.failure(userId, ApiException.badRequest("invalid_current_password", "Password is wrong"));
         }
         if (mfaService.verifySecondFactor(userId, code) == MfaService.Verification.INVALID) {
-            throw ApiException.badRequest("invalid_mfa_code", "Invalid code");
+            throw reauthGuard.failure(userId, ApiException.badRequest("invalid_mfa_code", "Invalid code"));
         }
         mfaService.disable(userId);
     }

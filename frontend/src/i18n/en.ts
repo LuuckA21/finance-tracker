@@ -431,4 +431,7 @@ export const en: Messages = {
   'recurring.colDescription': 'Description',
   'recurring.colSchedule': 'Frequency',
   'error.end_before_start': 'The end date is before the start date.',
+  // Security hardening
+  'error.start_too_old': 'The start date may be at most 2 years in the past.',
+  'mfa.passwordHint': 'For security, confirm with your current password.',
 }
