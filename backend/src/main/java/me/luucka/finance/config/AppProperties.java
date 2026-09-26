@@ -12,13 +12,15 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param encryptionKey  Base64 32-byte key for encrypting secrets at rest
  * @param bootstrapAdmin first administrator created on an empty database
  * @param login          brute-force protection settings
+ * @param session        login session settings
  */
 @ConfigurationProperties("app")
 public record AppProperties(
         String totpIssuer,
         String encryptionKey,
         BootstrapAdmin bootstrapAdmin,
-        Login login) {
+        Login login,
+        Session session) {
 
     public record BootstrapAdmin(String username, String password, Language language) {
     }
@@ -36,5 +38,11 @@ public record AppProperties(
             int ipMaxAttempts,
             Duration ipWindow,
             Duration mfaTimeout) {
+    }
+
+    /**
+     * @param maxLifetime how long a login lasts at most, even when the session stays active
+     */
+    public record Session(Duration maxLifetime) {
     }
 }

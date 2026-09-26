@@ -56,8 +56,9 @@ ops/systemd/     backup service and timer (user units)
 - **Accounts**: no self-registration. The first admin is created on an empty database; admins
   create users with a one-time temporary password that must be changed at first login.
   Admins manage accounts but **cannot see other users' financial data**.
-- **Passwords**: Argon2id (19 MiB, 2 iterations), min. 12 chars, common/username-containing
-  passwords rejected (NIST 800-63B style). Hashes are upgraded transparently if parameters change.
+- **Passwords**: Argon2id (19 MiB, 2 iterations), min. 12 chars, username-containing passwords
+  and ~47k leaked passwords of 12+ chars rejected (NIST 800-63B style; list from SecLists in
+  `backend/src/main/resources/security/common-passwords.txt`). Hashes are upgraded transparently if parameters change.
 - **Two-factor auth**: optional TOTP (RFC 6238) with QR enrolment; the secret is encrypted at rest
   with AES-256-GCM (`APP_ENCRYPTION_KEY`), codes cannot be replayed, 10 single-use recovery codes
   (stored as SHA-256 hashes).
@@ -68,14 +69,17 @@ ops/systemd/     backup service and timer (user units)
   cookie cannot be used to guess the password or a TOTP code. Enabling 2FA needs the current
   password. Nginx rate-limits the login, 2FA and CSRF endpoints per client IP (HTTP 429).
 - **Sessions**: server-side sessions stored in PostgreSQL (Spring Session JDBC); cookie is
-  `HttpOnly`, `Secure`, `SameSite=Strict`; session id rotated on login; 2 h idle timeout.
+  `HttpOnly`, `Secure`, `SameSite=Strict`; session id rotated on login; 2 h idle timeout
+  (`SESSION_TIMEOUT`) and a login lasts at most 7 days even when active (`SESSION_MAX_LIFETIME`).
   Password change / reset, disabling or deleting a user revokes their other sessions immediately.
 - **CSRF**: synchronizer token in the session, sent by the SPA in `X-CSRF-TOKEN`.
 - **Authorization**: every query is scoped by the owner id taken from the session; accessing
   another user's record returns 404. Covered by `DataIsolationIT`.
 - **Headers**: strict CSP, `frame-ancestors 'none'`, `nosniff`, `no-referrer` (Nginx + Spring).
 - **Containers**: DB not published; backend read-only filesystem, non-root, all capabilities
-  dropped; only the web container is exposed, bound to an address you choose.
+  dropped; only the web container is exposed, bound to an address you choose. Memory and process
+  limits on every container (`BACKEND_MEMORY` 768m, `DB_MEMORY` 512m, `WEB_MEMORY` 64m).
+- **Dependencies**: Dependabot opens weekly PRs for Maven, npm, base images and Actions.
 
 ## Run locally (development)
 
@@ -144,6 +148,10 @@ running on another host:
   through NPM: `docker compose logs --tail=5 web` must show your public IP. If it shows an
   internal address, set `DOCKERD_ROOTLESS_ROOTLESSKIT_PORT_DRIVER=slirp4netns` in a
   `~/.config/systemd/user/docker.service.d/` drop-in and restart Docker.
+- In NPM also enable "HSTS Enabled" on the SSL tab, so browsers never try plain HTTP again.
+- Container memory limits need the `memory` cgroup delegated to your user (default with systemd
+  and cgroup v2): `docker info` must not warn "No memory limit support". A container that goes over
+  its limit is restarted instead of taking memory from the other services on the server.
 
 ### Updates with `deploy.sh`
 

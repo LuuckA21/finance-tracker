@@ -1,5 +1,8 @@
 package me.luucka.finance.auth;
 
+import java.time.Clock;
+
+import me.luucka.finance.config.AppProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -8,6 +11,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
+import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
@@ -24,6 +28,7 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
  *       and sent back in the {@code X-CSRF-TOKEN} header.</li>
  *   <li>Login is a JSON endpoint handled by {@link AuthService}; no form login, no HTTP Basic.</li>
  *   <li>Unauthenticated API calls get 401 (never a redirect).</li>
+ *   <li>A login lasts at most {@code app.session.max-lifetime}, see {@link SessionLifetimeFilter}.</li>
  * </ul>
  */
 @Configuration(proxyBeanMethods = false)
@@ -42,7 +47,9 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http,
                                             SecurityContextRepository securityContextRepository,
-                                            CsrfTokenRepository csrfTokenRepository) throws Exception {
+                                            CsrfTokenRepository csrfTokenRepository,
+                                            AppProperties properties,
+                                            Clock clock) throws Exception {
         http
                 .securityContext(context -> context.securityContextRepository(securityContextRepository))
                 .csrf(csrf -> csrf
@@ -66,6 +73,8 @@ public class SecurityConfig {
                 .headers(headers -> headers
                         .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'none'; frame-ancestors 'none'"))
                         .referrerPolicy(referrer -> referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER)))
+                .addFilterBefore(new SessionLifetimeFilter(clock, properties.session().maxLifetime()),
+                        AnonymousAuthenticationFilter.class)
                 .addFilterBefore(new PasswordChangeRequiredFilter(), AuthorizationFilter.class);
         return http.build();
     }

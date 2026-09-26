@@ -1,9 +1,16 @@
 package me.luucka.finance.core.security;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Password rules following NIST SP 800-63B: favour length over composition rules,
@@ -15,10 +22,11 @@ public final class PasswordPolicy {
     /** Argon2 input is bounded to keep hashing cost predictable. */
     public static final int MAX_LENGTH = 128;
 
-    private static final Set<String> COMMON = Set.of(
-            "password1234", "123456789012", "qwertyuiopas", "passwordpassword",
-            "iloveyou1234", "administrator", "welcome12345", "changeme1234",
-            "letmein12345", "password123!", "qwerty123456", "1234567890ab");
+    /**
+     * Leaked passwords long enough to pass the length rule (lower case), taken from the
+     * SecLists xato-net 1M and NCSC 100k lists.
+     */
+    private static final Set<String> COMMON = load("/security/common-passwords.txt");
 
     private PasswordPolicy() {
     }
@@ -50,5 +58,17 @@ public final class PasswordPolicy {
             errors.add("Password is too repetitive");
         }
         return errors;
+    }
+
+    private static Set<String> load(String resource) {
+        try (InputStream in = PasswordPolicy.class.getResourceAsStream(resource)) {
+            if (in == null) {
+                throw new IllegalStateException("Missing classpath resource " + resource);
+            }
+            var reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+            return reader.lines().filter(line -> !line.isEmpty()).collect(Collectors.toUnmodifiableSet());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 }

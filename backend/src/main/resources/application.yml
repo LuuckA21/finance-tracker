@@ -73,6 +73,9 @@ app:
     ip-max-attempts: 30
     ip-window: 15m
     mfa-timeout: 5m
+  session:
+    # A login ends after this time even if used continuously (idle timeout: server.servlet.session.timeout)
+    max-lifetime: ${SESSION_MAX_LIFETIME:7d}
 
 logging:
   level:

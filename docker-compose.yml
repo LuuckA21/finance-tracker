@@ -17,6 +17,8 @@ services:
       retries: 5
     networks: [internal]
     # No published port: the database is reachable only from the backend
+    mem_limit: ${DB_MEMORY:-512m}
+    pids_limit: 200
 
   backend:
     build: ./backend
@@ -35,11 +37,15 @@ services:
       APP_ADMIN_LANGUAGE: ${APP_ADMIN_LANGUAGE:-IT}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
       SESSION_TIMEOUT: ${SESSION_TIMEOUT:-2h}
+      SESSION_MAX_LIFETIME: ${SESSION_MAX_LIFETIME:-7d}
     networks: [internal]
     read_only: true
     tmpfs: [/tmp]
     security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]
+    # Heap is 75% of this (JAVA_TOOL_OPTIONS in the Dockerfile); each password hash needs ~19 MiB
+    mem_limit: ${BACKEND_MEMORY:-768m}
+    pids_limit: 500
 
   web:
     build: ./frontend
@@ -55,6 +61,8 @@ services:
     networks: [internal]
     security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]
+    mem_limit: ${WEB_MEMORY:-64m}
+    pids_limit: 100
 
 networks:
   internal:

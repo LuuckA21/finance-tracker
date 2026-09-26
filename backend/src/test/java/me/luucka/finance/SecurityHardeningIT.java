@@ -3,10 +3,12 @@ package me.luucka.finance;
 import static me.luucka.finance.support.ApiClient.json;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
+import me.luucka.finance.auth.SessionLifetimeFilter;
 import me.luucka.finance.core.security.Totp;
 import me.luucka.finance.support.ApiClient;
 import me.luucka.finance.support.IntegrationTest;
@@ -15,10 +17,12 @@ import me.luucka.finance.user.AppUser;
 import me.luucka.finance.user.Role;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.session.FindByIndexNameSessionRepository;
+import org.springframework.session.Session;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-/** Brute force from inside a session, 2FA enrolment and input bounds. */
+/** Brute force from inside a session, 2FA enrolment, session lifetime and input bounds. */
 @IntegrationTest
 class SecurityHardeningIT {
 
@@ -27,6 +31,9 @@ class SecurityHardeningIT {
 
     @Autowired
     TestUsers testUsers;
+
+    @Autowired
+    FindByIndexNameSessionRepository<? extends Session> sessions;
 
     private ApiClient login(AppUser user) throws Exception {
         ApiClient client = new ApiClient(mvc);
@@ -140,5 +147,31 @@ class SecurityHardeningIT {
         assertEquals(400, farFuture.getResponse().getStatus());
         assertEquals(400, client.post("/api/fx-rates", "{\"currency\":\"EUR\",\"date\":\"1800-01-01\",\"rate\":1}")
                 .getResponse().getStatus());
+    }
+
+    @Test
+    void loginEndsAfterTheMaximumLifetimeEvenWhenActive() throws Exception {
+        AppUser user = testUsers.create("lifetime", Role.USER);
+        ApiClient client = login(user);
+        assertEquals(200, client.get("/api/auth/me").getResponse().getStatus());
+
+        // Pretend the login happened 7 days and 1 minute ago (default app.session.max-lifetime: 7d)
+        backdateLogin(sessions, user.getUsername(), Duration.ofDays(7).plusMinutes(1));
+
+        assertEquals(401, client.get("/api/auth/me").getResponse().getStatus());
+        assertEquals(0, sessions.findByPrincipalName(user.getUsername()).size());
+        // A new login works and starts a new lifetime
+        assertEquals(200, client.login(user.getUsername(), TestUsers.PASSWORD));
+        assertEquals(200, client.get("/api/auth/me").getResponse().getStatus());
+    }
+
+    private static <S extends Session> void backdateLogin(FindByIndexNameSessionRepository<S> repository,
+                                                          String username, Duration ago) {
+        var found = repository.findByPrincipalName(username).values();
+        assertEquals(1, found.size());
+        S session = found.iterator().next();
+        assertEquals(Long.class, session.getAttribute(SessionLifetimeFilter.AUTHENTICATED_AT).getClass());
+        session.setAttribute(SessionLifetimeFilter.AUTHENTICATED_AT, Instant.now().minus(ago).toEpochMilli());
+        repository.save(session);
     }
 }
