@@ -24,6 +24,11 @@ updates:
     directories: [/backend, /frontend]
     schedule:
       interval: weekly
+    ignore:
+      # Build stage only. Its tags mix Maven and JDK versions (3.9-eclipse-temurin-25) and
+      # Dependabot reads 3-eclipse-temurin-24 as newer: a JDK downgrade. The floating 3.9 tag
+      # already picks up Maven patches; move to a new JDK together with eclipse-temurin by hand.
+      - dependency-name: maven
 
   # postgres image in docker-compose.yml. A major version needs a dump/restore, so only minors
   - package-ecosystem: docker-compose
