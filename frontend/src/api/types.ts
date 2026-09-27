@@ -102,6 +102,29 @@ export interface FxRate {
   rate: number
 }
 
+/** ECB rate towards the base currency; manualRate is set when the user's own rate is used instead. */
+export interface CentralRate {
+  currency: string
+  rate: number
+  date: string
+  manualRate: number | null
+}
+
+export interface CentralRates {
+  source: 'ECB'
+  baseCurrency: string
+  latestDate: string | null
+  rates: CentralRate[]
+}
+
+export interface EcbStatus {
+  autoUpdate: boolean
+  latestDate: string | null
+  lastAttempt: string | null
+  lastSuccess: string | null
+  lastError: string | null
+}
+
 export interface CashflowTotals {
   income: number
   expense: number

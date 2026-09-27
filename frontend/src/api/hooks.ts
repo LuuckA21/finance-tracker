@@ -8,6 +8,8 @@ import type {
   CashflowYears,
   Category,
   EntryKind,
+  CentralRates,
+  EcbStatus,
   FxRate,
   Granularity,
   LoginEvent,
@@ -264,6 +266,18 @@ export function useSaveFxRate() {
 export function useDeleteFxRate() {
   const invalidate = useInvalidate()
   return useMutation({ mutationFn: (id: number) => del(`/api/fx-rates/${id}`), onSuccess: () => invalidate() })
+}
+
+export const useCentralRates = () =>
+  useQuery({ queryKey: ['fx', 'central'], queryFn: () => get<CentralRates>('/api/fx-rates/central') })
+
+export const useEcbStatus = (enabled: boolean) =>
+  useQuery({ queryKey: ['fx', 'ecb-status'], queryFn: () => get<EcbStatus>('/api/admin/fx'), enabled })
+
+export function useRefreshEcb() {
+  const invalidate = useInvalidate()
+  // onSettled: a failed download changes the status too
+  return useMutation({ mutationFn: () => post<unknown>('/api/admin/fx/refresh', {}), onSettled: () => invalidate() })
 }
 
 // ---------------------------------------------------------------- dashboards

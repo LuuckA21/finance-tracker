@@ -23,9 +23,13 @@ import org.springframework.test.context.TestPropertySource;
         "app.encryption-key=dGVzdC1rZXktdGVzdC1rZXktdGVzdC1rZXktdGVzdCE=",
         "app.bootstrap-admin.username=admin",
         "app.bootstrap-admin.password=" + IntegrationTest.ADMIN_PASSWORD,
-        "app.login.ip-max-attempts=1000"
+        "app.login.ip-max-attempts=1000",
+        // No downloads from the real ECB; EcbRatesIT serves the feeds itself on this address
+        "app.fx.ecb.enabled=false",
+        "app.fx.ecb.base-url=http://127.0.0.1:" + IntegrationTest.ECB_PORT + "/ecb/"
 })
 public @interface IntegrationTest {
 
     String ADMIN_PASSWORD = "Initial-Bootstrap-Secret-42";
+    int ECB_PORT = 18089;
 }

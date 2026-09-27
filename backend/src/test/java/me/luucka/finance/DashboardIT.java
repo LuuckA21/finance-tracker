@@ -42,7 +42,7 @@ class DashboardIT {
                 {"date":"2025-01-10","kind":"EXPENSE","categoryId":%d,"amount":200,"currency":"EUR"}
                 """.formatted(expense.getFirst()));
         c.post("/api/cash-entries", """
-                {"date":"2025-02-10","kind":"EXPENSE","categoryId":%d,"amount":50,"currency":"USD"}
+                {"date":"2025-02-10","kind":"EXPENSE","categoryId":%d,"amount":50,"currency":"ARS"}
                 """.formatted(expense.getFirst()));
 
         MvcResult year = c.get("/api/dashboard/cashflow?year=2025");
@@ -50,7 +50,8 @@ class DashboardIT {
         assertEquals("CHF", json(year, "$.baseCurrency"));
         assertEquals(6000.0, ((Number) json(year, "$.totals.income")).doubleValue());
         assertEquals(190.0, ((Number) json(year, "$.months[0].totals.expense")).doubleValue());
-        assertEquals(List.of("USD"), json(year, "$.unconvertedCurrencies"));
+        // No manual rate and not published by the ECB: left out of the totals
+        assertEquals(List.of("ARS"), json(year, "$.unconvertedCurrencies"));
 
         // Net worth: bank account in CHF + ETF priced in EUR
         int bank = json(c.post("/api/positions", """

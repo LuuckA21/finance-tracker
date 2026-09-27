@@ -42,6 +42,11 @@ public class FxController {
         return service.list(me.id());
     }
 
+    @GetMapping("/central")
+    public FxService.CentralRatesResponse central(@AuthenticationPrincipal AppPrincipal me) {
+        return service.centralRates(me.id());
+    }
+
     @PostMapping
     public FxService.RateResponse upsert(@AuthenticationPrincipal AppPrincipal me, @Valid @RequestBody RateRequest body) {
         return service.upsert(me.id(), body.currency(), body.date(), body.rate());
