@@ -19,7 +19,7 @@
 
     <properties>
         <java.version>25</java.version>
-        <bouncycastle.version>1.81</bouncycastle.version>
+        <bouncycastle.version>1.86</bouncycastle.version>
     </properties>
 
     <dependencies>
