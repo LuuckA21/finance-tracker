@@ -12,6 +12,11 @@ Self-hosted personal finance app for a small group of users (you and your family
 - **Net worth** – bank accounts, crypto, ETFs, stocks, pension, … Record *quantity × unit price*
   at a date; the value of every position is carried forward until the next record. Dashboards
   show total net worth per month/year and its split by asset class.
+- **CSV import/export** – export the entries matching the current filters (Excel-friendly: UTF-8,
+  `;`, ISO dates). Import either everything at once (valid rows, duplicates skipped, nothing saved
+  if a row has problems) or row by row: include or exclude each row, fix type and category,
+  see duplicates. Headers in Italian, English or German; dates `2026-08-01` or `01.08.2026`;
+  amounts `1234.50`, `1234,50` or `1'234.50`.
 - **Multi-currency** – each entry/position keeps its own currency; dashboards convert to the
   user's base currency with the ECB reference rates, downloaded automatically every working day
   and shared by all users. A user's own manual rates take priority over them.
@@ -77,6 +82,12 @@ ops/systemd/     backup service and timer (user units)
 - **Authorization**: every query is scoped by the owner id taken from the session; accessing
   another user's record returns 404. Covered by `DataIsolationIT`.
 - **Headers**: strict CSP, `frame-ancestors 'none'`, `nosniff`, `no-referrer` (Nginx + Spring).
+- **CSV**: the import preview parses in memory and stores nothing; the confirmed rows are
+  validated again like single entries and saved all or none, only with the user's own categories.
+  Bounded parser (2 MB, 5000 rows, 30 columns, 1000 characters per value; binary files and broken
+  quotes rejected), control and bidi characters stripped. The export prefixes text starting with
+  `= + - @` with `'` so spreadsheets never run it as a formula (CSV injection); importing the export
+  removes the prefix again. Nginx allows 4 MB only on the two import paths (1 MB elsewhere).
 - **Containers**: DB not published; backend read-only filesystem, non-root, all capabilities
   dropped; only the web container is exposed, bound to an address you choose. Memory and process
   limits on every container (`BACKEND_MEMORY` 768m, `DB_MEMORY` 512m, `WEB_MEMORY` 64m).
@@ -272,7 +283,7 @@ encrypted with it).
 | Auth | `GET /api/auth/csrf`, `POST /api/auth/login`, `POST /api/auth/login/mfa`, `POST /api/auth/logout`, `GET /api/auth/me` |
 | Account | `PUT /api/account/password`, `PUT /api/account/settings` (partial: `baseCurrency`, `language` `IT\|EN`, `theme` `SYSTEM\|LIGHT\|DARK`), `GET /api/account/logins`, `POST /api/account/mfa/{setup,enable,disable,recovery-codes}` |
 | Categories | `GET/POST /api/categories`, `PUT/DELETE /api/categories/{id}` |
-| Entries | `GET /api/cash-entries?from&to&kind&categoryId&q&page&size`, `POST`, `PUT/DELETE /{id}` |
+| Entries | `GET /api/cash-entries?from&to&kind&categoryId&q&page&size`, `POST`, `PUT/DELETE /{id}`, `GET /export?filters` (CSV), `POST /import/preview` (multipart `file`), `POST /import` (`{entries:[…]}`) |
 | Recurring | `GET/POST /api/recurring-entries`, `PUT/DELETE /{id}` (frequency `DAILY\|WEEKLY\|MONTHLY\|QUARTERLY\|FOUR_MONTHLY\|SEMIANNUAL\|YEARLY`) |
 | Positions | `GET/POST /api/positions`, `GET/PUT/DELETE /{id}`, `GET/POST /{id}/snapshots`, `PUT/DELETE /{id}/snapshots/{sid}`, `POST /api/positions/snapshots/bulk` |
 | FX | `GET/POST /api/fx-rates`, `DELETE /{id}` (manual rates), `GET /api/fx-rates/central?date` (ECB rates in the base currency on a day, default today) |
@@ -284,5 +295,5 @@ Errors are RFC 9457 problem details with a stable `code` (e.g. `invalid_credenti
 
 ## Ideas for later
 
-CSV import/export of entries, automatic price fetching (e.g. CoinGecko),
+Automatic price fetching (e.g. CoinGecko),
 budgets per category, transfers between own accounts.

@@ -97,6 +97,12 @@ public class CategoryService {
         categories.delete(category);
     }
 
+    /** Every category owned by the user. */
+    @Transactional(readOnly = true)
+    public List<Category> owned(long userId) {
+        return categories.findByUserIdOrderByKindAscNameAsc(userId);
+    }
+
     /** Loads a category owned by the user or fails with 404 (never reveals other users' data). */
     @Transactional(readOnly = true)
     public Category get(long userId, long id) {

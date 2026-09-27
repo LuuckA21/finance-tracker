@@ -1,5 +1,8 @@
 package me.luucka.finance.common;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import org.springframework.http.HttpStatus;
 
 /**
@@ -10,6 +13,7 @@ public class ApiException extends RuntimeException {
 
     private final HttpStatus status;
     private final String code;
+    private final Map<String, Object> properties = new LinkedHashMap<>();
 
     public ApiException(HttpStatus status, String code, String message) {
         super(message);
@@ -27,6 +31,16 @@ public class ApiException extends RuntimeException {
 
     public static ApiException conflict(String code, String message) {
         return new ApiException(HttpStatus.CONFLICT, code, message);
+    }
+
+    /** Extra member of the problem detail, e.g. the row of an import that failed. */
+    public ApiException withProperty(String name, Object value) {
+        properties.put(name, value);
+        return this;
+    }
+
+    public Map<String, Object> properties() {
+        return properties;
     }
 
     public HttpStatus status() {

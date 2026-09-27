@@ -3,9 +3,10 @@ package me.luucka.finance.support;
 import com.jayway.jsonpath.JsonPath;
 import jakarta.servlet.http.Cookie;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 /**
@@ -43,6 +44,17 @@ public class ApiClient {
 
     public MvcResult delete(String url) throws Exception {
         return perform(MockMvcRequestBuilders.delete(url), true);
+    }
+
+    /** Multipart upload of one file in the part "file", like the SPA's CSV import. */
+    public MvcResult upload(String url, String filename, byte[] content) throws Exception {
+        return perform(MockMvcRequestBuilders.multipart(url)
+                .file(new MockMultipartFile("file", filename, "text/csv", content)), true);
+    }
+
+    public MvcResult uploadWithoutCsrf(String url, String filename, byte[] content) throws Exception {
+        return perform(MockMvcRequestBuilders.multipart(url)
+                .file(new MockMultipartFile("file", filename, "text/csv", content)), false);
     }
 
     /** Sends a mutating request without the CSRF header. */
@@ -85,7 +97,7 @@ public class ApiClient {
         return JsonPath.read(body(result), path);
     }
 
-    private MvcResult perform(MockHttpServletRequestBuilder builder, boolean withCsrf) throws Exception {
+    private MvcResult perform(AbstractMockHttpServletRequestBuilder<?> builder, boolean withCsrf) throws Exception {
         if (session != null) {
             builder.cookie(session);
         }

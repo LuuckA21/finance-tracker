@@ -153,7 +153,8 @@ export function Modal({ title, open, onClose, children, footer, wide = false }: 
   onClose: () => void
   children: ReactNode
   footer?: ReactNode
-  wide?: boolean
+  /** true: 2xl; 'xl': wide tables (import review) */
+  wide?: boolean | 'xl'
 }) {
   const ref = useRef<HTMLDialogElement>(null)
   const { t } = useI18n()
@@ -172,7 +173,7 @@ export function Modal({ title, open, onClose, children, footer, wide = false }: 
         e.preventDefault()
         onClose()
       }}
-      className={`m-auto w-[calc(100%-2rem)] ${wide ? 'max-w-2xl' : 'max-w-md'} rounded-2xl border border-line bg-surface p-0 text-ink shadow-xl backdrop:bg-black/40`}
+      className={`m-auto w-[calc(100%-2rem)] ${wide === 'xl' ? 'max-w-6xl' : wide ? 'max-w-2xl' : 'max-w-md'} rounded-2xl border border-line bg-surface p-0 text-ink shadow-xl backdrop:bg-black/40`}
     >
       {open && (
         <div className="flex max-h-[85vh] flex-col">

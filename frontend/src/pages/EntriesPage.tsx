@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Pencil, Plus, Repeat, Trash2 } from 'lucide-react'
-import { errorMessage } from '../api/client'
-import { useCategories, useDeleteEntry, useEntries, type EntryFilter } from '../api/hooks'
+import { ChevronLeft, ChevronRight, Download, FileUp, Pencil, Plus, Repeat, Trash2 } from 'lucide-react'
+import { download, errorMessage } from '../api/client'
+import { entryFilterParams, useCategories, useDeleteEntry, useEntries, type EntryFilter } from '../api/hooks'
 import type { CashEntry, EntryKind } from '../api/types'
 import { Button, Card, EmptyState, ErrorAlert, PageHeader, Spinner } from '../components/ui'
 import { useI18n } from '../i18n'
 import { date, money } from '../lib/format'
 import { EntryFormModal } from './EntryForm'
+import { ImportModal } from './EntryImport'
 
 const PAGE_SIZE = 50
 
@@ -18,6 +19,8 @@ export function EntriesPage() {
   const categories = useCategories().data ?? []
   const remove = useDeleteEntry()
   const [error, setError] = useState<string | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const { t } = useI18n()
 
   const byId = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
@@ -33,6 +36,19 @@ export function EntriesPage() {
     }
   }
 
+  async function onExport() {
+    setError(null)
+    setExporting(true)
+    try {
+      const { page: _page, size: _size, ...filters } = filter
+      await download(`/api/cash-entries/export?${entryFilterParams(filters)}`, 'movimenti.csv')
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const page = entries.data
 
   return (
@@ -41,9 +57,17 @@ export function EntriesPage() {
         title={t('entries.title')}
         subtitle={t('entries.subtitle')}
         actions={
-          <Button variant="primary" onClick={() => { setEditing(null); setFormOpen(true) }}>
-            <Plus className="size-4" /> {t('entries.new')}
-          </Button>
+          <>
+            <Button onClick={onExport} loading={exporting} title={t('entries.exportHint')}>
+              <Download className="size-4" /> {t('entries.export')}
+            </Button>
+            <Button onClick={() => setImportOpen(true)}>
+              <FileUp className="size-4" /> {t('entries.import')}
+            </Button>
+            <Button variant="primary" onClick={() => { setEditing(null); setFormOpen(true) }}>
+              <Plus className="size-4" /> {t('entries.new')}
+            </Button>
+          </>
         }
       />
 
@@ -143,6 +167,7 @@ export function EntriesPage() {
       </Card>
 
       <EntryFormModal entry={editing} open={formOpen} onClose={() => setFormOpen(false)} />
+      <ImportModal open={importOpen} onClose={() => setImportOpen(false)} />
     </>
   )
 }
