@@ -448,4 +448,15 @@ export const it = {
   'fx.ecbLastError': 'Ultimo errore: {error}',
   'fx.ecbRefresh': 'Aggiorna ora',
   'error.ecb_unavailable': 'Impossibile scaricare i cambi dalla BCE. Riprova più tardi.',
+  // ECB rates by date and history download
+  'fx.ecbDay': 'Cambi in vigore il',
+  'fx.ecbToday': 'Oggi',
+  'fx.ecbPublished': 'Pubblicato il',
+  'fx.ecbNoneForDay': 'Nessun cambio BCE per il {date}',
+  'fx.ecbNoneForDayHelp': 'La BCE pubblica i cambi di riferimento dal {date}.',
+  'fx.ecbHistory': 'Riscarica storico completo',
+  'fx.ecbHistoryHint': 'Riscarica tutti i cambi BCE dal 1999: corregge dati mancanti o incompleti.',
+  'fx.ecbHistoryConfirm': 'Riscaricare tutti i cambi BCE dal 1999? Il download avviene in background e può richiedere qualche minuto; i cambi esistenti restano disponibili.',
+  'fx.ecbHistoryRunning': 'Download dello storico in corso…',
+  'error.ecb_busy': 'Il download dello storico BCE è già in corso.',
 }

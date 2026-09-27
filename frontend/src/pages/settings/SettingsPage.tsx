@@ -1,12 +1,13 @@
 import { useState, type FormEvent } from 'react'
 import { NavLink, useParams } from 'react-router'
-import { Pencil, RefreshCw, Trash2 } from 'lucide-react'
+import { History, Loader2, Pencil, RefreshCw, Trash2 } from 'lucide-react'
 import { errorMessage } from '../../api/client'
 import {
   useCategories,
   useCentralRates,
   useDeleteCategory,
   useDeleteFxRate,
+  useDownloadEcbHistory,
   useEcbStatus,
   useFxRates,
   useLoginHistory,
@@ -343,21 +344,31 @@ function FxTab() {
   )
 }
 
+/** First publication of the ECB euro reference rates. */
+const ECB_FIRST_DAY = '1999-01-04'
+
 function EcbRatesCard({ base, isAdmin }: { base: string; isAdmin: boolean }) {
   const { t } = useI18n()
-  const central = useCentralRates()
+  const [day, setDay] = useState(today())
+  const central = useCentralRates(day)
   const status = useEcbStatus(isAdmin)
   const refresh = useRefreshEcb()
+  const history = useDownloadEcbHistory()
   const [error, setError] = useState<string | null>(null)
   const data = central.data
+  const historyRunning = status.data?.historyRunning ?? false
 
-  async function refreshNow() {
+  async function run(action: () => Promise<unknown>) {
     setError(null)
     try {
-      await refresh.mutateAsync()
+      await action()
     } catch (err) {
       setError(errorMessage(err))
     }
+  }
+
+  function downloadHistory() {
+    if (confirm(t('fx.ecbHistoryConfirm'))) void run(() => history.mutateAsync())
   }
 
   return (
@@ -366,6 +377,15 @@ function EcbRatesCard({ base, isAdmin }: { base: string; isAdmin: boolean }) {
         {t('fx.ecbHelp')}{' '}
         {data?.latestDate && <span className="text-muted">{t('fx.ecbLatest', { date: date(data.latestDate) })}</span>}
       </p>
+      <div className="mb-3 flex flex-wrap items-end gap-2">
+        <Field label={t('fx.ecbDay')}>
+          {(id) => (
+            <input id={id} type="date" className="input w-auto" min={ECB_FIRST_DAY} value={day}
+              onChange={(e) => e.target.value && setDay(e.target.value)} />
+          )}
+        </Field>
+        {day !== today() && <Button variant="secondary" onClick={() => setDay(today())}>{t('fx.ecbToday')}</Button>}
+      </div>
       {isAdmin && (
         <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg bg-surface-2 px-3 py-2 text-xs text-ink-2">
           <span>
@@ -373,14 +393,24 @@ function EcbRatesCard({ base, isAdmin }: { base: string; isAdmin: boolean }) {
             {status.data?.lastSuccess && <> · {t('fx.ecbLastSuccess', { date: dateTime(status.data.lastSuccess) })}</>}
           </span>
           {status.data?.lastError && <span className="text-bad">{t('fx.ecbLastError', { error: status.data.lastError })}</span>}
-          <Button variant="secondary" onClick={refreshNow} loading={refresh.isPending}>
-            <RefreshCw className="size-4" /> {t('fx.ecbRefresh')}
-          </Button>
+          {historyRunning && <span className="flex items-center gap-1.5 font-medium text-accent"><Loader2 className="size-3.5 animate-spin" aria-hidden /> {t('fx.ecbHistoryRunning')}</span>}
+          <span className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => run(() => refresh.mutateAsync())} loading={refresh.isPending}
+              disabled={historyRunning}>
+              <RefreshCw className="size-4" /> {t('fx.ecbRefresh')}
+            </Button>
+            <Button variant="secondary" onClick={downloadHistory} loading={history.isPending} disabled={historyRunning}
+              title={t('fx.ecbHistoryHint')}>
+              <History className="size-4" /> {t('fx.ecbHistory')}
+            </Button>
+          </span>
         </div>
       )}
       <ErrorAlert message={error} />
-      {central.isPending ? <Spinner /> : !data || data.rates.length === 0 ? (
+      {central.isPending ? <Spinner /> : !data || !data.latestDate ? (
         <EmptyState title={t('fx.ecbEmptyTitle')}>{t('fx.ecbEmptyHelp')}</EmptyState>
+      ) : data.rates.length === 0 ? (
+        <EmptyState title={t('fx.ecbNoneForDay', { date: date(day) })}>{t('fx.ecbNoneForDayHelp', { date: date(ECB_FIRST_DAY) })}</EmptyState>
       ) : (
         <div className="-mx-4 overflow-x-auto sm:mx-0">
           <table className="w-full min-w-[32rem] text-sm">
@@ -388,7 +418,7 @@ function EcbRatesCard({ base, isAdmin }: { base: string; isAdmin: boolean }) {
               <tr className="border-b border-line text-left text-xs text-muted">
                 <th className="px-4 py-2 font-medium sm:px-2">{t('common.currency')}</th>
                 <th className="px-2 py-2 text-right font-medium">{t('fx.ecbRate', { base })}</th>
-                <th className="px-2 py-2 font-medium">{t('common.date')}</th>
+                <th className="px-2 py-2 font-medium">{t('fx.ecbPublished')}</th>
                 <th className="px-2 py-2 font-medium">{t('fx.ecbUsed')}</th>
               </tr>
             </thead>

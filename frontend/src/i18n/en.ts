@@ -450,4 +450,15 @@ export const en: Messages = {
   'fx.ecbLastError': 'Last error: {error}',
   'fx.ecbRefresh': 'Update now',
   'error.ecb_unavailable': 'The ECB rates could not be downloaded. Try again later.',
+  // ECB rates by date and history download
+  'fx.ecbDay': 'Rates in effect on',
+  'fx.ecbToday': 'Today',
+  'fx.ecbPublished': 'Published on',
+  'fx.ecbNoneForDay': 'No ECB rates for {date}',
+  'fx.ecbNoneForDayHelp': 'The ECB has published reference rates since {date}.',
+  'fx.ecbHistory': 'Download full history again',
+  'fx.ecbHistoryHint': 'Downloads every ECB rate since 1999 again: fixes missing or incomplete data.',
+  'fx.ecbHistoryConfirm': 'Download every ECB rate since 1999 again? It runs in the background and may take a few minutes; existing rates stay available.',
+  'fx.ecbHistoryRunning': 'Downloading the history…',
+  'error.ecb_busy': 'The ECB history is already being downloaded.',
 }

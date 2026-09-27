@@ -113,6 +113,8 @@ export interface CentralRate {
 export interface CentralRates {
   source: 'ECB'
   baseCurrency: string
+  /** Day the rates apply to (each rate carries the publication it comes from) */
+  date: string
   latestDate: string | null
   rates: CentralRate[]
 }
@@ -123,6 +125,7 @@ export interface EcbStatus {
   lastAttempt: string | null
   lastSuccess: string | null
   lastError: string | null
+  historyRunning: boolean
 }
 
 export interface CashflowTotals {

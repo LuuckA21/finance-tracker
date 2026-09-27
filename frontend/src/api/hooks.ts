@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { del, get, patch, post, put } from './client'
 import type {
@@ -268,11 +269,39 @@ export function useDeleteFxRate() {
   return useMutation({ mutationFn: (id: number) => del(`/api/fx-rates/${id}`), onSuccess: () => invalidate() })
 }
 
-export const useCentralRates = () =>
-  useQuery({ queryKey: ['fx', 'central'], queryFn: () => get<CentralRates>('/api/fx-rates/central') })
+/** ECB rates in effect on a day (yyyy-MM-dd). */
+export const useCentralRates = (date: string) =>
+  useQuery({
+    queryKey: ['fx', 'central', date],
+    queryFn: () => get<CentralRates>(`/api/fx-rates/central?date=${encodeURIComponent(date)}`),
+    placeholderData: keepPreviousData,
+  })
 
-export const useEcbStatus = (enabled: boolean) =>
-  useQuery({ queryKey: ['fx', 'ecb-status'], queryFn: () => get<EcbStatus>('/api/admin/fx'), enabled })
+/** Admin only. Polls while a history download runs, then refreshes rates and dashboards. */
+export function useEcbStatus(enabled: boolean) {
+  const invalidate = useInvalidate()
+  const query = useQuery({
+    queryKey: ['fx', 'ecb-status'],
+    queryFn: () => get<EcbStatus>('/api/admin/fx'),
+    enabled,
+    refetchInterval: (q) => (q.state.data?.historyRunning ? 2000 : false),
+  })
+  const running = query.data?.historyRunning ?? false
+  const wasRunning = useRef(running)
+  useEffect(() => {
+    if (wasRunning.current && !running) void invalidate()
+    wasRunning.current = running
+  }, [running, invalidate])
+  return query
+}
+
+export function useDownloadEcbHistory() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => post<EcbStatus>('/api/admin/fx/history', {}),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['fx', 'ecb-status'] }),
+  })
+}
 
 export function useRefreshEcb() {
   const invalidate = useInvalidate()
