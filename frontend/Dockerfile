@@ -7,7 +7,7 @@ COPY . .
 RUN npm run build
 
 # ---- runtime: static files + reverse proxy to the API ----
-FROM nginxinc/nginx-unprivileged:1.29-alpine
+FROM nginxinc/nginx-unprivileged:1.31-alpine
 # Files under templates/ go through envsubst at startup and land in /etc/nginx/conf.d/
 COPY default.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /src/dist /usr/share/nginx/html
