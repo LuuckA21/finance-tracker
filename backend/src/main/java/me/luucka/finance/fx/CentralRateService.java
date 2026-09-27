@@ -9,6 +9,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import me.luucka.finance.config.AppProperties;
 import me.luucka.finance.core.fx.CentralRates;
@@ -36,8 +37,9 @@ public class CentralRateService {
     /** Publication is around 16:00; a little margin avoids asking too early. */
     static final LocalTime PUBLICATION_TIME = LocalTime.of(16, 15);
 
+    /** {@code historyRunning}: a full history download started by an admin is in progress. */
     public record Status(boolean autoUpdate, LocalDate latestDate, Instant lastAttempt, Instant lastSuccess,
-                         String lastError) {
+                         String lastError, boolean historyRunning) {
     }
 
     public record RefreshResult(boolean downloaded, EcbClient.Feed feed, int received, int changed,
@@ -53,6 +55,7 @@ public class CentralRateService {
     private volatile Instant lastAttempt;
     private volatile Instant lastSuccess;
     private volatile String lastError;
+    private final AtomicBoolean historyRunning = new AtomicBoolean();
 
     public CentralRateService(CentralRateRepository repository, EcbClient client, AppProperties properties,
                               Clock clock) {
@@ -68,7 +71,8 @@ public class CentralRateService {
     }
 
     public Status status() {
-        return new Status(autoUpdate, rates.latestDate().orElse(null), lastAttempt, lastSuccess, lastError);
+        return new Status(autoUpdate, rates.latestDate().orElse(null), lastAttempt, lastSuccess, lastError,
+                historyRunning.get());
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -106,7 +110,36 @@ public class CentralRateService {
         if (!force && latest != null && !latest.isBefore(expectedLatest(now))) {
             return new RefreshResult(false, null, 0, 0, latest);
         }
-        EcbClient.Feed feed = feedFor(latest, now.toLocalDate());
+        return download(feedFor(latest, now.toLocalDate()));
+    }
+
+    /**
+     * Downloads the whole history since 1999 again in the background, e.g. to rebuild rates that
+     * were lost or are incomplete. Existing rates are kept and corrected where they differ.
+     *
+     * @return false when a history download is already running
+     */
+    public boolean startHistoryDownload() {
+        if (!historyRunning.compareAndSet(false, true)) {
+            return false;
+        }
+        // A few MB and ~200k rows: longer than an HTTP request should wait
+        Thread.ofVirtual().name("ecb-history").start(() -> {
+            try {
+                download(EcbClient.Feed.HISTORY);
+            } catch (Exception e) {
+                if (e instanceof InterruptedException) {
+                    Thread.currentThread().interrupt();
+                }
+                log.warn("ECB history download failed: {}", e.toString());
+            } finally {
+                historyRunning.set(false);
+            }
+        });
+        return true;
+    }
+
+    private synchronized RefreshResult download(EcbClient.Feed feed) throws Exception {
         lastAttempt = clock.instant();
         try {
             List<EcbXmlParser.Rate> fetched = client.fetch(feed);

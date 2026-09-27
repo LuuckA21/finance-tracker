@@ -37,7 +37,8 @@ public class FxService {
     public record CentralRateResponse(String currency, BigDecimal rate, LocalDate date, BigDecimal manualRate) {
     }
 
-    public record CentralRatesResponse(String source, String baseCurrency, LocalDate latestDate,
+    /** {@code date}: the day the rates apply to; each rate carries the publication it comes from. */
+    public record CentralRatesResponse(String source, String baseCurrency, LocalDate date, LocalDate latestDate,
                                        List<CentralRateResponse> rates) {
     }
 
@@ -72,20 +73,23 @@ public class FxService {
         return table;
     }
 
-    /** Today's ECB rates towards the user's base currency, marking those replaced by a manual rate. */
+    /**
+     * ECB rates in effect on {@code date} (today when null) towards the user's base currency, marking
+     * those replaced by a manual rate on that day.
+     */
     @Transactional(readOnly = true)
-    public CentralRatesResponse centralRates(long userId) {
+    public CentralRatesResponse centralRates(long userId, LocalDate date) {
         String base = baseCurrency(userId);
         CentralRates ecb = central.rates();
         FxTable table = table(userId, base);
-        LocalDate today = LocalDate.now(clock);
+        LocalDate day = date == null ? LocalDate.now(clock) : date;
         List<CentralRateResponse> result = new ArrayList<>();
         for (String currency : ecb.currencies()) {
             if (currency.equals(base)) {
                 continue;
             }
-            ecb.onOrBefore(currency, base, today).ifPresent(quote -> {
-                BigDecimal manual = table.quote(currency, today)
+            ecb.onOrBefore(currency, base, day).ifPresent(quote -> {
+                BigDecimal manual = table.quote(currency, day)
                         .filter(q -> q.source() == FxTable.Source.MANUAL)
                         .map(q -> Money.plain(q.rate()))
                         .orElse(null);
@@ -93,7 +97,7 @@ public class FxService {
                         quote.date(), manual));
             });
         }
-        return new CentralRatesResponse("ECB", base, ecb.latestDate().orElse(null), result);
+        return new CentralRatesResponse("ECB", base, day, ecb.latestDate().orElse(null), result);
     }
 
     @Transactional(readOnly = true)

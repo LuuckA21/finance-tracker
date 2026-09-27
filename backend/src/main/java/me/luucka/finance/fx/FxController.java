@@ -11,6 +11,7 @@ import jakarta.validation.constraints.NotNull;
 import me.luucka.finance.auth.AppPrincipal;
 import me.luucka.finance.common.CurrencyCode;
 import me.luucka.finance.common.ReasonableDate;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -42,9 +44,11 @@ public class FxController {
         return service.list(me.id());
     }
 
+    /** ECB rates in effect on {@code date} (default today); dates before 1999 have none. */
     @GetMapping("/central")
-    public FxService.CentralRatesResponse central(@AuthenticationPrincipal AppPrincipal me) {
-        return service.centralRates(me.id());
+    public FxService.CentralRatesResponse central(@AuthenticationPrincipal AppPrincipal me,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return service.centralRates(me.id(), date);
     }
 
     @PostMapping

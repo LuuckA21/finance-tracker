@@ -9,6 +9,7 @@ import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.sun.net.httpserver.HttpServer;
@@ -39,6 +40,7 @@ class EcbRatesIT {
 
     private HttpServer ecb;
     private final AtomicInteger requests = new AtomicInteger();
+    private final List<String> paths = new CopyOnWriteArrayList<>();
 
     @BeforeEach
     void startEcb() throws Exception {
@@ -50,6 +52,7 @@ class EcbRatesIT {
         // Same content for every feed: the choice of feed depends on today's date
         ecb.createContext("/ecb/", exchange -> {
             requests.incrementAndGet();
+            paths.add(exchange.getRequestURI().getPath());
             exchange.getResponseHeaders().add("Content-Type", "text/xml");
             exchange.sendResponseHeaders(200, feed.length);
             exchange.getResponseBody().write(feed);
@@ -109,6 +112,55 @@ class EcbRatesIT {
         assertEquals(80.0, ((Number) json(year, "$.totals.expense")).doubleValue());
         usd = json(user.get("/api/fx-rates/central"), "$.rates[?(@.currency == 'USD')]");
         assertEquals(0.8, ((Number) usd.getFirst().get("manualRate")).doubleValue());
+    }
+
+    @Test
+    void ratesCanBeViewedForAnyDate() throws Exception {
+        ApiClient admin = login(testUsers.create("fxdate-admin", Role.ADMIN));
+        assertEquals(200, admin.post("/api/admin/fx/refresh", null).getResponse().getStatus());
+        ApiClient user = login(testUsers.create("fxdate", Role.USER));
+
+        MvcResult thursday = user.get("/api/fx-rates/central?date=2026-09-24");
+        assertEquals("2026-09-24", json(thursday, "$.date"));
+        assertEquals("2026-09-25", json(thursday, "$.latestDate"));
+        List<Map<String, Object>> usd = json(thursday, "$.rates[?(@.currency == 'USD')]");
+        // 1 USD = 0.9300 / 1.1650 CHF, published on the 24th
+        assertEquals(0.79828326, ((Number) usd.getFirst().get("rate")).doubleValue(), 1e-9);
+        assertEquals("2026-09-24", usd.getFirst().get("date"));
+
+        // Weekend: Friday's publication
+        usd = json(user.get("/api/fx-rates/central?date=2026-09-27"), "$.rates[?(@.currency == 'USD')]");
+        assertEquals("2026-09-25", usd.getFirst().get("date"));
+
+        // Before the first publication there is nothing to show; a manual rate applies from its date on
+        assertEquals(List.of(), json(user.get("/api/fx-rates/central?date=2020-01-01"), "$.rates"));
+        user.post("/api/fx-rates", "{\"currency\":\"USD\",\"date\":\"2026-09-25\",\"rate\":0.8}");
+        usd = json(user.get("/api/fx-rates/central?date=2026-09-24"), "$.rates[?(@.currency == 'USD')]");
+        assertNull(usd.getFirst().get("manualRate"));
+        usd = json(user.get("/api/fx-rates/central?date=2026-09-25"), "$.rates[?(@.currency == 'USD')]");
+        assertEquals(0.8, ((Number) usd.getFirst().get("manualRate")).doubleValue());
+
+        assertEquals(400, user.get("/api/fx-rates/central?date=not-a-date").getResponse().getStatus());
+    }
+
+    @Test
+    void adminsCanDownloadTheFullHistoryAgain() throws Exception {
+        ApiClient user = login(testUsers.create("fxhist-user", Role.USER));
+        assertEquals(403, user.post("/api/admin/fx/history", null).getResponse().getStatus());
+
+        ApiClient admin = login(testUsers.create("fxhist-admin", Role.ADMIN));
+        MvcResult started = admin.post("/api/admin/fx/history", null);
+        assertEquals(202, started.getResponse().getStatus());
+        // Runs in the background: wait for it
+        MvcResult status = admin.get("/api/admin/fx");
+        for (int i = 0; i < 100 && Boolean.TRUE.equals(json(status, "$.historyRunning")); i++) {
+            Thread.sleep(100);
+            status = admin.get("/api/admin/fx");
+        }
+        assertEquals(Boolean.FALSE, json(status, "$.historyRunning"));
+        assertNull(json(status, "$.lastError"));
+        assertEquals("/ecb/eurofxref-hist.xml", paths.getLast());
+        assertEquals("2026-09-25", json(status, "$.latestDate"));
     }
 
     @Test

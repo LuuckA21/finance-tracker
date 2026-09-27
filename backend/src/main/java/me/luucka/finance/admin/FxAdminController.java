@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -34,6 +35,9 @@ public class FxAdminController {
     /** Downloads now, even when the rates look up to date or automatic updates are off. */
     @PostMapping("/refresh")
     public CentralRateService.RefreshResult refresh() {
+        if (central.status().historyRunning()) {
+            throw busy();
+        }
         try {
             return central.refresh(true);
         } catch (InterruptedException e) {
@@ -43,6 +47,20 @@ public class FxAdminController {
             log.warn("Manual ECB refresh failed: {}", e.toString());
             throw unavailable();
         }
+    }
+
+    /** Starts downloading the full history again; progress and errors show up in the status. */
+    @PostMapping("/history")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public CentralRateService.Status downloadHistory() {
+        if (!central.startHistoryDownload()) {
+            throw busy();
+        }
+        return central.status();
+    }
+
+    private static ApiException busy() {
+        return ApiException.conflict("ecb_busy", "The ECB history is already being downloaded");
     }
 
     private static ApiException unavailable() {

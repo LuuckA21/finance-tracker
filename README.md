@@ -259,8 +259,10 @@ encrypted with it).
   publication is due (~16:00 Frankfurt time on working days) and downloads only then: the full
   history the first time, the last 90 days after a longer downtime, otherwise the daily file.
   It needs outbound HTTPS to `www.ecb.europa.eu`; `APP_ECB_ENABLED=false` turns it off (manual
-  rates keep working). Admins see the last download and any error in Settings › Exchange rates,
-  with an "Update now" button.
+  rates keep working). Settings › Exchange rates shows the ECB rates in effect on any day
+  (default today). Admins also see the last download and any error there, with "Update now" and
+  "Download full history again" (rebuilds every rate since 1999 in the background, e.g. after
+  data loss; existing rates stay available and are corrected where they differ).
 - Bank accounts (`CASH`): quantity is the balance, unit price 1.
 
 ## API overview
@@ -273,9 +275,9 @@ encrypted with it).
 | Entries | `GET /api/cash-entries?from&to&kind&categoryId&q&page&size`, `POST`, `PUT/DELETE /{id}` |
 | Recurring | `GET/POST /api/recurring-entries`, `PUT/DELETE /{id}` (frequency `DAILY\|WEEKLY\|MONTHLY\|QUARTERLY\|FOUR_MONTHLY\|SEMIANNUAL\|YEARLY`) |
 | Positions | `GET/POST /api/positions`, `GET/PUT/DELETE /{id}`, `GET/POST /{id}/snapshots`, `PUT/DELETE /{id}/snapshots/{sid}`, `POST /api/positions/snapshots/bulk` |
-| FX | `GET/POST /api/fx-rates`, `DELETE /{id}` (manual rates), `GET /api/fx-rates/central` (ECB rates in the base currency) |
+| FX | `GET/POST /api/fx-rates`, `DELETE /{id}` (manual rates), `GET /api/fx-rates/central?date` (ECB rates in the base currency on a day, default today) |
 | Dashboards | `GET /api/dashboard/cashflow?year`, `/cashflow/years`, `/net-worth?granularity=MONTH\|YEAR&from=yyyy-MM&to=yyyy-MM`, `/net-worth/detail?date` |
-| Admin | `GET/POST /api/admin/users`, `PATCH/DELETE /{id}`, `POST /{id}/{reset-password,unlock,reset-mfa}`, `GET /api/admin/fx`, `POST /api/admin/fx/refresh` |
+| Admin | `GET/POST /api/admin/users`, `PATCH/DELETE /{id}`, `POST /{id}/{reset-password,unlock,reset-mfa}`, `GET /api/admin/fx`, `POST /api/admin/fx/refresh`, `POST /api/admin/fx/history` (202, runs in background) |
 
 Errors are RFC 9457 problem details with a stable `code` (e.g. `invalid_credentials`,
 `validation_failed` + `errors` map).
