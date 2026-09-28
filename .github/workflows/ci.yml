@@ -73,3 +73,70 @@ jobs:
 
       - name: Typecheck and build
         run: npm run build
+
+  e2e:
+    name: End-to-end (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: finance
+          POSTGRES_USER: finance
+          POSTGRES_PASSWORD: finance
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U finance"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      # Dev profile: plain-http session cookie, development encryption key and admin password.
+      # The backend runs against the empty PostgreSQL service, without downloading ECB rates.
+      SPRING_PROFILES_ACTIVE: dev
+      APP_ECB_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build backend
+        working-directory: backend
+        run: mvn -B -ntp -DskipTests package
+
+      - name: Install frontend dependencies and browser
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run typecheck:e2e && npm run build
+
+      # Playwright starts the backend jar and `vite preview` itself (playwright.config.ts)
+      - name: Run end-to-end tests
+        working-directory: frontend
+        run: npm run e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+          retention-days: 7
