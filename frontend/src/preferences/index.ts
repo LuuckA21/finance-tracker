@@ -32,7 +32,8 @@ function write(value: Stored) {
 }
 
 function browserLanguage(): Language {
-  return navigator.language.toLowerCase().startsWith('it') ? 'IT' : 'EN'
+  const code = navigator.language.slice(0, 2).toUpperCase() as Language
+  return LANGUAGES.includes(code) ? code : 'EN'
 }
 
 /** Applies the preferences stored in this browser; call once before the first render. */

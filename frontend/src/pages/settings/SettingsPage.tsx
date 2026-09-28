@@ -38,7 +38,7 @@ export function SettingsPage() {
   return (
     <>
       <PageHeader title={t('settings.title')} />
-      <nav className="mb-5 flex gap-1 overflow-x-auto border-b border-line" aria-label={t('settings.sections')}>
+      <nav className="relative mb-5 flex gap-1 overflow-x-auto border-b border-line" aria-label={t('settings.sections')}>
         {TABS.map((item) => (
           <NavLink key={item.id} to={`/impostazioni/${item.id}`}
             className={() => `whitespace-nowrap border-b-2 px-3 py-2 text-sm ${tab === item.id ? 'border-accent font-medium text-ink' : 'border-transparent text-ink-2 hover:text-ink'}`}>
@@ -90,11 +90,14 @@ function PreferencesForm() {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-ink-2">{t('settings.preferencesHelp')}</p>
-      <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium text-ink-2">{t('settings.language')}</span>
-        <Segmented label={t('settings.language')} value={me.language} onChange={(language) => change({ language })}
-          options={LANGUAGES.map((l) => ({ value: l, label: LANGUAGE_NAMES[l] }))} />
-      </div>
+      <Field label={t('settings.language')}>
+        {(id) => (
+          <select id={id} className="input max-w-56" value={me.language}
+            onChange={(e) => change({ language: e.target.value as Language })}>
+            {LANGUAGES.map((l) => <option key={l} value={l} lang={l.toLowerCase()}>{LANGUAGE_NAMES[l]}</option>)}
+          </select>
+        )}
+      </Field>
       <div className="flex flex-col gap-1">
         <span className="text-xs font-medium text-ink-2">{t('settings.theme')}</span>
         <Segmented label={t('settings.theme')} value={me.theme} onChange={(theme) => change({ theme })}
@@ -282,7 +285,7 @@ function FxTab() {
   ;(rates.data ?? []).forEach((r) => grouped.set(r.currency, [...(grouped.get(r.currency) ?? []), r]))
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_2fr]">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_2fr]">
       <Card title={t('fx.addRate')}>
         <form onSubmit={submit} className="flex flex-col gap-3">
           <p className="text-sm text-ink-2">
@@ -412,7 +415,7 @@ function EcbRatesCard({ base, isAdmin }: { base: string; isAdmin: boolean }) {
       ) : data.rates.length === 0 ? (
         <EmptyState title={t('fx.ecbNoneForDay', { date: date(day) })}>{t('fx.ecbNoneForDayHelp', { date: date(ECB_FIRST_DAY) })}</EmptyState>
       ) : (
-        <div className="-mx-4 overflow-x-auto sm:mx-0">
+        <div className="relative -mx-4 overflow-x-auto sm:mx-0">
           <table className="w-full min-w-[32rem] text-sm">
             <thead>
               <tr className="border-b border-line text-left text-xs text-muted">

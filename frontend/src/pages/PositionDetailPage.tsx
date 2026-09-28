@@ -78,7 +78,7 @@ export function PositionDetailPage() {
       <ErrorAlert message={error} />
       {p.notes && <p className="mb-4 whitespace-pre-line text-sm text-ink-2">{p.notes}</p>}
 
-      <div className="mb-4 grid gap-4 lg:grid-cols-[1fr_2fr]">
+      <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_2fr]">
         <Card title={t('position.currentValue')}>
           <p className="text-3xl font-semibold tracking-tight">{p.latest ? money(p.latest.value, p.currency) : '—'}</p>
           {p.latest && (
@@ -106,7 +106,7 @@ export function PositionDetailPage() {
             {isCash ? t('position.noSnapshotsCash') : t('position.noSnapshotsOther')}
           </EmptyState>
         ) : (
-          <div className="-mx-4 overflow-x-auto sm:mx-0">
+          <div className="relative -mx-4 overflow-x-auto sm:mx-0">
             <table className="w-full min-w-[38rem] text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-xs text-muted">

@@ -25,13 +25,14 @@ Self-hosted personal finance app for a small group of users (you and your family
 - **CSV import/export** – export the entries matching the current filters (Excel-friendly: UTF-8,
   `;`, ISO dates). Import either everything at once (valid rows, duplicates skipped, nothing saved
   if a row has problems) or row by row: include or exclude each row, fix type and category,
-  see duplicates. Headers in Italian, English or German; dates `2026-08-01` or `01.08.2026`;
-  amounts `1234.50`, `1234,50` or `1'234.50`. Transfers use the type "Trasferimento"/"Transfer"
-  and the optional columns `da`/`verso` (`from`/`to`) with position names.
+  see duplicates. Headers in Italian, English, German or French; dates `2026-08-01` or
+  `01.08.2026`; amounts `1234.50`, `1234,50` or `1'234.50`. Transfers use the type
+  "Trasferimento"/"Transfer"/"Umbuchung"/"Virement" and the optional columns `da`/`verso`
+  (`from`/`to`, `von`/`nach`, `de`/`vers`) with position names.
 - **Multi-currency** – each entry/position keeps its own currency; dashboards convert to the
   user's base currency with the ECB reference rates, downloaded automatically every working day
   and shared by all users. A user's own manual rates take priority over them.
-- **Per-user preferences** – interface language (Italian / English) and theme (system, light,
+- **Per-user preferences** – interface language (Italian, English, German, French) and theme (system, light,
   dark) are saved to the account and follow the user on every device.
 - **Personal categories** – each user starts with a set of categories named in the language chosen
   when the account is created (`APP_ADMIN_LANGUAGE` for the first admin); from then on they are

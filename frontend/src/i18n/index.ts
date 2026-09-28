@@ -1,20 +1,22 @@
 import { useSyncExternalStore } from 'react'
+import { de } from './de'
 import { en } from './en'
+import { fr } from './fr'
 import { it } from './it'
 
 /** Interface languages, spelled like the backend enum. */
-export type Language = 'IT' | 'EN'
-export const LANGUAGES: Language[] = ['IT', 'EN']
+export type Language = 'IT' | 'EN' | 'DE' | 'FR'
+export const LANGUAGES: Language[] = ['IT', 'EN', 'DE', 'FR']
 
 /** Each language named in itself, as shown in language pickers. */
-export const LANGUAGE_NAMES: Record<Language, string> = { IT: 'Italiano', EN: 'English' }
+export const LANGUAGE_NAMES: Record<Language, string> = { IT: 'Italiano', EN: 'English', DE: 'Deutsch', FR: 'Français' }
 
 export type MessageKey = keyof typeof it
 export type Messages = Record<MessageKey, string>
 type Vars = Record<string, string | number>
 
-const CATALOGS: Record<Language, Messages> = { IT: it, EN: en }
-const LOCALES: Record<Language, string> = { IT: 'it-CH', EN: 'en-CH' }
+const CATALOGS: Record<Language, Messages> = { IT: it, EN: en, DE: de, FR: fr }
+const LOCALES: Record<Language, string> = { IT: 'it-CH', EN: 'en-CH', DE: 'de-CH', FR: 'fr-CH' }
 
 let current: Language = 'IT'
 const listeners = new Set<() => void>()

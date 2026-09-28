@@ -61,7 +61,7 @@ export function RecurringPage() {
         {rules.isPending ? <Spinner /> : list.length === 0 ? (
           <EmptyState title={t('recurring.emptyTitle')}>{t('recurring.emptyHelp')}</EmptyState>
         ) : (
-          <div className="-mx-4 overflow-x-auto sm:mx-0">
+          <div className="relative -mx-4 overflow-x-auto sm:mx-0">
             <table className="w-full min-w-[44rem] text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-xs text-muted">

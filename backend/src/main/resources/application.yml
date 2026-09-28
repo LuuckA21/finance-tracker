@@ -72,7 +72,7 @@ app:
     username: ${APP_ADMIN_USERNAME:admin}
     # When empty, a random password is generated and printed once in the log
     password: ${APP_ADMIN_PASSWORD:}
-    # Interface language of the first administrator and of their starting categories: IT or EN
+    # Interface language of the first administrator and of their starting categories: IT, EN, DE or FR
     language: ${APP_ADMIN_LANGUAGE:IT}
   login:
     max-failed-attempts: 5

@@ -5,7 +5,7 @@ import { useCategories, useImportEntries, useImportPreview, useMe, usePositions 
 import type { Category, EntryKind, ImportPreview, ImportPreviewRow, ImportRowError, Position } from '../api/types'
 import { transferOptions } from '../components/TransferFields'
 import { Badge, Button, ErrorAlert, Field, Modal, Segmented } from '../components/ui'
-import { useI18n, type MessageKey } from '../i18n'
+import { useI18n, type Language, type MessageKey } from '../i18n'
 import { date, money } from '../lib/format'
 
 type Mode = 'all' | 'review'
@@ -14,6 +14,13 @@ type Mode = 'all' | 'review'
 const FIXABLE: ImportRowError[] = ['invalid_kind', 'missing_category', 'unknown_category', 'category_kind_mismatch',
   'unknown_position', 'transfer_same_position']
 const REVIEW_PAGE = 100
+/** Downloadable example file, with the headers and kind words of each interface language. */
+const TEMPLATES: Record<Language, { file: string; header: string; expense: string; income: string; transfer: string; shop: string; savings: string }> = {
+  IT: { file: 'modello.csv', header: 'data;tipo;categoria;importo;valuta;descrizione;da;verso', expense: 'Uscita', income: 'Entrata', transfer: 'Trasferimento', shop: 'Supermercato', savings: 'Risparmio' },
+  EN: { file: 'template.csv', header: 'date;type;category;amount;currency;description;from;to', expense: 'Expense', income: 'Income', transfer: 'Transfer', shop: 'Supermarket', savings: 'Savings' },
+  DE: { file: 'vorlage.csv', header: 'datum;art;kategorie;betrag;währung;beschreibung;von;nach', expense: 'Ausgabe', income: 'Einnahme', transfer: 'Umbuchung', shop: 'Supermarkt', savings: 'Sparen' },
+  FR: { file: 'modele.csv', header: 'date;type;catégorie;montant;monnaie;description;de;vers', expense: 'Dépense', income: 'Revenu', transfer: 'Virement', shop: 'Supermarché', savings: 'Épargne' },
+}
 const MAX_FILE_BYTES = 2 * 1024 * 1024
 
 interface ReviewRow {
@@ -108,10 +115,10 @@ function SelectStep({ onStep }: { onStep: (step: Step) => void }) {
   function downloadTemplate() {
     const expense = categories.find((c) => c.kind === 'EXPENSE')?.name ?? ''
     const income = categories.find((c) => c.kind === 'INCOME')?.name ?? ''
-    const csv = language === 'EN'
-      ? `date;type;category;amount;currency;description;from;to\r\n2026-08-01;Expense;${expense};45.20;CHF;Supermarket;;\r\n2026-08-25;Income;${income};6000;CHF;;;\r\n2026-08-28;Transfer;;500;CHF;Savings;;\r\n`
-      : `data;tipo;categoria;importo;valuta;descrizione;da;verso\r\n2026-08-01;Uscita;${expense};45.20;CHF;Supermercato;;\r\n2026-08-25;Entrata;${income};6000;CHF;;;\r\n2026-08-28;Trasferimento;;500;CHF;Risparmio;;\r\n`
-    saveBlob(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }), language === 'EN' ? 'template.csv' : 'modello.csv')
+    const tpl = TEMPLATES[language]
+    const csv = `${tpl.header}\r\n2026-08-01;${tpl.expense};${expense};45.20;CHF;${tpl.shop};;\r\n`
+      + `2026-08-25;${tpl.income};${income};6000;CHF;;;\r\n2026-08-28;${tpl.transfer};;500;CHF;${tpl.savings};;\r\n`
+    saveBlob(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }), tpl.file)
   }
 
   return (
@@ -252,7 +259,7 @@ function ReviewStep({ preview, onStep }: { preview: ImportPreview; onStep: (step
         </label>
       </div>
 
-      <div className="-mx-5 overflow-x-auto sm:mx-0">
+      <div className="relative -mx-5 overflow-x-auto sm:mx-0">
         <table className="w-full min-w-[56rem] text-sm">
           <thead>
             <tr className="border-b border-line text-left text-xs text-muted">

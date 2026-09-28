@@ -9,6 +9,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 import me.luucka.finance.core.csv.CsvReader;
@@ -114,6 +115,23 @@ class CsvTest {
     }
 
     @Test
+    void exportHeadersAndKindLabelsOfEveryLanguageReadBack() {
+        for (Locale language : List.of(Locale.ITALIAN, Locale.ENGLISH, Locale.GERMAN, Locale.FRENCH)) {
+            List<String> headers = EntryCsvFormat.headers(language);
+            for (Column column : Column.values()) {
+                String header = headers.get(column.ordinal());
+                assertEquals(Optional.of(column), EntryCsvFormat.column(header), language + " " + header);
+            }
+            for (EntryKind kind : EntryKind.values()) {
+                String label = EntryCsvFormat.kindLabel(kind, language);
+                assertEquals(Optional.of(kind), EntryCsvFormat.kind(label), language + " " + label);
+            }
+        }
+        assertEquals("Virement", EntryCsvFormat.kindLabel(EntryKind.TRANSFER, Locale.FRENCH));
+        assertEquals("Ausgabe", EntryCsvFormat.kindLabel(EntryKind.EXPENSE, Locale.GERMAN));
+    }
+
+    @Test
     void matchesHeadersKindsAndCleansText() {
         assertEquals(Optional.of(Column.CURRENCY), EntryCsvFormat.column(" Währung "));
         assertEquals(Optional.of(Column.DESCRIPTION), EntryCsvFormat.column("Descrizione"));
@@ -125,6 +143,12 @@ class CsvTest {
         assertTrue(EntryCsvFormat.kind("rimborso").isEmpty());
         assertEquals(Optional.of(Column.TO), EntryCsvFormat.column("Verso"));
         assertEquals(Optional.of(Column.FROM), EntryCsvFormat.column("from"));
+        assertEquals(Optional.of(Column.CATEGORY), EntryCsvFormat.column("Catégorie"));
+        assertEquals(Optional.of(Column.AMOUNT), EntryCsvFormat.column("Montant"));
+        assertEquals(Optional.of(Column.DESCRIPTION), EntryCsvFormat.column("Libellé"));
+        assertEquals(EntryKind.EXPENSE, EntryCsvFormat.kind("Dépense").orElseThrow());
+        assertEquals(EntryKind.INCOME, EntryCsvFormat.kind("Einnahmen").orElseThrow());
+        assertEquals(EntryKind.TRANSFER, EntryCsvFormat.kind("virement").orElseThrow());
         // Control and bidi-override characters become spaces; the export prefix is removed
         assertEquals("a b c", EntryCsvFormat.text(" a‮b\tc "));
         assertEquals("=1+1", EntryCsvFormat.text("'=1+1"));

@@ -69,7 +69,7 @@ export function NetWorthPage() {
             actions={<button type="button" className="text-sm text-accent hover:underline" aria-expanded={showTable}
               onClick={() => setShowTable((v) => !v)}>{showTable ? t('netWorth.hideTable') : t('netWorth.showTable')}</button>}>
             {showTable && (
-              <div className="-mx-4 overflow-x-auto sm:mx-0">
+              <div className="relative -mx-4 overflow-x-auto sm:mx-0">
                 <table className="w-full min-w-[32rem] text-sm">
                   <thead>
                     <tr className="border-b border-line text-left text-xs text-muted">
@@ -98,7 +98,7 @@ export function NetWorthPage() {
         </>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_2fr]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_2fr]">
         <Card title={t('netWorth.breakdown')}>
           <p className="mb-1 text-xs text-ink-2">{t('netWorth.totalAt', { date: date(detail.data?.date) })}</p>
           <p className="mb-4 text-3xl font-semibold tracking-tight">{money(detail.data?.total ?? 0, currency, 0)}</p>
@@ -118,7 +118,7 @@ export function NetWorthPage() {
           {detail.isPending ? <Spinner /> : (detail.data?.positions.length ?? 0) === 0 ? (
             <EmptyState title={t('netWorth.noPositionsAtDate')} />
           ) : (
-            <div className="-mx-4 overflow-x-auto sm:mx-0">
+            <div className="relative -mx-4 overflow-x-auto sm:mx-0">
               <table className="w-full min-w-[36rem] text-sm">
                 <thead>
                   <tr className="border-b border-line text-left text-xs text-muted">

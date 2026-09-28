@@ -126,6 +126,33 @@ class CsvImportExportIT {
     }
 
     @Test
+    void exportFollowsTheInterfaceLanguageAndFrenchFilesImport() throws Exception {
+        ApiClient client = login(testUsers.create("csv-fr", Role.USER));
+        long groceries = category(client, "Spesa alimentare");
+        client.post("/api/cash-entries", """
+                {"date":"2026-08-01","kind":"EXPENSE","categoryId":%d,"amount":12.5,"currency":"CHF",
+                 "description":"Migros"}""".formatted(groceries));
+        assertEquals(200, client.put("/api/account/settings", "{\"language\":\"FR\"}").getResponse().getStatus());
+
+        MvcResult export = client.get("/api/cash-entries/export");
+        assertTrue(export.getResponse().getHeader("Content-Disposition").matches(
+                "attachment; filename=\"operations-\\d{4}-\\d{2}-\\d{2}\\.csv\""));
+        String csv = export.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertTrue(csv.startsWith("\uFEFFdate;type;catégorie;montant;monnaie;description;de;vers\r\n"), csv);
+        assertTrue(csv.contains("2026-08-01;Dépense;Spesa alimentare;12.5;CHF;Migros;;\r\n"), csv);
+        assertEquals(Integer.valueOf(1), json(upload(client, csv), "$.duplicates"));
+
+        MvcResult preview = upload(client, """
+                Date;Type;Catégorie;Montant;Monnaie;Libellé
+                02.08.2026;Dépense;Spesa alimentare;7,30;CHF;Coop
+                03.08.2026;Virement;;500;CHF;Épargne
+                """);
+        assertEquals(200, preview.getResponse().getStatus());
+        assertEquals(Integer.valueOf(2), json(preview, "$.valid"));
+        assertEquals(List.of("EXPENSE", "TRANSFER"), json(preview, "$.rows[*].kind"));
+    }
+
+    @Test
     void previewReportsEveryRowProblem() throws Exception {
         ApiClient client = login(testUsers.create("csv-rows", Role.USER));
         String csv = """
