@@ -4,6 +4,8 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -18,6 +20,7 @@ import me.luucka.finance.user.LoginEventRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -25,7 +28,8 @@ import org.springframework.stereotype.Service;
  * Two-step login (password, then optional TOTP) with brute-force protection.
  * <p>
  * Not transactional on purpose: failed-attempt counters and audit events must be persisted
- * even though the request ends with an error.
+ * even though the request ends with an error. Counters are updated with {@link #updateUser}, so
+ * simultaneous attempts on one account are all counted instead of failing on the version check.
  * <p>
  * Every failure returns the same generic error so the API does not reveal whether a
  * username exists, is locked or is disabled. Unknown usernames still pay the cost of a
@@ -35,6 +39,9 @@ import org.springframework.stereotype.Service;
 public class AuthService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+
+    /** Concurrent updates of one account are retried this many times before giving up. */
+    private static final int MAX_UPDATE_ATTEMPTS = 10;
 
     public enum Outcome {
         AUTHENTICATED,
@@ -87,21 +94,21 @@ public class AuthService {
             throw fail(user.getId(), username, request, Reason.LOCKED);
         }
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
-            user.registerFailedLogin(settings.maxFailedAttempts(), settings.lockDuration(), now);
-            users.save(user);
-            throw fail(user.getId(), username, request, Reason.BAD_CREDENTIALS);
+            ApiException failure = fail(user.getId(), username, request, Reason.BAD_CREDENTIALS);
+            updateUser(user.getId(), u -> u.registerFailedLogin(settings.maxFailedAttempts(), settings.lockDuration(), now));
+            throw failure;
         }
         if (!user.isEnabled()) {
             throw fail(user.getId(), username, request, Reason.DISABLED);
         }
 
         if (passwordEncoder.upgradeEncoding(user.getPasswordHash())) {
-            user.setPasswordHash(passwordEncoder.encode(password));
+            String upgraded = passwordEncoder.encode(password);
+            user = updateUser(user.getId(), u -> u.setPasswordHash(upgraded));
         }
 
         if (user.isTotpEnabled()) {
             // Failed-attempt counter is reset only once the second factor succeeds
-            user = users.save(user);
             authSession.destroy(request);
             HttpSession session = request.getSession(true);
             session.setAttribute(MfaPending.SESSION_ATTRIBUTE,
@@ -110,8 +117,9 @@ public class AuthService {
             return Outcome.MFA_REQUIRED;
         }
 
-        user.resetFailedLogins();
-        complete(user, request, response, Reason.SUCCESS);
+        String name = user.getUsername();
+        complete(user.getId(), request, response, Reason.SUCCESS,
+                refused -> fail(refused.getId(), name, request, refused.isEnabled() ? Reason.LOCKED : Reason.DISABLED));
         return Outcome.AUTHENTICATED;
     }
 
@@ -145,37 +153,64 @@ public class AuthService {
         if (result == MfaService.Verification.INVALID) {
             MfaPending updated = pending.withFailure();
             session.setAttribute(MfaPending.SESSION_ATTRIBUTE, updated);
-            users.findById(pending.userId()).ifPresent(user -> {
-                user.registerFailedLogin(settings.maxFailedAttempts(), settings.lockDuration(), now);
-                users.save(user);
-            });
+            if (users.existsById(pending.userId())) {
+                updateUser(pending.userId(),
+                        u -> u.registerFailedLogin(settings.maxFailedAttempts(), settings.lockDuration(), now));
+            }
             rateLimiter.recordFailure(ip);
             audit(pending.userId(), pending.username(), request, false, Reason.BAD_MFA_CODE);
             throw new ApiException(HttpStatus.UNAUTHORIZED, "invalid_mfa_code", "Invalid code");
         }
 
-        AppUser user = users.findById(pending.userId())
-                .filter(AppUser::isEnabled)
-                .filter(u -> !u.isLocked(now))
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "mfa_expired",
-                        "Login expired, please sign in again"));
         session.removeAttribute(MfaPending.SESSION_ATTRIBUTE);
-        user.resetFailedLogins();
-        complete(user, request, response,
-                result == MfaService.Verification.RECOVERY_CODE ? Reason.RECOVERY_CODE_USED : Reason.SUCCESS);
+        complete(pending.userId(), request, response,
+                result == MfaService.Verification.RECOVERY_CODE ? Reason.RECOVERY_CODE_USED : Reason.SUCCESS,
+                refused -> new ApiException(HttpStatus.UNAUTHORIZED, "mfa_expired", "Login expired, please sign in again"));
     }
 
     public void logout(HttpServletRequest request) {
         authSession.destroy(request);
     }
 
-    private void complete(AppUser user, HttpServletRequest request, HttpServletResponse response, Reason reason) {
-        user.setLastLoginAt(clock.instant());
-        AppUser saved = users.save(user);
+    /**
+     * Records the successful login and opens the session; {@code refusal} builds the error for an
+     * account that was disabled or locked in the meantime.
+     */
+    private void complete(long userId, HttpServletRequest request, HttpServletResponse response, Reason reason,
+                          Function<AppUser, ApiException> refusal) {
+        Instant now = clock.instant();
+        AppUser saved = updateUser(userId, user -> {
+            // Checked again on the fresh copy: the account may have been disabled or locked meanwhile
+            if (!user.isEnabled() || user.isLocked(now)) {
+                throw refusal.apply(user);
+            }
+            user.resetFailedLogins();
+            user.setLastLoginAt(now);
+        });
         authSession.establish(saved, request, response);
         rateLimiter.reset(request.getRemoteAddr());
         audit(saved.getId(), saved.getUsername(), request, true, reason);
         log.info("User '{}' logged in from {}", saved.getUsername(), request.getRemoteAddr());
+    }
+
+    /**
+     * Applies {@code change} to the stored account and saves it. On a concurrent update (another
+     * login of the same account at the same moment) the account is read again and the change
+     * re-applied, so no attempt is lost and no login fails with a version conflict.
+     */
+    private AppUser updateUser(long userId, Consumer<AppUser> change) {
+        for (int attempt = 1; ; attempt++) {
+            AppUser user = users.findById(userId).orElseThrow(() ->
+                    new ApiException(HttpStatus.UNAUTHORIZED, "invalid_credentials", "Invalid username or password"));
+            change.accept(user);
+            try {
+                return users.save(user);
+            } catch (ObjectOptimisticLockingFailureException e) {
+                if (attempt >= MAX_UPDATE_ATTEMPTS) {
+                    throw e;
+                }
+            }
+        }
     }
 
     /** Records a failed attempt and returns the generic error to throw. */

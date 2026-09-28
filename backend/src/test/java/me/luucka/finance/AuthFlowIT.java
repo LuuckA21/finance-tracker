@@ -5,7 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import me.luucka.finance.support.ApiClient;
 import me.luucka.finance.support.IntegrationTest;
@@ -92,6 +98,38 @@ class AuthFlowIT {
         // Correct password is now refused while the account is locked, with the same generic error
         assertEquals(401, client.login(user.getUsername(), TestUsers.PASSWORD));
         assertEquals(401, client.login("no-such-user", TestUsers.PASSWORD));
+    }
+
+    /** Runs {@code count} logins at the same moment, each in its own session; returns the statuses. */
+    private List<Integer> simultaneousLogins(int count, String username, String password) throws Exception {
+        CountDownLatch start = new CountDownLatch(1);
+        try (ExecutorService pool = Executors.newFixedThreadPool(count)) {
+            List<Future<Integer>> results = new ArrayList<>();
+            for (int i = 0; i < count; i++) {
+                ApiClient client = new ApiClient(mvc);
+                client.refreshCsrf();
+                results.add(pool.submit(() -> {
+                    start.await();
+                    return client.login(username, password);
+                }));
+            }
+            start.countDown();
+            List<Integer> statuses = new ArrayList<>();
+            for (Future<Integer> result : results) {
+                statuses.add(result.get());
+            }
+            return statuses;
+        }
+    }
+
+    @Test
+    void simultaneousLoginsOfOneAccountAreAllCounted() throws Exception {
+        AppUser user = testUsers.create("parallel", Role.USER);
+        // The same account signing in from several devices at once: no version conflict (409)
+        assertEquals(Collections.nCopies(6, 200), simultaneousLogins(6, user.getUsername(), TestUsers.PASSWORD));
+        // Wrong passwords sent at once are all counted, so they cannot dodge the account lock
+        assertEquals(Collections.nCopies(5, 401), simultaneousLogins(5, user.getUsername(), "wrong-password"));
+        assertEquals(401, new ApiClient(mvc).login(user.getUsername(), TestUsers.PASSWORD));
     }
 
     @Test
