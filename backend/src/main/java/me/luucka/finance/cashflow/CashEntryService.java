@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -16,7 +17,10 @@ import me.luucka.finance.common.ApiException;
 import me.luucka.finance.common.PageResponse;
 import me.luucka.finance.core.Currencies;
 import me.luucka.finance.core.EntryKind;
+import me.luucka.finance.position.AssetPosition;
+import me.luucka.finance.position.AssetPositionRepository;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -29,9 +33,12 @@ public class CashEntryService {
     /** Rows accepted by one CSV import. */
     public static final int MAX_IMPORT_ROWS = 5000;
 
-    /** Fields of a new or updated entry (already validated for shape by the controller). */
-    public record EntryData(LocalDate date, EntryKind kind, long categoryId, BigDecimal amount, String currency,
-                            String description) {
+    /**
+     * Fields of a new or updated entry (already validated for shape by the controller).
+     * {@code categoryId} applies to income/expense, the positions to transfers only.
+     */
+    public record EntryData(LocalDate date, EntryKind kind, Long categoryId, BigDecimal amount, String currency,
+                            String description, Long fromPositionId, Long toPositionId) {
     }
 
     /** Optional list filters; {@code null} means "no filter". */
@@ -39,20 +46,25 @@ public class CashEntryService {
     }
 
     /** {@code recurringEntryId} is set when a recurring rule created the entry. */
-    public record EntryResponse(long id, LocalDate date, EntryKind kind, long categoryId, BigDecimal amount,
-                                String currency, String description, Long recurringEntryId) {
+    public record EntryResponse(long id, LocalDate date, EntryKind kind, Long categoryId, BigDecimal amount,
+                                String currency, String description, Long recurringEntryId,
+                                Long fromPositionId, Long toPositionId) {
         static EntryResponse of(CashEntry e) {
             return new EntryResponse(e.getId(), e.getDate(), e.getKind(), e.getCategoryId(), e.getAmount(),
-                    e.getCurrency(), e.getDescription(), e.getRecurringEntryId());
+                    e.getCurrency(), e.getDescription(), e.getRecurringEntryId(), e.getFromPositionId(),
+                    e.getToPositionId());
         }
     }
 
     private final CashEntryRepository entries;
     private final CategoryService categories;
+    private final AssetPositionRepository positions;
 
-    public CashEntryService(CashEntryRepository entries, CategoryService categories) {
+    public CashEntryService(CashEntryRepository entries, CategoryService categories,
+                            AssetPositionRepository positions) {
         this.entries = entries;
         this.categories = categories;
+        this.positions = positions;
     }
 
     @Transactional(readOnly = true)
@@ -72,8 +84,8 @@ public class CashEntryService {
     }
 
     /**
-     * Creates every entry or none: one invalid row (a category that is not the user's, or of the
-     * other kind) rolls the whole import back and names the row.
+     * Creates every entry or none: one invalid row (a category or position that is not the user's,
+     * a category of the other kind) rolls the whole import back and names the row.
      *
      * @return entries created
      */
@@ -83,19 +95,26 @@ public class CashEntryService {
             throw ApiException.badRequest("import_row_count",
                     "An import must contain between 1 and " + MAX_IMPORT_ROWS + " entries");
         }
-        Map<Long, Category> owned = categories.owned(userId).stream()
+        Map<Long, Category> ownCategories = categories.owned(userId).stream()
                 .collect(Collectors.toMap(Category::getId, Function.identity()));
+        Map<Long, AssetPosition> ownPositions = positions.findByUserIdOrderByArchivedAscNameAsc(userId).stream()
+                .collect(Collectors.toMap(AssetPosition::getId, Function.identity()));
         List<CashEntry> created = new ArrayList<>(rows.size());
         for (int i = 0; i < rows.size(); i++) {
             EntryData data = rows.get(i);
-            Category category = owned.get(data.categoryId());
-            if (category == null || category.getKind() != data.kind()) {
-                throw ApiException.badRequest(category == null ? "import_unknown_category" : "category_kind_mismatch",
-                        "Entry " + (i + 1) + ": the category is not one of yours or does not match the type")
-                        .withProperty("row", i);
+            EntryTargets.Targets targets;
+            try {
+                targets = EntryTargets.resolve(data.kind(), data.categoryId(), data.fromPositionId(),
+                        data.toPositionId(), id -> Optional.ofNullable(ownCategories.get(id)),
+                        id -> Optional.ofNullable(ownPositions.get(id)));
+            } catch (ApiException e) {
+                ApiException error = e.status() != HttpStatus.NOT_FOUND ? e : ApiException.badRequest(
+                        data.kind().hasCategory() ? "import_unknown_category" : "import_unknown_position",
+                        "Entry " + (i + 1) + ": the category or position is not one of yours");
+                throw error.withProperty("row", i);
             }
             CashEntry entry = new CashEntry(userId);
-            fill(entry, category, data);
+            fill(entry, targets, data);
             created.add(entry);
         }
         entries.saveAll(created);
@@ -122,18 +141,17 @@ public class CashEntryService {
     }
 
     private void apply(long userId, CashEntry entry, EntryData data) {
-        Category category = categories.get(userId, data.categoryId());
-        if (category.getKind() != data.kind()) {
-            throw ApiException.badRequest("category_kind_mismatch",
-                    "The category does not match the entry type (income/expense)");
-        }
-        fill(entry, category, data);
+        fill(entry, EntryTargets.resolve(data.kind(), data.categoryId(), data.fromPositionId(),
+                data.toPositionId(), id -> categories.find(userId, id),
+                id -> positions.findByIdAndUserId(id, userId)), data);
     }
 
-    private static void fill(CashEntry entry, Category category, EntryData data) {
+    private static void fill(CashEntry entry, EntryTargets.Targets targets, EntryData data) {
         entry.setDate(data.date());
         entry.setKind(data.kind());
-        entry.setCategoryId(category.getId());
+        entry.setCategoryId(targets.categoryId());
+        entry.setFromPositionId(targets.fromPositionId());
+        entry.setToPositionId(targets.toPositionId());
         entry.setAmount(data.amount());
         entry.setCurrency(Currencies.normalize(data.currency()));
         entry.setDescription(data.description() == null || data.description().isBlank()

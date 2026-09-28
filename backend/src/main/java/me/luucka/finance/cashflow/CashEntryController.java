@@ -46,14 +46,19 @@ public class CashEntryController {
     public record EntryRequest(
             @NotNull @ReasonableDate LocalDate date,
             @NotNull EntryKind kind,
-            @NotNull Long categoryId,
+            // Required for income/expense, ignored for transfers (checked by the service)
+            Long categoryId,
             @NotNull @DecimalMin(value = "0.0001") @DecimalMax("999999999999999")
             @Digits(integer = 15, fraction = 4) BigDecimal amount,
             @NotNull @CurrencyCode String currency,
-            @Size(max = 500) String description) {
+            @Size(max = 500) String description,
+            // Transfers only, both optional: the user's positions the money moved from and to
+            Long fromPositionId,
+            Long toPositionId) {
 
         CashEntryService.EntryData toData() {
-            return new CashEntryService.EntryData(date, kind, categoryId, amount, currency, description);
+            return new CashEntryService.EntryData(date, kind, categoryId, amount, currency, description,
+                    fromPositionId, toPositionId);
         }
     }
 

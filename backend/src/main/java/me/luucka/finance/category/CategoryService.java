@@ -1,6 +1,7 @@
 package me.luucka.finance.category;
 
 import java.util.List;
+import java.util.Optional;
 
 import me.luucka.finance.cashflow.CashEntryRepository;
 import me.luucka.finance.common.ApiException;
@@ -68,6 +69,9 @@ public class CategoryService {
 
     @Transactional
     public CategoryResponse create(long userId, String name, EntryKind kind, String color) {
+        if (!kind.hasCategory()) {
+            throw ApiException.badRequest("transfer_category", "Transfers have no categories");
+        }
         String trimmed = name.trim();
         if (categories.existsByUserIdAndKindAndNameIgnoreCase(userId, kind, trimmed)) {
             throw ApiException.conflict("category_exists", "A category with this name already exists");
@@ -95,6 +99,12 @@ public class CategoryService {
             throw ApiException.conflict("category_in_use", "The category is used by existing entries");
         }
         categories.delete(category);
+    }
+
+    /** A category owned by the user, if any. */
+    @Transactional(readOnly = true)
+    public Optional<Category> find(long userId, long id) {
+        return categories.findByIdAndUserId(id, userId);
     }
 
     /** Every category owned by the user. */

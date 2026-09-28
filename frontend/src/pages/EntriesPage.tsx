@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Download, FileUp, Pencil, Plus, Repeat, Trash2 } from 'lucide-react'
 import { download, errorMessage } from '../api/client'
-import { entryFilterParams, useCategories, useDeleteEntry, useEntries, type EntryFilter } from '../api/hooks'
+import { entryFilterParams, useCategories, useDeleteEntry, useEntries, usePositions, type EntryFilter } from '../api/hooks'
 import type { CashEntry, EntryKind } from '../api/types'
+import { amountStyle, EntryTarget } from '../components/TransferFields'
 import { Button, Card, EmptyState, ErrorAlert, PageHeader, Spinner } from '../components/ui'
 import { useI18n } from '../i18n'
 import { date, money } from '../lib/format'
@@ -17,6 +18,7 @@ export function EntriesPage() {
   const [formOpen, setFormOpen] = useState(false)
   const entries = useEntries(filter)
   const categories = useCategories().data ?? []
+  const positions = usePositions().data ?? []
   const remove = useDeleteEntry()
   const [error, setError] = useState<string | null>(null)
   const [importOpen, setImportOpen] = useState(false)
@@ -79,8 +81,9 @@ export function EntriesPage() {
             <option value="">{t('entries.kindAll')}</option>
             <option value="INCOME">{t('entries.kindIncome')}</option>
             <option value="EXPENSE">{t('entries.kindExpense')}</option>
+            <option value="TRANSFER">{t('entries.kindTransfer')}</option>
           </select>
-          <select className="input" aria-label={t('entries.category')} value={filter.categoryId}
+          <select className="input" aria-label={t('entries.category')} value={filter.categoryId} disabled={filter.kind === 'TRANSFER'}
             onChange={(e) => update({ categoryId: e.target.value ? Number(e.target.value) : '' })}>
             <option value="">{t('entries.allCategories')}</option>
             {categories.filter((c) => !filter.kind || c.kind === filter.kind).map((c) => (
@@ -109,15 +112,13 @@ export function EntriesPage() {
               </thead>
               <tbody>
                 {page.content.map((e) => {
-                  const cat = byId.get(e.categoryId)
+                  const style = amountStyle(e.kind)
                   return (
                     <tr key={e.id} className="border-b border-line last:border-0 hover:bg-surface-2">
                       <td className="tabular px-4 py-2 text-ink-2 sm:px-2">{date(e.date)}</td>
                       <td className="px-2 py-2">
-                        <span className="flex items-center gap-2">
-                          <span className="size-2.5 rounded-full" style={{ background: cat?.color }} aria-hidden />
-                          {cat?.name ?? '—'}
-                        </span>
+                        <EntryTarget kind={e.kind} categoryId={e.categoryId} from={e.fromPositionId} to={e.toPositionId}
+                          categories={byId} positions={positions} />
                       </td>
                       <td className="max-w-64 truncate px-2 py-2 text-ink-2">
                         {e.recurringEntryId !== null && (
@@ -127,8 +128,8 @@ export function EntriesPage() {
                         )}
                         {e.description}
                       </td>
-                      <td className={`tabular px-2 py-2 text-right font-medium ${e.kind === 'INCOME' ? 'text-good' : 'text-ink'}`}>
-                        {e.kind === 'INCOME' ? '+' : '−'} {money(e.amount, e.currency)}
+                      <td className={`tabular px-2 py-2 text-right font-medium ${style.className}`}>
+                        {style.sign}{money(e.amount, e.currency)}
                       </td>
                       <td className="px-2 py-2">
                         <div className="flex justify-end gap-1">

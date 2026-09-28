@@ -37,8 +37,17 @@ public class CashEntry {
     @Column(nullable = false, length = 16)
     private EntryKind kind;
 
-    @Column(name = "category_id", nullable = false)
+    /** Income and expense only; null for transfers. */
+    @Column(name = "category_id")
     private Long categoryId;
+
+    /** Transfers only: the user's position the money left (optional). */
+    @Column(name = "from_position_id")
+    private Long fromPositionId;
+
+    /** Transfers only: the user's position the money went to (optional). */
+    @Column(name = "to_position_id")
+    private Long toPositionId;
 
     @Column(nullable = false, precision = 19, scale = 4)
     private BigDecimal amount;
@@ -139,5 +148,21 @@ public class CashEntry {
 
     public void setRecurringEntryId(Long recurringEntryId) {
         this.recurringEntryId = recurringEntryId;
+    }
+
+    public Long getFromPositionId() {
+        return fromPositionId;
+    }
+
+    public void setFromPositionId(Long fromPositionId) {
+        this.fromPositionId = fromPositionId;
+    }
+
+    public Long getToPositionId() {
+        return toPositionId;
+    }
+
+    public void setToPositionId(Long toPositionId) {
+        this.toPositionId = toPositionId;
     }
 }

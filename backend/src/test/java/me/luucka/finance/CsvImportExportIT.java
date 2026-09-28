@@ -89,10 +89,10 @@ class CsvImportExportIT {
         assertEquals("no-store", export.getResponse().getHeader("Cache-Control"));
         byte[] bytes = export.getResponse().getContentAsByteArray();
         String csv = new String(bytes, StandardCharsets.UTF_8);
-        assertTrue(csv.startsWith("﻿data;tipo;categoria;importo;valuta;descrizione\r\n"), csv);
+        assertTrue(csv.startsWith("\uFEFFdata;tipo;categoria;importo;valuta;descrizione;da;verso\r\n"), csv);
         assertTrue(csv.contains("2026-08-01;Uscita;Spesa alimentare;12.5;CHF;\"'=HYPERLINK(\"\"http://evil\"\",\"\"clic\"\")\""), csv);
         assertTrue(csv.contains("2026-08-02;Uscita;Spesa alimentare;3.2;EUR;\"Caffè; bar \"\"centrale\"\"\""), csv);
-        assertTrue(csv.contains("2026-08-25;Entrata;Stipendio;6000;CHF;\r\n"), csv);
+        assertTrue(csv.contains("2026-08-25;Entrata;Stipendio;6000;CHF;;;\r\n"), csv);
         // Filters apply to the export too
         String income = alice.get("/api/cash-entries/export?kind=INCOME").getResponse()
                 .getContentAsString(StandardCharsets.UTF_8);

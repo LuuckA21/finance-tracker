@@ -24,12 +24,13 @@ import me.luucka.finance.core.EntryKind;
  */
 public final class EntryCsvFormat {
 
-    public enum Column { DATE, KIND, CATEGORY, AMOUNT, CURRENCY, DESCRIPTION }
+    /** {@code FROM}/{@code TO}: position names of a transfer, both optional. */
+    public enum Column { DATE, KIND, CATEGORY, AMOUNT, CURRENCY, DESCRIPTION, FROM, TO }
 
     /** Export headers per interface language. */
     public static final Map<Locale, List<String>> HEADERS = Map.of(
-            Locale.ITALIAN, List.of("data", "tipo", "categoria", "importo", "valuta", "descrizione"),
-            Locale.ENGLISH, List.of("date", "type", "category", "amount", "currency", "description"));
+            Locale.ITALIAN, List.of("data", "tipo", "categoria", "importo", "valuta", "descrizione", "da", "verso"),
+            Locale.ENGLISH, List.of("date", "type", "category", "amount", "currency", "description", "from", "to"));
 
     private static final Map<Column, List<String>> ALIASES = new EnumMap<>(Map.of(
             Column.DATE, List.of("data", "date", "datum", "giorno", "day"),
@@ -38,7 +39,9 @@ public final class EntryCsvFormat {
             Column.AMOUNT, List.of("importo", "amount", "betrag", "valore", "value", "somma"),
             Column.CURRENCY, List.of("valuta", "currency", "wahrung", "divisa"),
             Column.DESCRIPTION, List.of("descrizione", "description", "beschreibung", "note", "nota", "notes",
-                    "causale", "memo")));
+                    "causale", "memo"),
+            Column.FROM, List.of("da", "from", "von", "origine", "source"),
+            Column.TO, List.of("verso", "a", "to", "nach", "destinazione", "destination")));
 
     private static final Map<String, EntryKind> KINDS = Map.ofEntries(
             Map.entry("entrata", EntryKind.INCOME), Map.entry("entrate", EntryKind.INCOME),
@@ -47,7 +50,10 @@ public final class EntryCsvFormat {
             Map.entry("uscita", EntryKind.EXPENSE), Map.entry("uscite", EntryKind.EXPENSE),
             Map.entry("spesa", EntryKind.EXPENSE), Map.entry("expense", EntryKind.EXPENSE),
             Map.entry("ausgabe", EntryKind.EXPENSE), Map.entry("out", EntryKind.EXPENSE),
-            Map.entry("-", EntryKind.EXPENSE));
+            Map.entry("-", EntryKind.EXPENSE),
+            Map.entry("trasferimento", EntryKind.TRANSFER), Map.entry("trasferimenti", EntryKind.TRANSFER),
+            Map.entry("transfer", EntryKind.TRANSFER), Map.entry("umbuchung", EntryKind.TRANSFER),
+            Map.entry("giroconto", EntryKind.TRANSFER));
 
     private static final List<DateTimeFormatter> DATE_FORMATS = List.of(
             DateTimeFormatter.ofPattern("uuuu-MM-dd").withResolverStyle(ResolverStyle.STRICT),
@@ -88,7 +94,11 @@ public final class EntryCsvFormat {
     /** Export label of a kind in the user's language. */
     public static String kindLabel(EntryKind kind, Locale language) {
         boolean english = Locale.ENGLISH.equals(language);
-        return kind == EntryKind.INCOME ? (english ? "Income" : "Entrata") : (english ? "Expense" : "Uscita");
+        return switch (kind) {
+            case INCOME -> english ? "Income" : "Entrata";
+            case EXPENSE -> english ? "Expense" : "Uscita";
+            case TRANSFER -> english ? "Transfer" : "Trasferimento";
+        };
     }
 
     /**

@@ -12,16 +12,20 @@ import me.luucka.finance.core.Money;
  * @param expense     total expenses (positive number)
  * @param net         income minus expenses
  * @param savingsRate net divided by income as a percentage, or {@code null} when there is no income
+ * @param transferred moved between the user's own accounts/investments: not part of income,
+ *                    expenses, net or savings rate
  */
-public record CashflowTotals(BigDecimal income, BigDecimal expense, BigDecimal net, BigDecimal savingsRate) {
+public record CashflowTotals(BigDecimal income, BigDecimal expense, BigDecimal net, BigDecimal savingsRate,
+                             BigDecimal transferred) {
 
-    public static final CashflowTotals ZERO = of(BigDecimal.ZERO, BigDecimal.ZERO);
+    public static final CashflowTotals ZERO = of(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
 
-    static CashflowTotals of(BigDecimal income, BigDecimal expense) {
+    static CashflowTotals of(BigDecimal income, BigDecimal expense, BigDecimal transferred) {
         BigDecimal net = income.subtract(expense);
         BigDecimal rate = income.signum() > 0
                 ? net.multiply(BigDecimal.valueOf(100)).divide(income, 1, RoundingMode.HALF_EVEN)
                 : null;
-        return new CashflowTotals(Money.round(income), Money.round(expense), Money.round(net), rate);
+        return new CashflowTotals(Money.round(income), Money.round(expense), Money.round(net), rate,
+                Money.round(transferred));
     }
 }

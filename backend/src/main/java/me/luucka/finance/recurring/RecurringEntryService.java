@@ -7,11 +7,12 @@ import java.util.List;
 
 import me.luucka.finance.cashflow.CashEntry;
 import me.luucka.finance.cashflow.CashEntryRepository;
-import me.luucka.finance.category.Category;
+import me.luucka.finance.cashflow.EntryTargets;
 import me.luucka.finance.category.CategoryService;
 import me.luucka.finance.common.ApiException;
 import me.luucka.finance.core.Currencies;
 import me.luucka.finance.core.EntryKind;
+import me.luucka.finance.position.AssetPositionRepository;
 import me.luucka.finance.core.recurrence.Frequency;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,30 +26,35 @@ public class RecurringEntryService {
      */
     static final int MAX_BACKFILL_YEARS = 2;
 
-    public record RuleData(EntryKind kind, long categoryId, BigDecimal amount, String currency, String description,
-                           Frequency frequency, LocalDate startDate, LocalDate endDate, boolean active) {
+    /** {@code categoryId} applies to income/expense, the positions to transfers only. */
+    public record RuleData(EntryKind kind, Long categoryId, BigDecimal amount, String currency, String description,
+                           Frequency frequency, LocalDate startDate, LocalDate endDate, boolean active,
+                           Long fromPositionId, Long toPositionId) {
     }
 
-    public record RuleResponse(long id, EntryKind kind, long categoryId, BigDecimal amount, String currency,
+    public record RuleResponse(long id, EntryKind kind, Long categoryId, BigDecimal amount, String currency,
                                String description, Frequency frequency, LocalDate startDate, LocalDate endDate,
-                               boolean active, LocalDate lastGenerated, LocalDate nextDate) {
+                               boolean active, LocalDate lastGenerated, LocalDate nextDate,
+                               Long fromPositionId, Long toPositionId) {
         static RuleResponse of(RecurringEntry r) {
             return new RuleResponse(r.getId(), r.getKind(), r.getCategoryId(), r.getAmount(), r.getCurrency(),
                     r.getDescription(), r.getFrequency(), r.getStartDate(), r.getEndDate(), r.isActive(),
-                    r.getLastGenerated(), r.nextDate());
+                    r.getLastGenerated(), r.nextDate(), r.getFromPositionId(), r.getToPositionId());
         }
     }
 
     private final RecurringEntryRepository rules;
     private final CashEntryRepository entries;
     private final CategoryService categories;
+    private final AssetPositionRepository positions;
     private final Clock clock;
 
     public RecurringEntryService(RecurringEntryRepository rules, CashEntryRepository entries,
-                                 CategoryService categories, Clock clock) {
+                                 CategoryService categories, AssetPositionRepository positions, Clock clock) {
         this.rules = rules;
         this.entries = entries;
         this.categories = categories;
+        this.positions = positions;
         this.clock = clock;
     }
 
@@ -113,6 +119,8 @@ public class RecurringEntryService {
                 entry.setDate(date);
                 entry.setKind(rule.getKind());
                 entry.setCategoryId(rule.getCategoryId());
+                entry.setFromPositionId(rule.getFromPositionId());
+                entry.setToPositionId(rule.getToPositionId());
                 entry.setAmount(rule.getAmount());
                 entry.setCurrency(rule.getCurrency());
                 entry.setDescription(rule.getDescription());
@@ -126,11 +134,8 @@ public class RecurringEntryService {
     }
 
     private void apply(long userId, RecurringEntry rule, RuleData data) {
-        Category category = categories.get(userId, data.categoryId());
-        if (category.getKind() != data.kind()) {
-            throw ApiException.badRequest("category_kind_mismatch",
-                    "The category does not match the entry type (income/expense)");
-        }
+        EntryTargets.Targets targets = EntryTargets.resolve(data.kind(), data.categoryId(), data.fromPositionId(),
+                data.toPositionId(), id -> categories.find(userId, id), id -> positions.findByIdAndUserId(id, userId));
         // Checked only when the start date is set or changed, so older rules stay editable
         if (!data.startDate().equals(rule.getStartDate())
                 && data.startDate().isBefore(today().minusYears(MAX_BACKFILL_YEARS))) {
@@ -141,7 +146,9 @@ public class RecurringEntryService {
             throw ApiException.badRequest("end_before_start", "The end date is before the start date");
         }
         rule.setKind(data.kind());
-        rule.setCategoryId(category.getId());
+        rule.setCategoryId(targets.categoryId());
+        rule.setFromPositionId(targets.fromPositionId());
+        rule.setToPositionId(targets.toPositionId());
         rule.setAmount(data.amount());
         rule.setCurrency(Currencies.normalize(data.currency()));
         rule.setDescription(data.description() == null || data.description().isBlank()

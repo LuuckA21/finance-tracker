@@ -24,6 +24,8 @@ import me.luucka.finance.core.csv.CsvReader;
 import me.luucka.finance.core.csv.CsvWriter;
 import me.luucka.finance.core.csv.EntryCsvFormat;
 import me.luucka.finance.core.csv.EntryCsvFormat.Column;
+import me.luucka.finance.position.AssetPosition;
+import me.luucka.finance.position.AssetPositionRepository;
 import me.luucka.finance.user.AppUser;
 import me.luucka.finance.user.AppUserRepository;
 import me.luucka.finance.user.Language;
@@ -46,12 +48,12 @@ public class CashEntryCsvService {
     private static final CsvReader.Limits LIMITS =
             new CsvReader.Limits(CashEntryService.MAX_IMPORT_ROWS + 1, 30, 1000);
     private static final char EXPORT_DELIMITER = ';';
-    private static final String BOM = "﻿";
+    private static final String BOM = "\uFEFF";
 
     /** One data row: the text as written in the file and, where it could be read, the values. */
     public record PreviewRow(int line, Map<String, String> raw, LocalDate date, EntryKind kind, Long categoryId,
-                             BigDecimal amount, String currency, String description, boolean duplicate,
-                             List<String> errors) {
+                             BigDecimal amount, String currency, String description, Long fromPositionId,
+                             Long toPositionId, boolean duplicate, List<String> errors) {
     }
 
     public record Preview(String delimiter, List<String> ignoredColumns, int total, int valid, int duplicates,
@@ -61,13 +63,16 @@ public class CashEntryCsvService {
     private final CashEntryService entries;
     private final CashEntryRepository repository;
     private final CategoryService categories;
+    private final AssetPositionRepository positions;
     private final AppUserRepository users;
 
     public CashEntryCsvService(CashEntryService entries, CashEntryRepository repository,
-                               CategoryService categories, AppUserRepository users) {
+                               CategoryService categories, AssetPositionRepository positions,
+                               AppUserRepository users) {
         this.entries = entries;
         this.repository = repository;
         this.categories = categories;
+        this.positions = positions;
         this.users = users;
     }
 
@@ -79,18 +84,23 @@ public class CashEntryCsvService {
         Locale language = locale(user(userId).getLanguage());
         Map<Long, String> names = categories.owned(userId).stream()
                 .collect(Collectors.toMap(Category::getId, Category::getName));
-        // Only category names and descriptions are user text; the rest is produced here
-        boolean[] text = {false, false, true, false, false, true};
+        Map<Long, String> positionNames = positions.findByUserIdOrderByArchivedAscNameAsc(userId).stream()
+                .collect(Collectors.toMap(AssetPosition::getId, AssetPosition::getName));
+        // Category, description and position names are user text; the rest is produced here
+        boolean[] text = {false, false, true, false, false, true, true, true};
         CsvWriter csv = new CsvWriter(EXPORT_DELIMITER);
         csv.textRow(EntryCsvFormat.headers(language));
         for (CashEntry entry : entries.all(userId, filter)) {
             csv.row(Arrays.asList(
                     entry.getDate().toString(),
                     EntryCsvFormat.kindLabel(entry.getKind(), language),
-                    names.getOrDefault(entry.getCategoryId(), ""),
+                    entry.getCategoryId() == null ? "" : names.getOrDefault(entry.getCategoryId(), ""),
                     entry.getAmount().stripTrailingZeros().toPlainString(),
                     entry.getCurrency(),
-                    entry.getDescription()), text);
+                    entry.getDescription(),
+                    entry.getFromPositionId() == null ? "" : positionNames.getOrDefault(entry.getFromPositionId(), ""),
+                    entry.getToPositionId() == null ? "" : positionNames.getOrDefault(entry.getToPositionId(), "")),
+                    text);
         }
         return (BOM + csv).getBytes(StandardCharsets.UTF_8);
     }
@@ -163,12 +173,15 @@ public class CashEntryCsvService {
         // Folded once: names are compared ignoring case and accents
         Map<String, List<Category>> byName = categories.owned(userId).stream()
                 .collect(Collectors.groupingBy(c -> EntryCsvFormat.fold(c.getName())));
+        // Active positions first, so a name shared with an archived one picks the active one
+        Map<String, List<AssetPosition>> positionsByName = positions.findByUserIdOrderByArchivedAscNameAsc(userId)
+                .stream().collect(Collectors.groupingBy(p -> EntryCsvFormat.fold(p.getName())));
         List<PreviewRow> rows = new ArrayList<>();
         for (CsvReader.Row record : records.subList(1, records.size())) {
             if (record.fields().stream().allMatch(String::isBlank)) {
                 continue;
             }
-            rows.add(readRow(record, columns, byName, baseCurrency));
+            rows.add(readRow(record, columns, byName, positionsByName, baseCurrency));
         }
         if (rows.isEmpty()) {
             throw ApiException.badRequest("csv_empty", "The file has no rows below the header");
@@ -187,7 +200,8 @@ public class CashEntryCsvService {
     }
 
     private static PreviewRow readRow(CsvReader.Row record, Map<Column, Integer> columns,
-                                      Map<String, List<Category>> byName, String baseCurrency) {
+                                      Map<String, List<Category>> byName,
+                                      Map<String, List<AssetPosition>> positionsByName, String baseCurrency) {
         Map<String, String> raw = new LinkedHashMap<>();
         for (Column column : Column.values()) {
             Integer index = columns.get(column);
@@ -244,7 +258,17 @@ public class CashEntryCsvService {
             }
         }
         Long categoryId = null;
-        if (categoryText.isEmpty()) {
+        Long fromPositionId = null;
+        Long toPositionId = null;
+        if (kind == EntryKind.TRANSFER) {
+            // No category; the positions are optional but must be the user's when named
+            fromPositionId = position(raw.getOrDefault("from", ""), positionsByName, errors);
+            toPositionId = position(raw.getOrDefault("to", ""), positionsByName, errors);
+            if (fromPositionId != null && fromPositionId.equals(toPositionId)) {
+                errors.add("transfer_same_position");
+                toPositionId = null;
+            }
+        } else if (categoryText.isEmpty()) {
             errors.add("missing_category");
         } else if (kind != null) {
             EntryKind rowKind = kind;
@@ -259,7 +283,22 @@ public class CashEntryCsvService {
         }
 
         return new PreviewRow(record.line(), raw, date, kind, categoryId, amount, currency,
-                description.isEmpty() ? null : description, false, errors);
+                description.isEmpty() ? null : description, fromPositionId, toPositionId, false, errors);
+    }
+
+    private static Long position(String name, Map<String, List<AssetPosition>> positionsByName,
+                                 List<String> errors) {
+        if (name.isEmpty()) {
+            return null;
+        }
+        List<AssetPosition> matches = positionsByName.getOrDefault(EntryCsvFormat.fold(name), List.of());
+        if (matches.isEmpty()) {
+            if (!errors.contains("unknown_position")) {
+                errors.add("unknown_position");
+            }
+            return null;
+        }
+        return matches.getFirst().getId();
     }
 
     /** Flags rows equal to an entry the user already has (same date, type, amount, currency, text). */
@@ -279,7 +318,8 @@ public class CashEntryCsvService {
             boolean duplicate = comparable && existing.contains(
                     key(row.date(), row.kind(), row.amount(), row.currency(), row.description()));
             return duplicate ? new PreviewRow(row.line(), row.raw(), row.date(), row.kind(), row.categoryId(),
-                    row.amount(), row.currency(), row.description(), true, row.errors()) : row;
+                    row.amount(), row.currency(), row.description(), row.fromPositionId(), row.toPositionId(),
+                    true, row.errors()) : row;
         }).toList();
     }
 

@@ -34,7 +34,8 @@ public class RecurringEntryController {
 
     public record RuleRequest(
             @NotNull EntryKind kind,
-            @NotNull Long categoryId,
+            // Required for income/expense, ignored for transfers (checked by the service)
+            Long categoryId,
             @NotNull @DecimalMin(value = "0.0001") @DecimalMax("999999999999999")
             @Digits(integer = 15, fraction = 4) BigDecimal amount,
             @NotNull @CurrencyCode String currency,
@@ -43,11 +44,14 @@ public class RecurringEntryController {
             @NotNull @ReasonableDate LocalDate startDate,
             @ReasonableDate LocalDate endDate,
             // Omitted means active
-            Boolean active) {
+            Boolean active,
+            // Transfers only, both optional
+            Long fromPositionId,
+            Long toPositionId) {
 
         RecurringEntryService.RuleData toData() {
             return new RecurringEntryService.RuleData(kind, categoryId, amount, currency, description, frequency,
-                    startDate, endDate, !Boolean.FALSE.equals(active));
+                    startDate, endDate, !Boolean.FALSE.equals(active), fromPositionId, toPositionId);
         }
     }
 
