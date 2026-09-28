@@ -25,13 +25,14 @@ export function money(value: number | null | undefined, currency: string, digits
   }).format(value)
 }
 
+const oneDecimal = (n: number) => numberFormat({ maximumFractionDigits: 1 }).format(n)
+
 /** Compact form for axis ticks: 950, 12.5k, 1.2M. */
 export function compact(value: number): string {
   const abs = Math.abs(value)
-  const fmt = (n: number) => numberFormat({ maximumFractionDigits: 1 }).format(n)
-  if (abs >= 1_000_000) return `${fmt(value / 1_000_000)}M`
-  if (abs >= 10_000) return `${fmt(value / 1_000)}k`
-  return fmt(value)
+  if (abs >= 1_000_000) return `${oneDecimal(value / 1_000_000)}M`
+  if (abs >= 10_000) return `${oneDecimal(value / 1_000)}k`
+  return oneDecimal(value)
 }
 
 /** Money with an explicit sign in front, whatever the locale puts the symbol: +CHF 1'234.50, −CHF 80.00. */

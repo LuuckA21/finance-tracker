@@ -62,6 +62,7 @@ frontend/
   src/i18n/      it.ts (reference), en.ts, de.ts, fr.ts messages (loaded on demand), useI18n()
   src/preferences/ language + theme: applied at startup, synced with the profile
   src/pages/     dashboards, entries, positions, bulk update, settings, admin (one chunk each)
+  src/**/*.test.ts  Vitest unit tests
   e2e/           Playwright end-to-end tests (real backend + PostgreSQL)
   default.conf.template   Nginx: SPA + reverse proxy + security headers
 docker-compose.yml, .env.example
@@ -138,6 +139,8 @@ Optionally add the Maven wrapper once: `mvn wrapper:wrapper`.
 cd backend
 mvn verify           # unit tests (surefire) + integration tests *IT (failsafe, needs Docker)
 cd ../frontend
+npm run lint         # oxlint: React hooks rules, accessibility, common bugs (warnings fail too)
+npm test             # Vitest: formatting, translations, API error messages
 npm run typecheck && npm run build
 
 # End-to-end: the production build (vite preview) against the real backend and PostgreSQL.
@@ -160,7 +163,15 @@ login/CSRF/session rotation, lockout, forced password change, session revocation
 
 GitHub Actions (`.github/workflows/ci.yml`) runs the same checks on every pull request and on
 pushes to `master`: `mvn verify` on JDK 25 (Testcontainers uses the runner's Docker), the
-frontend typecheck + build, and the end-to-end suite against a PostgreSQL service container.
+frontend lint, unit tests, typecheck + build, and the end-to-end suite against a PostgreSQL
+service container.
+
+The linter is [oxlint](https://oxc.rs) (`frontend/.oxlintrc.json`) rather than ESLint, because
+typescript-eslint does not support TypeScript 7 yet. Two rules are off on purpose: `no-autofocus`
+(dialogs focus their first field, which helps keyboard and screen-reader users) and
+`prefer-tag-over-role` (it suggests `<output>`, `<progress>` or radio inputs, which do not fit the
+status messages, budget bars and segmented controls). The unit tests check, among other things,
+that all four catalogues have the same keys and keep every `{placeholder}` of the Italian text.
 
 ## Deploy with Docker Compose
 

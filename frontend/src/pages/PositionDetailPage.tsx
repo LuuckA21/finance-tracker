@@ -181,7 +181,7 @@ function SnapshotForm({ position, snapshot, onDone }: { position: Position; snap
   const save = useSaveSnapshot(position.id)
   const { t } = useI18n()
   const base = snapshot ?? position.latest
-  const [date, setDate] = useState(snapshot?.date ?? today())
+  const [day, setDay] = useState(snapshot?.date ?? today())
   const [quantity, setQuantity] = useState(base ? String(base.quantity) : '')
   const [price, setPrice] = useState(isCash ? '1' : base ? String(base.unitPrice) : '')
   const [note, setNote] = useState(snapshot?.note ?? '')
@@ -199,7 +199,7 @@ function SnapshotForm({ position, snapshot, onDone }: { position: Position; snap
       return
     }
     try {
-      await save.mutateAsync({ id: snapshot?.id, date, quantity: q, unitPrice: up, note })
+      await save.mutateAsync({ id: snapshot?.id, date: day, quantity: q, unitPrice: up, note })
       onDone()
     } catch (err) {
       setError(err instanceof ApiError && err.status === 409 ? errorMessage(err) : errorMessage(err))
@@ -209,7 +209,7 @@ function SnapshotForm({ position, snapshot, onDone }: { position: Position; snap
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
       <Field label={t('common.date')} hint={!snapshot ? t('snapshotForm.dateHint') : undefined}>
-        {(id) => <input id={id} type="date" className="input" required value={date} onChange={(e) => setDate(e.target.value)} />}
+        {(id) => <input id={id} type="date" className="input" required value={day} onChange={(e) => setDay(e.target.value)} />}
       </Field>
       <div className={`grid gap-3 ${isCash ? '' : 'grid-cols-2'}`}>
         <Field label={isCash ? t('snapshotForm.balance', { currency: position.currency }) : t('position.quantity')} hint={!isCash ? t('snapshotForm.quantityHint') : undefined}>
@@ -237,7 +237,7 @@ function ValueChart({ snapshots, currency }: { snapshots: Snapshot[]; currency: 
   const theme = useChartTheme()
   const { t } = useI18n()
   const color = theme.series[0]
-  const data = [...snapshots].reverse().map((s) => ({ ...s, label: date(s.date) }))
+  const data = snapshots.toReversed().map((s) => ({ ...s, label: date(s.date) }))
   return (
     <div style={{ height: 200 }}>
       <ResponsiveContainer width="100%" height="100%">

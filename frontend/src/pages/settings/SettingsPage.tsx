@@ -132,7 +132,7 @@ function BaseCurrencyForm() {
       <div className="flex gap-2">
         <input className="input w-28 uppercase" list="base-currencies" maxLength={3} aria-label={t('settings.baseCurrency')} value={currency}
           onChange={(e) => setCurrency(e.target.value.toUpperCase())} />
-        <datalist id="base-currencies">{COMMON_CURRENCIES.map((c) => <option key={c} value={c} />)}</datalist>
+        <datalist id="base-currencies">{COMMON_CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}</datalist>
         <Button type="submit" loading={update.isPending} disabled={currency === me?.baseCurrency}>{t('common.save')}</Button>
       </div>
       <ErrorAlert message={error} />
@@ -297,7 +297,7 @@ function FxTab() {
                 <>
                   <input id={id} className="input uppercase" list="fx-currencies" maxLength={3} required value={currency}
                     onChange={(e) => setCurrency(e.target.value.toUpperCase())} />
-                  <datalist id="fx-currencies">{COMMON_CURRENCIES.filter((c) => c !== base).map((c) => <option key={c} value={c} />)}</datalist>
+                  <datalist id="fx-currencies">{COMMON_CURRENCIES.filter((c) => c !== base).map((c) => <option key={c} value={c}>{c}</option>)}</datalist>
                 </>
               )}
             </Field>

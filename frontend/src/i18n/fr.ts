@@ -1,7 +1,7 @@
 import type { Messages } from '.'
 
 // French messages: same keys as it.ts (the compiler enforces it).
-// Non-breaking spaces before ":" and inside « » ( ), narrow ones before "?" and "!" ( ).
+// Typography: a no-break space (\u00a0) before ":" and inside guillemets, a narrow one (\u202f) before "?" and "!".
 export const fr: Messages = {
   // App
   'app.name': 'Finances',

@@ -2,13 +2,16 @@ import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Download, FileUp, Pencil, Plus, Repeat, Trash2 } from 'lucide-react'
 import { download, errorMessage } from '../api/client'
 import { entryFilterParams, useCategories, useDeleteEntry, useEntries, usePositions, type EntryFilter } from '../api/hooks'
-import type { CashEntry, EntryKind } from '../api/types'
+import type { CashEntry, Category, EntryKind } from '../api/types'
 import { amountStyle, EntryTarget } from '../components/TransferFields'
 import { Button, Card, EmptyState, ErrorAlert, PageHeader, Spinner } from '../components/ui'
 import { useI18n } from '../i18n'
 import { date, money } from '../lib/format'
 import { EntryFormModal } from './EntryForm'
 import { ImportModal } from './EntryImport'
+
+/** Stable while categories load, so memoized lookups are not rebuilt on every render. */
+const NO_CATEGORIES: Category[] = []
 
 const PAGE_SIZE = 50
 
@@ -17,7 +20,7 @@ export function EntriesPage() {
   const [editing, setEditing] = useState<CashEntry | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const entries = useEntries(filter)
-  const categories = useCategories().data ?? []
+  const categories = useCategories().data ?? NO_CATEGORIES
   const positions = usePositions().data ?? []
   const remove = useDeleteEntry()
   const [error, setError] = useState<string | null>(null)

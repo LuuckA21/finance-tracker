@@ -71,7 +71,7 @@ export function NetWorthStacked({ points, currency, height = 300 }: { points: Ne
                 const rows = present
                   .filter((c) => Number(row[c]) !== 0)
                   .map((c) => ({ key: c, label: assetClassLabel(c), color: assetClassColor(theme, c), value: Number(row[c]) }))
-                  .reverse()
+                  .toReversed()
                 return <TooltipCard title={t('common.asOf', { date: date(String(row.date)) })} currency={currency} rows={rows} total={Number(row.total)} />
               }}
             />

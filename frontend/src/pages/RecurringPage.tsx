@@ -2,18 +2,21 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { Pause, Pencil, Play, Plus, Trash2 } from 'lucide-react'
 import { ApiError, errorMessage } from '../api/client'
 import { useCategories, useDeleteRecurring, useMe, usePositions, useRecurringEntries, useSaveRecurring } from '../api/hooks'
-import type { EntryKind, Frequency, RecurringEntry } from '../api/types'
+import type { Category, EntryKind, Frequency, RecurringEntry } from '../api/types'
 import { amountStyle, EntryTarget, TransferFields, transferRoute } from '../components/TransferFields'
 import { Badge, Button, Card, EmptyState, ErrorAlert, Field, Modal, PageHeader, Segmented, Spinner } from '../components/ui'
 import { useI18n, type MessageKey } from '../i18n'
 import { COMMON_CURRENCIES, date, money, parseDecimal, today } from '../lib/format'
+
+/** Stable while categories load, so memoized lookups are not rebuilt on every render. */
+const NO_CATEGORIES: Category[] = []
 
 const FREQUENCIES: Frequency[] = ['DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY', 'FOUR_MONTHLY', 'SEMIANNUAL', 'YEARLY']
 
 export function RecurringPage() {
   const { t } = useI18n()
   const rules = useRecurringEntries()
-  const categories = useCategories().data ?? []
+  const categories = useCategories().data ?? NO_CATEGORIES
   const positions = usePositions().data ?? []
   const save = useSaveRecurring()
   const remove = useDeleteRecurring()
@@ -135,7 +138,7 @@ export function RecurringPage() {
 function RecurringForm({ rule, onDone }: { rule: RecurringEntry | null; onDone: () => void }) {
   const { t } = useI18n()
   const me = useMe().data
-  const categories = useCategories().data ?? []
+  const categories = useCategories().data ?? NO_CATEGORIES
   const save = useSaveRecurring()
 
   const [kind, setKind] = useState<EntryKind>(rule?.kind ?? 'EXPENSE')
@@ -242,7 +245,7 @@ function RecurringForm({ rule, onDone }: { rule: RecurringEntry | null; onDone: 
             <>
               <input id={id} className="input uppercase" list="recurring-currencies" maxLength={3} required value={currency}
                 onChange={(e) => setCurrency(e.target.value.toUpperCase())} />
-              <datalist id="recurring-currencies">{COMMON_CURRENCIES.map((c) => <option key={c} value={c} />)}</datalist>
+              <datalist id="recurring-currencies">{COMMON_CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}</datalist>
             </>
           )}
         </Field>

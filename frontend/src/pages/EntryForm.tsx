@@ -121,7 +121,7 @@ function EntryForm({ entry, onDone }: { entry: CashEntry | null; onDone: () => v
             <>
               <input id={id} className="input uppercase" list="currencies" maxLength={3} required value={currency}
                 onChange={(e) => setCurrency(e.target.value.toUpperCase())} />
-              <datalist id="currencies">{COMMON_CURRENCIES.map((c) => <option key={c} value={c} />)}</datalist>
+              <datalist id="currencies">{COMMON_CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}</datalist>
             </>
           )}
         </Field>

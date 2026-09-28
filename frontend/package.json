@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit -p tsconfig.json && vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "oxlint --deny-warnings",
+    "test": "vitest run",
     "preview": "vite preview",
     "typecheck:e2e": "tsc --noEmit -p e2e/tsconfig.json",
     "e2e": "playwright test"
@@ -28,8 +30,10 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
+    "oxlint": "1.86.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
-    "vite": "^8.3.1"
+    "vite": "^8.3.1",
+    "vitest": "5.0.2"
   }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { errorMessage } from '../api/client'
 import { useBulkSnapshot, usePositions } from '../api/hooks'
@@ -13,41 +13,40 @@ interface Row {
   include: boolean
 }
 
+/** Starting values of a position's row: its latest record (a cash balance always has price 1). */
+function defaults(p: Position): Row {
+  return {
+    quantity: p.latest ? String(p.latest.quantity) : '',
+    price: p.assetClass === 'CASH' ? '1' : p.latest ? String(p.latest.unitPrice) : '',
+    include: true,
+  }
+}
+
 /** The "monthly update": one date, new quantity/price for every active position, saved atomically. */
 export function BulkUpdatePage() {
   const positions = usePositions()
   const save = useBulkSnapshot()
   const navigate = useNavigate()
   const [day, setDay] = useState(today())
-  const [rows, setRows] = useState<Record<number, Row>>({})
+  // Only what the user changed: a refetch of the positions never wipes values being typed
+  const [edits, setEdits] = useState<Record<number, Partial<Row>>>({})
   const [error, setError] = useState<string | null>(null)
   const { t } = useI18n()
 
   const active = useMemo(() => (positions.data ?? []).filter((p) => !p.archived), [positions.data])
 
-  useEffect(() => {
-    const initial: Record<number, Row> = {}
-    active.forEach((p) => {
-      initial[p.id] = {
-        quantity: p.latest ? String(p.latest.quantity) : '',
-        price: p.assetClass === 'CASH' ? '1' : p.latest ? String(p.latest.unitPrice) : '',
-        include: true,
-      }
-    })
-    setRows(initial)
-  }, [active])
-
-  const set = (id: number, patch: Partial<Row>) => setRows((r) => ({ ...r, [id]: { ...r[id], ...patch } }))
+  const row = (p: Position): Row => ({ ...defaults(p), ...edits[p.id] })
+  const set = (id: number, patch: Partial<Row>) => setEdits((e) => ({ ...e, [id]: { ...e[id], ...patch } }))
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     const items: { positionId: number; quantity: number; unitPrice: number }[] = []
     for (const p of active) {
-      const row = rows[p.id]
-      if (!row?.include) continue
-      const q = parseDecimal(row.quantity)
-      const up = parseDecimal(row.price)
+      const values = row(p)
+      if (!values.include) continue
+      const q = parseDecimal(values.quantity)
+      const up = parseDecimal(values.price)
       if (q === null || up === null || q < 0 || up < 0) {
         setError(t('bulk.invalidValues', { name: p.name }))
         return
@@ -90,7 +89,7 @@ export function BulkUpdatePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {active.map((p) => <BulkRow key={p.id} p={p} row={rows[p.id]} onChange={(patch) => set(p.id, patch)} />)}
+                  {active.map((p) => <BulkRow key={p.id} p={p} row={row(p)} onChange={(patch) => set(p.id, patch)} />)}
                 </tbody>
               </table>
             </div>
@@ -105,9 +104,8 @@ export function BulkUpdatePage() {
   )
 }
 
-function BulkRow({ p, row, onChange }: { p: Position; row: Row | undefined; onChange: (patch: Partial<Row>) => void }) {
+function BulkRow({ p, row, onChange }: { p: Position; row: Row; onChange: (patch: Partial<Row>) => void }) {
   const { t } = useI18n()
-  if (!row) return null
   const isCash = p.assetClass === 'CASH'
   const q = parseDecimal(row.quantity)
   const up = parseDecimal(row.price)

@@ -9,7 +9,7 @@ import { assetClassColor, useChartTheme } from '../charts/theme'
 import type { CashflowTotals } from '../api/types'
 
 export function CashflowPage() {
-  const [year, setYear] = useState(new Date().getFullYear())
+  const [year, setYear] = useState(() => new Date().getFullYear())
   const [view, setView] = useState<'MONTH' | 'YEAR'>('MONTH')
   const me = useMe().data
   const { t } = useI18n()
