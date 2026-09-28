@@ -1,5 +1,4 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import QRCode from 'qrcode'
 import { ShieldCheck, ShieldOff } from 'lucide-react'
 import { errorMessage } from '../../api/client'
 import { useMe, useMfaDisable, useMfaEnable, useMfaSetup, useRegenerateRecoveryCodes } from '../../api/hooks'
@@ -68,7 +67,11 @@ function SetupFlow({ onEnabled }: { onEnabled: (codes: string[]) => void }) {
 
   useEffect(() => {
     mutate(undefined, {
-      onSuccess: async (data) => setQr(await QRCode.toDataURL(data.otpauthUri, { margin: 1, width: 200 })),
+      onSuccess: async (data) => {
+        // Only needed while enabling 2FA: loaded on demand
+        const QRCode = (await import('qrcode')).default
+        setQr(await QRCode.toDataURL(data.otpauthUri, { margin: 1, width: 200 }))
+      },
       onError: (err) => setError(errorMessage(err)),
     })
   }, [mutate])

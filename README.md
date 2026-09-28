@@ -59,9 +59,10 @@ backend/
   src/test/java/…/*IT.java           integration tests (Testcontainers + MockMvc)
 frontend/
   src/api/       fetch client (CSRF), types, React Query hooks
-  src/i18n/      it.ts (reference) + en.ts messages, useI18n()
+  src/i18n/      it.ts (reference), en.ts, de.ts, fr.ts messages (loaded on demand), useI18n()
   src/preferences/ language + theme: applied at startup, synced with the profile
-  src/pages/     dashboards, entries, positions, bulk update, settings, admin
+  src/pages/     dashboards, entries, positions, bulk update, settings, admin (one chunk each)
+  e2e/           Playwright end-to-end tests (real backend + PostgreSQL)
   default.conf.template   Nginx: SPA + reverse proxy + security headers
 docker-compose.yml, .env.example
 deploy.sh        update the code and restart the containers
@@ -82,7 +83,8 @@ ops/systemd/     backup service and timer (user units)
   (stored as SHA-256 hashes).
 - **Brute force**: generic error for every login failure (no user enumeration, constant-ish time),
   account lock after 5 failures for 15 min, per-IP limit on failed attempts, audit log of logins
-  visible to the user. Re-checks inside a session (change password, enable/disable 2FA, new
+  visible to the user. Simultaneous attempts on one account are all counted (no version-conflict
+  loophole). Re-checks inside a session (change password, enable/disable 2FA, new
   recovery codes) count towards the same lock, and locking revokes every session, so a stolen
   cookie cannot be used to guess the password or a TOTP code. Enabling 2FA needs the current
   password. Nginx rate-limits the login, 2FA and CSRF endpoints per client IP (HTTP 429).
@@ -137,15 +139,28 @@ cd backend
 mvn verify           # unit tests (surefire) + integration tests *IT (failsafe, needs Docker)
 cd ../frontend
 npm run typecheck && npm run build
+
+# End-to-end: the production build (vite preview) against the real backend and PostgreSQL.
+# Playwright starts backend/target/finance-tracker-*.jar (after `mvn package`) unless a backend
+# already listens on :8080; start the database first (see "Run locally").
+npx playwright install chromium        # once
+SPRING_PROFILES_ACTIVE=dev APP_ECB_ENABLED=false npm run e2e
 ```
+
+Each end-to-end test creates its own user through the admin API and deletes it at the end, so the
+suite also runs against a database that already holds data. The admin credentials default to the
+dev profile's (`admin` / `dev-password-change-me`); set `E2E_ADMIN_USERNAME` / `E2E_ADMIN_PASSWORD`
+if you changed them. On a fresh database the first-login password change is done automatically.
+The tests cover sign-in with a temporary password, wrong credentials, 2FA enrolment and login,
+entries and transfers, CSV import/export, budgets, the four languages and a 360 px phone layout.
 
 Integration tests start PostgreSQL with Testcontainers and exercise the real security chain:
 login/CSRF/session rotation, lockout, forced password change, session revocation, admin rules,
 2FA enrolment + replay protection + recovery codes, per-user data isolation, dashboard math.
 
 GitHub Actions (`.github/workflows/ci.yml`) runs the same checks on every pull request and on
-pushes to `master`: `mvn verify` on JDK 25 (Testcontainers uses the runner's Docker) and the
-frontend typecheck + build.
+pushes to `master`: `mvn verify` on JDK 25 (Testcontainers uses the runner's Docker), the
+frontend typecheck + build, and the end-to-end suite against a PostgreSQL service container.
 
 ## Deploy with Docker Compose
 

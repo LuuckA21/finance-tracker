@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { NavLink, Outlet } from 'react-router'
 import {
   ArrowLeftRight,
@@ -18,6 +18,7 @@ import {
 import { useMe } from '../api/hooks'
 import { useLogout } from '../auth/useLogout'
 import { useI18n } from '../i18n'
+import { Spinner } from './ui'
 
 const NAV = [
   { to: '/', label: 'nav.overview', icon: LayoutDashboard, end: true },
@@ -105,7 +106,9 @@ export function Layout() {
       )}
 
       <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:py-8">
-        <Outlet />
+        <Suspense fallback={<Spinner />}>
+          <Outlet />
+        </Suspense>
       </main>
     </div>
   )
