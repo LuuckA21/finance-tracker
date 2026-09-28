@@ -25,6 +25,13 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  servlet:
+    multipart:
+      # CSV import (CashEntryCsvService.MAX_BYTES); Nginx allows 4 MB on the import paths only
+      max-file-size: 2MB
+      max-request-size: 3MB
+      # Keep uploads in memory: nothing is written to /tmp
+      file-size-threshold: 3MB
 
 server:
   port: 8080

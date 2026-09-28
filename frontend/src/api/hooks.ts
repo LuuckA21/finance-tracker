@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
-import { del, get, patch, post, put } from './client'
+import { del, get, patch, post, put, upload } from './client'
 import type {
   AdminUser,
   AssetClass,
@@ -12,6 +12,7 @@ import type {
   CentralRates,
   EcbStatus,
   FxRate,
+  ImportPreview,
   Granularity,
   LoginEvent,
   Me,
@@ -141,6 +142,35 @@ export function useEntries(filter: EntryFilter) {
 }
 
 export type EntryInput = Omit<CashEntry, 'id' | 'recurringEntryId'> & { id?: number }
+
+/** Query string of the entry filters (without paging), for the list and the CSV export. */
+export function entryFilterParams(filter: Omit<EntryFilter, 'page' | 'size'>): URLSearchParams {
+  const params = new URLSearchParams()
+  Object.entries(filter).forEach(([k, v]) => {
+    if (v !== undefined && v !== '' && v !== null) params.set(k, String(v))
+  })
+  return params
+}
+
+/** First import step: the server reads the file and reports every row; nothing is saved. */
+export function useImportPreview() {
+  return useMutation({
+    mutationFn: (file: File) => {
+      const form = new FormData()
+      form.append('file', file)
+      return upload<ImportPreview>('/api/cash-entries/import/preview', form)
+    },
+  })
+}
+
+/** Second step: the confirmed rows, saved all together or not at all. */
+export function useImportEntries() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: (entries: Omit<EntryInput, 'id'>[]) => post<{ imported: number }>('/api/cash-entries/import', { entries }),
+    onSuccess: () => invalidate(),
+  })
+}
 
 export function useSaveEntry() {
   const invalidate = useInvalidate()

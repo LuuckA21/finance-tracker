@@ -102,6 +102,34 @@ export interface FxRate {
   rate: number
 }
 
+export type ImportRowError =
+  | 'invalid_date' | 'invalid_amount' | 'zero_amount' | 'invalid_currency' | 'description_too_long'
+  | 'invalid_kind' | 'missing_category' | 'unknown_category' | 'category_kind_mismatch'
+
+/** One CSV data row: raw text as in the file plus the values that could be read. */
+export interface ImportPreviewRow {
+  line: number
+  raw: Partial<Record<'date' | 'kind' | 'category' | 'amount' | 'currency' | 'description', string>>
+  date: string | null
+  kind: EntryKind | null
+  categoryId: number | null
+  amount: number | null
+  currency: string | null
+  description: string | null
+  duplicate: boolean
+  errors: ImportRowError[]
+}
+
+export interface ImportPreview {
+  delimiter: string
+  ignoredColumns: string[]
+  total: number
+  valid: number
+  duplicates: number
+  invalid: number
+  rows: ImportPreviewRow[]
+}
+
 /** ECB rate towards the base currency; manualRate is set when the user's own rate is used instead. */
 export interface CentralRate {
   currency: string

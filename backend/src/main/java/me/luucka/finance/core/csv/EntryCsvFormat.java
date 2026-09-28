@@ -1,0 +1,155 @@
+package me.luucka.finance.core.csv;
+
+import java.math.BigDecimal;
+import java.text.Normalizer;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.regex.Pattern;
+
+import me.luucka.finance.core.EntryKind;
+
+/**
+ * Columns and value formats of the income/expense CSV, shared by export and import.
+ * <p>
+ * Import is lenient where spreadsheets and banks differ (Italian, English or German headers,
+ * {@code ;} or {@code ,}, decimal comma, Swiss apostrophes, dd.MM.yyyy dates) and strict about
+ * everything else: a value that cannot be read unambiguously is reported, never guessed.
+ */
+public final class EntryCsvFormat {
+
+    public enum Column { DATE, KIND, CATEGORY, AMOUNT, CURRENCY, DESCRIPTION }
+
+    /** Export headers per interface language. */
+    public static final Map<Locale, List<String>> HEADERS = Map.of(
+            Locale.ITALIAN, List.of("data", "tipo", "categoria", "importo", "valuta", "descrizione"),
+            Locale.ENGLISH, List.of("date", "type", "category", "amount", "currency", "description"));
+
+    private static final Map<Column, List<String>> ALIASES = new EnumMap<>(Map.of(
+            Column.DATE, List.of("data", "date", "datum", "giorno", "day"),
+            Column.KIND, List.of("tipo", "type", "kind", "typ", "art"),
+            Column.CATEGORY, List.of("categoria", "category", "kategorie"),
+            Column.AMOUNT, List.of("importo", "amount", "betrag", "valore", "value", "somma"),
+            Column.CURRENCY, List.of("valuta", "currency", "wahrung", "divisa"),
+            Column.DESCRIPTION, List.of("descrizione", "description", "beschreibung", "note", "nota", "notes",
+                    "causale", "memo")));
+
+    private static final Map<String, EntryKind> KINDS = Map.ofEntries(
+            Map.entry("entrata", EntryKind.INCOME), Map.entry("entrate", EntryKind.INCOME),
+            Map.entry("income", EntryKind.INCOME), Map.entry("einnahme", EntryKind.INCOME),
+            Map.entry("in", EntryKind.INCOME), Map.entry("+", EntryKind.INCOME),
+            Map.entry("uscita", EntryKind.EXPENSE), Map.entry("uscite", EntryKind.EXPENSE),
+            Map.entry("spesa", EntryKind.EXPENSE), Map.entry("expense", EntryKind.EXPENSE),
+            Map.entry("ausgabe", EntryKind.EXPENSE), Map.entry("out", EntryKind.EXPENSE),
+            Map.entry("-", EntryKind.EXPENSE));
+
+    private static final List<DateTimeFormatter> DATE_FORMATS = List.of(
+            DateTimeFormatter.ofPattern("uuuu-MM-dd").withResolverStyle(ResolverStyle.STRICT),
+            DateTimeFormatter.ofPattern("d.M.uuuu").withResolverStyle(ResolverStyle.STRICT),
+            DateTimeFormatter.ofPattern("d/M/uuuu").withResolverStyle(ResolverStyle.STRICT));
+
+    private static final Pattern AMOUNT_CHARS = Pattern.compile("[0-9.,]+");
+    private static final Pattern CONTROL = Pattern.compile("[\\p{Cc}\\p{Cf}]");
+
+    public static final LocalDate MIN_DATE = LocalDate.of(1900, 1, 1);
+    public static final LocalDate MAX_DATE = LocalDate.of(2199, 12, 31);
+    public static final int MAX_DESCRIPTION = 500;
+
+    private EntryCsvFormat() {
+    }
+
+    /** Headers of the export in the user's language (Italian unless English). */
+    public static List<String> headers(Locale language) {
+        return HEADERS.getOrDefault(language, HEADERS.get(Locale.ITALIAN));
+    }
+
+    /** The column a header names, ignoring case, accents and surrounding spaces. */
+    public static Optional<Column> column(String header) {
+        String key = fold(header);
+        for (Map.Entry<Column, List<String>> entry : ALIASES.entrySet()) {
+            if (entry.getValue().contains(key)) {
+                return Optional.of(entry.getKey());
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** Income/expense word in Italian, English or German, or a sign; empty if unknown. */
+    public static Optional<EntryKind> kind(String value) {
+        return Optional.ofNullable(KINDS.get(fold(value)));
+    }
+
+    /** Export label of a kind in the user's language. */
+    public static String kindLabel(EntryKind kind, Locale language) {
+        boolean english = Locale.ENGLISH.equals(language);
+        return kind == EntryKind.INCOME ? (english ? "Income" : "Entrata") : (english ? "Expense" : "Uscita");
+    }
+
+    /**
+     * ISO {@code 2026-08-01}, {@code 01.08.2026} or {@code 01/08/2026} (day first), 1900–2199.
+     */
+    public static Optional<LocalDate> date(String value) {
+        String text = value.strip();
+        for (DateTimeFormatter format : DATE_FORMATS) {
+            try {
+                LocalDate date = LocalDate.parse(text, format);
+                return date.isBefore(MIN_DATE) || date.isAfter(MAX_DATE) ? Optional.empty() : Optional.of(date);
+            } catch (DateTimeParseException ignored) {
+                // try the next format
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * A signed amount: {@code 1234.50}, {@code 1234,50}, {@code 1'234.50}, {@code 1.234,50},
+     * {@code -12.30}, {@code 12.30-}. With both {@code .} and {@code ,} the last one is the
+     * decimal separator; a single separator is always decimal. At most 15 integer and 4 decimal
+     * digits.
+     */
+    public static Optional<BigDecimal> amount(String value) {
+        String text = value.strip().replace("'", "").replace("’", "").replace(" ", "").replace(" ", "");
+        boolean negative = false;
+        if (text.startsWith("-") || text.startsWith("+")) {
+            negative = text.startsWith("-");
+            text = text.substring(1);
+        } else if (text.endsWith("-")) {
+            negative = true;
+            text = text.substring(0, text.length() - 1);
+        }
+        if (text.isEmpty() || !AMOUNT_CHARS.matcher(text).matches()) {
+            return Optional.empty();
+        }
+        int decimal = Math.max(text.lastIndexOf('.'), text.lastIndexOf(','));
+        String integer = decimal < 0 ? text : text.substring(0, decimal);
+        String fraction = decimal < 0 ? "" : text.substring(decimal + 1);
+        char decimalChar = decimal < 0 ? 0 : text.charAt(decimal);
+        // Thousands separators: only the other character, never the decimal one twice
+        if (integer.indexOf(decimalChar) >= 0 && decimalChar != 0) {
+            return Optional.empty();
+        }
+        integer = integer.replace(".", "").replace(",", "");
+        if (integer.isEmpty() || fraction.length() > 4 || integer.length() > 15 || !fraction.matches("[0-9]*")) {
+            return Optional.empty();
+        }
+        BigDecimal amount = new BigDecimal(fraction.isEmpty() ? integer : integer + "." + fraction);
+        return Optional.of(negative ? amount.negate() : amount);
+    }
+
+    /** Trimmed, single-line-safe text: control characters become spaces, export prefix removed. */
+    public static String text(String value) {
+        return CONTROL.matcher(CsvWriter.unneutralize(value.strip())).replaceAll(" ").strip();
+    }
+
+    /** Lower case without accents or surrounding spaces, for matching names and headers. */
+    public static String fold(String value) {
+        String decomposed = Normalizer.normalize(value.strip(), Normalizer.Form.NFD);
+        return decomposed.replaceAll("\\p{M}", "").toLowerCase(Locale.ROOT);
+    }
+}

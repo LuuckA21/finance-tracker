@@ -69,8 +69,23 @@ server {
             limit_req zone=ft_session burst=30 nodelay;
             proxy_pass http://backend:8080;
         }
-        # Same JSON shape as the backend, so the SPA shows its "too many attempts" message
+        # CSV import: the file (max 2 MB) and the confirmed rows (up to 5000) need more than 1 MB
+        location = /api/cash-entries/import/preview {
+            client_max_body_size 4m;
+            proxy_pass http://backend:8080;
+        }
+        location = /api/cash-entries/import {
+            client_max_body_size 4m;
+            proxy_pass http://backend:8080;
+        }
+        # Same JSON shape as the backend, so the SPA shows a translated message
         error_page 429 = @too_many_requests;
+        error_page 413 = @payload_too_large;
+    }
+
+    location @payload_too_large {
+        default_type application/problem+json;
+        return 413 '{"status":413,"title":"Payload Too Large","code":"payload_too_large"}';
     }
 
     location @too_many_requests {

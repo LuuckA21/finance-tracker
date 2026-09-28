@@ -14,6 +14,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
@@ -31,6 +32,7 @@ public class GlobalExceptionHandler {
     ProblemDetail handleApi(ApiException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(ex.status(), ex.getMessage());
         problem.setProperty("code", ex.code());
+        ex.properties().forEach(problem::setProperty);
         return problem;
     }
 
@@ -45,6 +47,14 @@ public class GlobalExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Validation failed");
         problem.setProperty("code", "validation_failed");
         problem.setProperty("errors", errors);
+        return problem;
+    }
+
+    /** Upload over spring.servlet.multipart limits (CSV import). */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    ProblemDetail handleUploadSize(MaxUploadSizeExceededException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.PAYLOAD_TOO_LARGE, "The file is too large");
+        problem.setProperty("code", "csv_too_large");
         return problem;
     }
 
