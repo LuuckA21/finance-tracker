@@ -75,6 +75,45 @@ export interface RecurringEntry {
   nextDate: string | null
 }
 
+export interface Budget {
+  categoryId: number
+  amount: number
+  currency: string
+}
+
+export type BudgetState = 'OK' | 'WARNING' | 'OVER'
+
+export interface BudgetStatus {
+  baseCurrency: string
+  /** yyyy-MM */
+  month: string
+  currentMonth: boolean
+  budgeted: number
+  spent: number
+  remaining: number
+  unbudgeted: number
+  categories: {
+    categoryId: number
+    name: string
+    color: string
+    /** As entered, in its own currency */
+    amount: number
+    currency: string
+    /** In the base currency; null when the currency cannot be converted */
+    budget: number | null
+    spent: number
+    remaining: number | null
+    percent: number | null
+    state: BudgetState
+    /** Current month only: spending extrapolated to the end of the month */
+    projected: number | null
+    /** Average monthly spending of the previous 3 months */
+    average: number
+  }[]
+  others: { categoryId: number; name: string; color: string; spent: number; average: number }[]
+  unconvertedCurrencies: string[]
+}
+
 export interface Page<T> {
   content: T[]
   page: number

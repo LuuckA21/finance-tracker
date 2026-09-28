@@ -8,6 +8,7 @@ import type {
   CashflowYear,
   CashflowYears,
   Category,
+  BudgetStatus,
   CategoryKind,
   EntryKind,
   CentralRates,
@@ -29,7 +30,7 @@ import type { Language } from '../i18n'
 import type { Theme } from '../preferences/theme'
 
 // Every mutation that changes financial data invalidates the dashboards too.
-const FINANCE_KEYS = [['entries'], ['dashboard'], ['positions'], ['fx']] as const
+const FINANCE_KEYS = [['entries'], ['dashboard'], ['positions'], ['fx'], ['budgets']] as const
 
 function useInvalidate() {
   const qc = useQueryClient()
@@ -338,6 +339,33 @@ export function useRefreshEcb() {
   const invalidate = useInvalidate()
   // onSettled: a failed download changes the status too
   return useMutation({ mutationFn: () => post<unknown>('/api/admin/fx/refresh', {}), onSettled: () => invalidate() })
+}
+
+// ---------------------------------------------------------------- budgets
+
+/** Budgets compared with the spending of a month (yyyy-MM), default the current one. */
+export const useBudgetStatus = (month?: string) =>
+  useQuery({
+    queryKey: ['budgets', 'status', month ?? 'current'],
+    queryFn: () => get<BudgetStatus>(`/api/budgets/status${month ? `?month=${month}` : ''}`),
+    placeholderData: keepPreviousData,
+  })
+
+export function useSaveBudget() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ categoryId, ...body }: { categoryId: number; amount: number; currency: string }) =>
+      put<unknown>(`/api/budgets/${categoryId}`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['budgets'] }),
+  })
+}
+
+export function useDeleteBudget() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (categoryId: number) => del(`/api/budgets/${categoryId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['budgets'] }),
+  })
 }
 
 // ---------------------------------------------------------------- dashboards
