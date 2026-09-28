@@ -1,19 +1,21 @@
-import type { ReactNode } from 'react'
+import { lazy, type ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router'
 import { LoginPage } from './auth/LoginPage'
 import { RequireAuth } from './auth/RequireAuth'
 import { Layout } from './components/Layout'
-import { OverviewPage } from './pages/OverviewPage'
-import { EntriesPage } from './pages/EntriesPage'
-import { RecurringPage } from './pages/RecurringPage'
-import { BudgetPage } from './pages/BudgetPage'
-import { CashflowPage } from './pages/CashflowPage'
-import { NetWorthPage } from './pages/NetWorthPage'
-import { PositionsPage } from './pages/PositionsPage'
-import { PositionDetailPage } from './pages/PositionDetailPage'
-import { BulkUpdatePage } from './pages/BulkUpdatePage'
-import { SettingsPage } from './pages/settings/SettingsPage'
-import { AdminUsersPage } from './pages/AdminUsersPage'
+
+// Pages are separate chunks, downloaded on first visit (Layout shows a spinner meanwhile)
+const OverviewPage = lazy(() => import('./pages/OverviewPage').then((m) => ({ default: m.OverviewPage })))
+const EntriesPage = lazy(() => import('./pages/EntriesPage').then((m) => ({ default: m.EntriesPage })))
+const RecurringPage = lazy(() => import('./pages/RecurringPage').then((m) => ({ default: m.RecurringPage })))
+const BudgetPage = lazy(() => import('./pages/BudgetPage').then((m) => ({ default: m.BudgetPage })))
+const CashflowPage = lazy(() => import('./pages/CashflowPage').then((m) => ({ default: m.CashflowPage })))
+const NetWorthPage = lazy(() => import('./pages/NetWorthPage').then((m) => ({ default: m.NetWorthPage })))
+const PositionsPage = lazy(() => import('./pages/PositionsPage').then((m) => ({ default: m.PositionsPage })))
+const PositionDetailPage = lazy(() => import('./pages/PositionDetailPage').then((m) => ({ default: m.PositionDetailPage })))
+const BulkUpdatePage = lazy(() => import('./pages/BulkUpdatePage').then((m) => ({ default: m.BulkUpdatePage })))
+const SettingsPage = lazy(() => import('./pages/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })))
+const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage').then((m) => ({ default: m.AdminUsersPage })))
 import { useMe } from './api/hooks'
 
 function AdminOnly({ children }: { children: ReactNode }) {

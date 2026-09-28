@@ -7,7 +7,19 @@ import { App } from './App'
 import { initPreferences } from './preferences'
 import './index.css'
 
-initPreferences()
+// After a deploy, a tab opened earlier asks for chunks of the previous build, which no longer
+// exist: reload once to get the new build (at most once a minute, so a real outage cannot loop).
+window.addEventListener('vite:preloadError', (event) => {
+  try {
+    const last = Number(sessionStorage.getItem('ft-chunk-reload') ?? 0)
+    if (Date.now() - last < 60_000) return
+    sessionStorage.setItem('ft-chunk-reload', String(Date.now()))
+  } catch {
+    return
+  }
+  event.preventDefault()
+  window.location.reload()
+})
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,12 +32,15 @@ const queryClient = new QueryClient({
   },
 })
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
-    </QueryClientProvider>
-  </StrictMode>,
-)
+// Rendering waits for the interface language, whose catalogue is loaded on demand
+initPreferences().then(() => {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </QueryClientProvider>
+    </StrictMode>,
+  )
+})

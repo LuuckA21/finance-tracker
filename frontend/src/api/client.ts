@@ -6,8 +6,7 @@
  * - A 403 on a mutating request may mean the token rotated: refresh it once and retry.
  */
 
-import { translate, type MessageKey } from '../i18n'
-import { it } from '../i18n/it'
+import { hasMessage, translate, type MessageKey } from '../i18n'
 
 export class ApiError extends Error {
   readonly status: number
@@ -182,5 +181,5 @@ export function errorMessage(error: unknown): string {
 
 function translateCode(code: string | undefined): string | undefined {
   const key = `error.${code}` as MessageKey
-  return code && key in it ? translate(key) : undefined
+  return code && hasMessage(key) ? translate(key) : undefined
 }

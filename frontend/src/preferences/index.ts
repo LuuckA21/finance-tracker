@@ -36,18 +36,19 @@ function browserLanguage(): Language {
   return LANGUAGES.includes(code) ? code : 'EN'
 }
 
-/** Applies the preferences stored in this browser; call once before the first render. */
-export function initPreferences() {
+/** Applies the preferences stored in this browser; wait for it before the first render. */
+export async function initPreferences() {
   const stored = read()
-  setLanguage(stored.language && LANGUAGES.includes(stored.language) ? stored.language : browserLanguage())
   setTheme(stored.theme && THEMES.includes(stored.theme) ? stored.theme : 'SYSTEM')
+  await setLanguage(stored.language && LANGUAGES.includes(stored.language) ? stored.language : browserLanguage())
 }
 
-/** Applies preferences now and remembers them in this browser. */
+/** Applies preferences (the language as soon as its catalogue is loaded) and remembers them in this browser. */
 export function applyPreferences(prefs: { language: Language; theme: Theme }) {
-  setLanguage(prefs.language)
   setTheme(prefs.theme)
   write(prefs)
+  // A catalogue that fails to load (network lost) leaves the current language in place
+  setLanguage(prefs.language).catch(() => {})
 }
 
 /** Keeps the interface in line with the logged-in user's saved preferences. */
