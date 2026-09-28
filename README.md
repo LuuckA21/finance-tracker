@@ -12,6 +12,11 @@ Self-hosted personal finance app for a small group of users (you and your family
 - **Net worth** – bank accounts, crypto, ETFs, stocks, pension, … Record *quantity × unit price*
   at a date; the value of every position is carried forward until the next record. Dashboards
   show total net worth per month/year and its split by asset class.
+- **Budgets** – a monthly spending limit per expense category (the same every month, in any
+  currency). The Budget page shows, for any month, what was spent, what is left, the categories
+  close to (80 %) or over their limit, an end-of-month projection for the current month and the
+  spending in categories without a budget, with a suggestion from the last 3 months' average.
+  The overview warns when a budget of the current month is over or close to its limit.
 - **Transfers** – money moved between your own accounts or investments (to savings, a broker, a
   pension account): a third kind of entry, without category, optionally from and to one of your
   positions. Transfers are not income or expenses, so they never distort spending or the savings
@@ -271,6 +276,9 @@ encrypted with it).
   (`quantity × unit price`, in the position's currency), converted with the rate valid on D.
   Positions don't exist before their first record; a record with quantity 0 closes a position.
   Monthly series use month-end dates (today for the current month); yearly series use Dec 31.
+- **Budgets**: only expenses count (income and transfers never do); a budget in another currency
+  is converted at the end of the month (today for the current month). The projection counts
+  expenses created by recurring rules as booked and extrapolates the rest over the month's days.
 - **Exchange rates**, `1 <currency> = rate <base>`, looked up for each date in this order:
   1. the user's latest manual rate on or before the date (manual rates are tied to the base
      currency they were entered for, and always win);
@@ -299,6 +307,7 @@ encrypted with it).
 | Recurring | `GET/POST /api/recurring-entries`, `PUT/DELETE /{id}` (frequency `DAILY\|WEEKLY\|MONTHLY\|QUARTERLY\|FOUR_MONTHLY\|SEMIANNUAL\|YEARLY`) |
 | Positions | `GET/POST /api/positions`, `GET/PUT/DELETE /{id}`, `GET/POST /{id}/snapshots`, `PUT/DELETE /{id}/snapshots/{sid}`, `POST /api/positions/snapshots/bulk` |
 | FX | `GET/POST /api/fx-rates`, `DELETE /{id}` (manual rates), `GET /api/fx-rates/central?date` (ECB rates in the base currency on a day, default today) |
+| Budgets | `GET /api/budgets`, `PUT/DELETE /api/budgets/{categoryId}` (`{amount,currency}`), `GET /api/budgets/status?month=yyyy-MM` |
 | Dashboards | `GET /api/dashboard/cashflow?year`, `/cashflow/years`, `/net-worth?granularity=MONTH\|YEAR&from=yyyy-MM&to=yyyy-MM`, `/net-worth/detail?date` |
 | Admin | `GET/POST /api/admin/users`, `PATCH/DELETE /{id}`, `POST /{id}/{reset-password,unlock,reset-mfa}`, `GET /api/admin/fx`, `POST /api/admin/fx/refresh`, `POST /api/admin/fx/history` (202, runs in background) |
 
@@ -307,5 +316,4 @@ Errors are RFC 9457 problem details with a stable `code` (e.g. `invalid_credenti
 
 ## Ideas for later
 
-Automatic price fetching (e.g. CoinGecko),
-budgets per category, transfers between own accounts.
+Automatic price fetching (e.g. CoinGecko).

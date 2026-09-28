@@ -1,6 +1,6 @@
 import { Link } from 'react-router'
-import { ArrowRight } from 'lucide-react'
-import { useCashflowYear, useMe, useNetWorthDetail, useNetWorthSeries } from '../api/hooks'
+import { AlertTriangle, ArrowRight } from 'lucide-react'
+import { useBudgetStatus, useCashflowYear, useMe, useNetWorthDetail, useNetWorthSeries } from '../api/hooks'
 import { Card, MissingRatesNotice, PageHeader, Spinner, StatTile } from '../components/ui'
 import { CashflowChart } from '../charts/CashflowChart'
 import { NetWorthLine } from '../charts/NetWorthCharts'
@@ -31,6 +31,7 @@ export function OverviewPage() {
     <>
       <PageHeader title={t('overview.greeting', { name: me?.username ?? '' })} subtitle={t('overview.asOf', { date: date(detail.data?.date) })} />
       <MissingRatesNotice currencies={missing} baseCurrency={currency} />
+      <BudgetAlert />
 
       <section className="card mb-4 p-5 sm:p-6">
         <p className="text-sm font-medium text-ink-2">{t('overview.netWorth')}</p>
@@ -83,5 +84,27 @@ export function OverviewPage() {
         )}
       </Card>
     </>
+  )
+}
+
+/** Budgets of the current month over or close to their limit, linking to the budget page. */
+function BudgetAlert() {
+  const { t } = useI18n()
+  const data = useBudgetStatus().data
+  const over = data?.categories.filter((c) => c.state === 'OVER') ?? []
+  const warning = data?.categories.filter((c) => c.state === 'WARNING') ?? []
+  if (over.length + warning.length === 0) return null
+  const names = [...over, ...warning].map((c) => c.name).join(', ')
+  return (
+    <Link to="/budget" role="status"
+      className={`mb-4 flex items-start gap-2 rounded-lg px-3 py-2 text-sm hover:underline ${over.length > 0 ? 'bg-bad-soft text-bad' : 'bg-warn-soft text-warn-ink'}`}>
+      <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+      <span>
+        {over.length > 0 && t('budget.alertOver', { count: over.length })}
+        {over.length > 0 && warning.length > 0 && ' · '}
+        {warning.length > 0 && t('budget.alertWarning', { count: warning.length })}
+        {' — '}{names}
+      </span>
+    </Link>
   )
 }

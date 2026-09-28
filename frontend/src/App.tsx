@@ -6,6 +6,7 @@ import { Layout } from './components/Layout'
 import { OverviewPage } from './pages/OverviewPage'
 import { EntriesPage } from './pages/EntriesPage'
 import { RecurringPage } from './pages/RecurringPage'
+import { BudgetPage } from './pages/BudgetPage'
 import { CashflowPage } from './pages/CashflowPage'
 import { NetWorthPage } from './pages/NetWorthPage'
 import { PositionsPage } from './pages/PositionsPage'
@@ -30,6 +31,7 @@ export function App() {
           <Route path="movimenti" element={<EntriesPage />} />
           <Route path="ricorrenti" element={<RecurringPage />} />
           <Route path="flussi" element={<CashflowPage />} />
+          <Route path="budget" element={<BudgetPage />} />
           <Route path="patrimonio" element={<NetWorthPage />} />
           <Route path="posizioni" element={<PositionsPage />} />
           <Route path="posizioni/:id" element={<PositionDetailPage />} />
