@@ -4,7 +4,10 @@ import type { Language } from '../i18n'
 import type { Theme } from '../preferences/theme'
 
 export type Role = 'ADMIN' | 'USER'
-export type EntryKind = 'INCOME' | 'EXPENSE'
+/** TRANSFER: money moved between own accounts or investments, neither income nor expense */
+export type EntryKind = 'INCOME' | 'EXPENSE' | 'TRANSFER'
+/** Categories exist for income and expenses only */
+export type CategoryKind = Exclude<EntryKind, 'TRANSFER'>
 export type AssetClass =
   | 'CASH'
   | 'CRYPTO'
@@ -32,7 +35,7 @@ export interface Me {
 export interface Category {
   id: number
   name: string
-  kind: EntryKind
+  kind: CategoryKind
   color: string
 }
 
@@ -40,12 +43,16 @@ export interface CashEntry {
   id: number
   date: string
   kind: EntryKind
-  categoryId: number
+  /** Income/expense only */
+  categoryId: number | null
   amount: number
   currency: string
   description: string | null
   /** Set when a recurring rule created the entry */
   recurringEntryId: number | null
+  /** Transfers only, both optional */
+  fromPositionId: number | null
+  toPositionId: number | null
 }
 
 export type Frequency = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'FOUR_MONTHLY' | 'SEMIANNUAL' | 'YEARLY'
@@ -53,7 +60,9 @@ export type Frequency = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'FOUR_MON
 export interface RecurringEntry {
   id: number
   kind: EntryKind
-  categoryId: number
+  categoryId: number | null
+  fromPositionId: number | null
+  toPositionId: number | null
   amount: number
   currency: string
   description: string | null
@@ -105,17 +114,20 @@ export interface FxRate {
 export type ImportRowError =
   | 'invalid_date' | 'invalid_amount' | 'zero_amount' | 'invalid_currency' | 'description_too_long'
   | 'invalid_kind' | 'missing_category' | 'unknown_category' | 'category_kind_mismatch'
+  | 'unknown_position' | 'transfer_same_position'
 
 /** One CSV data row: raw text as in the file plus the values that could be read. */
 export interface ImportPreviewRow {
   line: number
-  raw: Partial<Record<'date' | 'kind' | 'category' | 'amount' | 'currency' | 'description', string>>
+  raw: Partial<Record<'date' | 'kind' | 'category' | 'amount' | 'currency' | 'description' | 'from' | 'to', string>>
   date: string | null
   kind: EntryKind | null
   categoryId: number | null
   amount: number | null
   currency: string | null
   description: string | null
+  fromPositionId: number | null
+  toPositionId: number | null
   duplicate: boolean
   errors: ImportRowError[]
 }
@@ -161,6 +173,8 @@ export interface CashflowTotals {
   expense: number
   net: number
   savingsRate: number | null
+  /** Moved between own accounts/investments: not part of the other figures */
+  transferred: number
 }
 
 export interface CashflowYear {
@@ -172,10 +186,12 @@ export interface CashflowYear {
     categoryId: number
     name: string
     color: string
-    kind: EntryKind
+    kind: CategoryKind
     amount: number
     share: number | null
   }[]
+  /** Transfers by asset class of the destination; null when no destination was given */
+  transfers: { destination: AssetClass | null; amount: number; share: number | null }[]
   availableYears: number[]
   unconvertedCurrencies: string[]
 }

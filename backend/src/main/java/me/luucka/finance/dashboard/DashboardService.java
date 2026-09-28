@@ -54,9 +54,13 @@ public class DashboardService {
                               BigDecimal share) {
     }
 
+    /** Transfers by the asset class they went to; {@code destination} null when not given. */
+    public record TransferRow(AssetClass destination, BigDecimal amount, BigDecimal share) {
+    }
+
     public record CashflowYearResponse(String baseCurrency, int year, List<MonthRow> months, CashflowTotals totals,
-                                       List<CategoryRow> categories, List<Integer> availableYears,
-                                       SortedSet<String> unconvertedCurrencies) {
+                                       List<CategoryRow> categories, List<TransferRow> transfers,
+                                       List<Integer> availableYears, SortedSet<String> unconvertedCurrencies) {
     }
 
     public record YearRow(int year, CashflowTotals totals) {
@@ -108,9 +112,10 @@ public class DashboardService {
 
     public CashflowYearResponse cashflowYear(long userId, int year) {
         FxTable fx = fxService.table(userId);
+        Map<Long, AssetClass> classes = assetClasses(userId);
         List<CashflowEntry> data = entries.findByUserIdAndDateBetween(userId,
                         LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31)).stream()
-                .map(DashboardService::toCashflow)
+                .map(e -> toCashflow(e, classes))
                 .toList();
         CashflowCalculator.YearResult result = CashflowCalculator.year(data, fx, year);
 
@@ -126,6 +131,11 @@ public class DashboardService {
                     c.kind(), c.amount(), percentage(c.amount(), total)));
         }
 
+        List<TransferRow> transfers = result.transfers().stream()
+                .map(t -> new TransferRow(t.destination(), t.amount(),
+                        percentage(t.amount(), result.totals().transferred())))
+                .toList();
+
         List<MonthRow> months = result.months().stream()
                 .map(m -> new MonthRow(m.month(), m.totals()))
                 .toList();
@@ -135,13 +145,14 @@ public class DashboardService {
             years.add(currentYear);
         }
         years.sort(null);
-        return new CashflowYearResponse(fx.baseCurrency(), year, months, result.totals(), rows, years,
+        return new CashflowYearResponse(fx.baseCurrency(), year, months, result.totals(), rows, transfers, years,
                 result.unconvertedCurrencies());
     }
 
     public CashflowYearsResponse cashflowYears(long userId) {
         FxTable fx = fxService.table(userId);
-        List<CashflowEntry> data = entries.findByUserId(userId).stream().map(DashboardService::toCashflow).toList();
+        Map<Long, AssetClass> classes = assetClasses(userId);
+        List<CashflowEntry> data = entries.findByUserId(userId).stream().map(e -> toCashflow(e, classes)).toList();
         CashflowCalculator.MultiYearResult result = CashflowCalculator.years(data, fx);
         List<YearRow> rows = result.years().stream().map(y -> new YearRow(y.year(), y.totals())).toList();
         return new CashflowYearsResponse(fx.baseCurrency(), rows, result.unconvertedCurrencies());
@@ -219,8 +230,16 @@ public class DashboardService {
         return result;
     }
 
-    private static CashflowEntry toCashflow(CashEntry e) {
-        return new CashflowEntry(e.getDate(), e.getKind(), e.getAmount(), e.getCurrency(), e.getCategoryId());
+    private static CashflowEntry toCashflow(CashEntry e, Map<Long, AssetClass> classes) {
+        AssetClass destination = e.getToPositionId() == null ? null : classes.get(e.getToPositionId());
+        return new CashflowEntry(e.getDate(), e.getKind(), e.getAmount(), e.getCurrency(), e.getCategoryId(),
+                destination);
+    }
+
+    /** Asset class of every position of the user, for the destination of transfers. */
+    private Map<Long, AssetClass> assetClasses(long userId) {
+        return positions.findByUserIdOrderByArchivedAscNameAsc(userId).stream()
+                .collect(Collectors.toMap(AssetPosition::getId, AssetPosition::getAssetClass));
     }
 
     private static BigDecimal percentage(BigDecimal part, BigDecimal total) {

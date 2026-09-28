@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { ApiError, errorMessage } from '../api/client'
 import { useCategories, useMe, useSaveEntry } from '../api/hooks'
 import type { CashEntry, EntryKind } from '../api/types'
+import { TransferFields } from '../components/TransferFields'
 import { Button, ErrorAlert, Field, Modal, Segmented } from '../components/ui'
 import { useI18n } from '../i18n'
 import { COMMON_CURRENCIES, parseDecimal, today } from '../lib/format'
@@ -29,6 +30,8 @@ function EntryForm({ entry, onDone }: { entry: CashEntry | null; onDone: () => v
   const [amount, setAmount] = useState(entry ? String(entry.amount) : '')
   const [currency, setCurrency] = useState(entry?.currency ?? lastCurrency ?? me?.baseCurrency ?? 'CHF')
   const [description, setDescription] = useState(entry?.description ?? '')
+  const [route, setRoute] = useState({ from: entry?.fromPositionId ?? null, to: entry?.toPositionId ?? null })
+  const isTransfer = kind === 'TRANSFER'
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
@@ -42,8 +45,12 @@ function EntryForm({ entry, onDone }: { entry: CashEntry | null; onDone: () => v
       setFieldErrors({ amount: t('entryForm.amountRequired') })
       return
     }
-    if (categoryId === '') {
+    if (!isTransfer && categoryId === '') {
       setFieldErrors({ categoryId: t('entryForm.categoryRequired') })
+      return
+    }
+    if (isTransfer && route.from !== null && route.from === route.to) {
+      setFieldErrors({ to: t('error.transfer_same_position') })
       return
     }
     setFieldErrors({})
@@ -52,10 +59,12 @@ function EntryForm({ entry, onDone }: { entry: CashEntry | null; onDone: () => v
         id: entry?.id,
         date,
         kind,
-        categoryId,
+        categoryId: isTransfer || categoryId === '' ? null : categoryId,
         amount: parsed,
         currency: currency.toUpperCase(),
         description: description.trim() || null,
+        fromPositionId: isTransfer ? route.from : null,
+        toPositionId: isTransfer ? route.to : null,
       })
       lastCurrency = currency.toUpperCase()
       if (again) {
@@ -82,21 +91,25 @@ function EntryForm({ entry, onDone }: { entry: CashEntry | null; onDone: () => v
         options={[
           { value: 'EXPENSE', label: t('entryForm.expense') },
           { value: 'INCOME', label: t('entryForm.income') },
+          { value: 'TRANSFER', label: t('entryForm.transfer') },
         ]}
       />
+      {isTransfer && <p className="-mt-2 text-xs text-muted">{t('transfer.help')}</p>}
       <div className="grid grid-cols-2 gap-3">
         <Field label={t('common.date')} error={fieldErrors.date}>
           {(id) => <input id={id} type="date" className="input" required value={date} onChange={(e) => setDate(e.target.value)} />}
         </Field>
-        <Field label={t('entries.category')} error={fieldErrors.categoryId}>
-          {(id) => (
-            <select id={id} className="input" required value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : '')}>
-              <option value="">{t('entryForm.choose')}</option>
-              {options.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          )}
-        </Field>
+        {!isTransfer && (
+          <Field label={t('entries.category')} error={fieldErrors.categoryId}>
+            {(id) => (
+              <select id={id} className="input" required value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : '')}>
+                <option value="">{t('entryForm.choose')}</option>
+                {options.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            )}
+          </Field>
+        )}
         <Field label={t('common.amount')} error={fieldErrors.amount}>
           {(id) => (
             <input id={id} className="input tabular" inputMode="decimal" required placeholder="0.00" autoFocus
@@ -113,6 +126,13 @@ function EntryForm({ entry, onDone }: { entry: CashEntry | null; onDone: () => v
           )}
         </Field>
       </div>
+      {isTransfer && (
+        <div className="grid grid-cols-2 gap-3">
+          <TransferFields from={route.from} to={route.to}
+            onChange={(next) => { setRoute(next); setFieldErrors(({ to: _to, ...rest }) => rest) }}
+            errors={{ from: fieldErrors.fromPositionId, to: fieldErrors.to ?? fieldErrors.toPositionId }} />
+        </div>
+      )}
       <Field label={t('entryForm.descriptionOptional')} error={fieldErrors.description}>
         {(id) => <input id={id} className="input" maxLength={500} value={description} onChange={(e) => setDescription(e.target.value)} />}
       </Field>

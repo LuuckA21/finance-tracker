@@ -8,6 +8,7 @@ import type {
   CashflowYear,
   CashflowYears,
   Category,
+  CategoryKind,
   EntryKind,
   CentralRates,
   EcbStatus,
@@ -101,7 +102,7 @@ export const useCategories = () =>
 export function useSaveCategory() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (c: { id?: number; name: string; kind: EntryKind; color: string }) =>
+    mutationFn: (c: { id?: number; name: string; kind: CategoryKind; color: string }) =>
       c.id
         ? put<Category>(`/api/categories/${c.id}`, { name: c.name, color: c.color })
         : post<Category>('/api/categories', c),

@@ -12,11 +12,17 @@ Self-hosted personal finance app for a small group of users (you and your family
 - **Net worth** – bank accounts, crypto, ETFs, stocks, pension, … Record *quantity × unit price*
   at a date; the value of every position is carried forward until the next record. Dashboards
   show total net worth per month/year and its split by asset class.
+- **Transfers** – money moved between your own accounts or investments (to savings, a broker, a
+  pension account): a third kind of entry, without category, optionally from and to one of your
+  positions. Transfers are not income or expenses, so they never distort spending or the savings
+  rate; the cash-flow page shows them separately ("Transferred") and by type of destination.
+  Recurring rules and the CSV import/export support them too.
 - **CSV import/export** – export the entries matching the current filters (Excel-friendly: UTF-8,
   `;`, ISO dates). Import either everything at once (valid rows, duplicates skipped, nothing saved
   if a row has problems) or row by row: include or exclude each row, fix type and category,
   see duplicates. Headers in Italian, English or German; dates `2026-08-01` or `01.08.2026`;
-  amounts `1234.50`, `1234,50` or `1'234.50`.
+  amounts `1234.50`, `1234,50` or `1'234.50`. Transfers use the type "Trasferimento"/"Transfer"
+  and the optional columns `da`/`verso` (`from`/`to`) with position names.
 - **Multi-currency** – each entry/position keeps its own currency; dashboards convert to the
   user's base currency with the ECB reference rates, downloaded automatically every working day
   and shared by all users. A user's own manual rates take priority over them.
@@ -79,6 +85,9 @@ ops/systemd/     backup service and timer (user units)
   (`SESSION_TIMEOUT`) and a login lasts at most 7 days even when active (`SESSION_MAX_LIFETIME`).
   Password change / reset, disabling or deleting a user revokes their other sessions immediately.
 - **CSRF**: synchronizer token in the session, sent by the SPA in `X-CSRF-TOKEN`.
+- **Transfers**: the positions a transfer points to must be the user's own (404 otherwise, also on
+  CSV import); database checks keep categories on income/expense only and positions on transfers
+  only, and a deleted position just clears the link.
 - **Authorization**: every query is scoped by the owner id taken from the session; accessing
   another user's record returns 404. Covered by `DataIsolationIT`.
 - **Headers**: strict CSP, `frame-ancestors 'none'`, `nosniff`, `no-referrer` (Nginx + Spring).
@@ -255,6 +264,9 @@ encrypted with it).
 
 - **Cash flow**: each entry is converted with the rate of its own date. Entries in a currency
   with no rate (neither manual nor ECB) are excluded from totals and the UI warns about it.
+  Transfers are summed apart (`transferred`) and grouped by the asset class of their destination
+  position; income, expenses, net and savings rate ignore them. Net worth still comes only from
+  position snapshots: a transfer never changes a balance.
 - **Net worth at date D**: for each position, the latest record on or before D
   (`quantity × unit price`, in the position's currency), converted with the rate valid on D.
   Positions don't exist before their first record; a record with quantity 0 closes a position.
@@ -283,7 +295,7 @@ encrypted with it).
 | Auth | `GET /api/auth/csrf`, `POST /api/auth/login`, `POST /api/auth/login/mfa`, `POST /api/auth/logout`, `GET /api/auth/me` |
 | Account | `PUT /api/account/password`, `PUT /api/account/settings` (partial: `baseCurrency`, `language` `IT\|EN`, `theme` `SYSTEM\|LIGHT\|DARK`), `GET /api/account/logins`, `POST /api/account/mfa/{setup,enable,disable,recovery-codes}` |
 | Categories | `GET/POST /api/categories`, `PUT/DELETE /api/categories/{id}` |
-| Entries | `GET /api/cash-entries?from&to&kind&categoryId&q&page&size`, `POST`, `PUT/DELETE /{id}`, `GET /export?filters` (CSV), `POST /import/preview` (multipart `file`), `POST /import` (`{entries:[…]}`) |
+| Entries | `GET /api/cash-entries?from&to&kind&categoryId&q&page&size` (kind `INCOME\|EXPENSE\|TRANSFER`; transfers take `fromPositionId`/`toPositionId` instead of `categoryId`), `POST`, `PUT/DELETE /{id}`, `GET /export?filters` (CSV), `POST /import/preview` (multipart `file`), `POST /import` (`{entries:[…]}`) |
 | Recurring | `GET/POST /api/recurring-entries`, `PUT/DELETE /{id}` (frequency `DAILY\|WEEKLY\|MONTHLY\|QUARTERLY\|FOUR_MONTHLY\|SEMIANNUAL\|YEARLY`) |
 | Positions | `GET/POST /api/positions`, `GET/PUT/DELETE /{id}`, `GET/POST /{id}/snapshots`, `PUT/DELETE /{id}/snapshots/{sid}`, `POST /api/positions/snapshots/bulk` |
 | FX | `GET/POST /api/fx-rates`, `DELETE /{id}` (manual rates), `GET /api/fx-rates/central?date` (ECB rates in the base currency on a day, default today) |

@@ -4,7 +4,8 @@ import { Card, MissingRatesNotice, PageHeader, Segmented, Spinner, StatTile } fr
 import { CashflowChart } from '../charts/CashflowChart'
 import { RankedBars } from '../charts/ChartParts'
 import { useI18n } from '../i18n'
-import { money, monthName, monthShort, percent } from '../lib/format'
+import { assetClassLabel, money, monthName, monthShort, percent } from '../lib/format'
+import { assetClassColor, useChartTheme } from '../charts/theme'
 import type { CashflowTotals } from '../api/types'
 
 export function CashflowPage() {
@@ -16,6 +17,7 @@ export function CashflowPage() {
   const years = useCashflowYears()
   const currency = data.data?.baseCurrency ?? me?.baseCurrency ?? 'CHF'
   const available = data.data?.availableYears ?? [year]
+  const theme = useChartTheme()
 
   return (
     <>
@@ -39,12 +41,14 @@ export function CashflowPage() {
         data.isPending ? <Spinner /> : data.data && (
           <>
             <MissingRatesNotice currencies={data.data.unconvertedCurrencies} baseCurrency={currency} />
-            <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
               <StatTile label={t('cashflow.incomeYear', { year })} value={money(data.data.totals.income, currency, 0)} />
               <StatTile label={t('cashflow.expenseYear', { year })} value={money(data.data.totals.expense, currency, 0)} />
               <StatTile label={t('cashflow.net')} value={money(data.data.totals.net, currency, 0)} tone={data.data.totals.net >= 0 ? 'good' : 'bad'}
                 sub={data.data.totals.net >= 0 ? t('cashflow.surplus') : t('cashflow.deficit')} />
               <StatTile label={t('cashflow.savingsRate')} value={percent(data.data.totals.savingsRate)} />
+              <StatTile label={t('cashflow.transferredYear', { year })} value={money(data.data.totals.transferred, currency, 0)}
+                sub={t('cashflow.transferredHint')} />
             </div>
 
             <Card title={t('cashflow.monthlyTrend', { year })} className="mb-4">
@@ -67,6 +71,19 @@ export function CashflowPage() {
                   }))} />
               </Card>
             </div>
+
+            {data.data.transfers.length > 0 && (
+              <Card title={t('cashflow.transfersByDestination')} className="mb-4">
+                <p className="mb-3 text-xs text-muted">{t('cashflow.transfersHelp')}</p>
+                <RankedBars currency={currency} emptyText=""
+                  rows={data.data.transfers.map((r) => ({
+                    key: r.destination ?? 'NONE',
+                    label: r.destination ? assetClassLabel(r.destination) : t('cashflow.transferNoDestination'),
+                    swatch: r.destination ? assetClassColor(theme, r.destination) : undefined,
+                    value: r.amount, share: r.share,
+                  }))} />
+              </Card>
+            )}
 
             <Card title={t('cashflow.monthlyTable')}>
               <TotalsTable currency={currency} firstHeader={t('cashflow.month')}
@@ -104,11 +121,12 @@ function TotalsTable({ rows, footer, currency, firstHeader }: {
       <td className="tabular px-2 py-2 text-right">{money(totals.expense, currency)}</td>
       <td className={`tabular px-2 py-2 text-right ${totals.net < 0 ? 'text-bad' : ''}`}>{money(totals.net, currency)}</td>
       <td className="tabular px-2 py-2 text-right text-ink-2">{percent(totals.savingsRate)}</td>
+      <td className="tabular px-2 py-2 text-right text-ink-2">{money(totals.transferred, currency)}</td>
     </>
   )
   return (
     <div className="-mx-4 overflow-x-auto sm:mx-0">
-      <table className="w-full min-w-[32rem] text-sm">
+      <table className="w-full min-w-[38rem] text-sm">
         <thead>
           <tr className="border-b border-line text-left text-xs text-muted">
             <th className="px-4 py-2 font-medium sm:px-2">{firstHeader}</th>
@@ -116,6 +134,7 @@ function TotalsTable({ rows, footer, currency, firstHeader }: {
             <th className="px-2 py-2 text-right font-medium">{t('cashflow.colExpense')}</th>
             <th className="px-2 py-2 text-right font-medium">{t('cashflow.colNet')}</th>
             <th className="px-2 py-2 text-right font-medium">{t('cashflow.colSavings')}</th>
+            <th className="px-2 py-2 text-right font-medium">{t('cashflow.colTransferred')}</th>
           </tr>
         </thead>
         <tbody>

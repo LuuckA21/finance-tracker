@@ -1,8 +1,9 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Pause, Pencil, Play, Plus, Trash2 } from 'lucide-react'
 import { ApiError, errorMessage } from '../api/client'
-import { useCategories, useDeleteRecurring, useMe, useRecurringEntries, useSaveRecurring } from '../api/hooks'
+import { useCategories, useDeleteRecurring, useMe, usePositions, useRecurringEntries, useSaveRecurring } from '../api/hooks'
 import type { EntryKind, Frequency, RecurringEntry } from '../api/types'
+import { amountStyle, EntryTarget, TransferFields, transferRoute } from '../components/TransferFields'
 import { Badge, Button, Card, EmptyState, ErrorAlert, Field, Modal, PageHeader, Segmented, Spinner } from '../components/ui'
 import { useI18n, type MessageKey } from '../i18n'
 import { COMMON_CURRENCIES, date, money, parseDecimal, today } from '../lib/format'
@@ -13,6 +14,7 @@ export function RecurringPage() {
   const { t } = useI18n()
   const rules = useRecurringEntries()
   const categories = useCategories().data ?? []
+  const positions = usePositions().data ?? []
   const save = useSaveRecurring()
   const remove = useDeleteRecurring()
   const [editing, setEditing] = useState<RecurringEntry | null>(null)
@@ -72,15 +74,19 @@ export function RecurringPage() {
               </thead>
               <tbody>
                 {list.map((r) => {
-                  const cat = byId.get(r.categoryId)
+                  const cat = r.categoryId === null ? undefined : byId.get(r.categoryId)
+                  const style = amountStyle(r.kind)
+                  const fallback = r.kind === 'TRANSFER'
+                    ? transferRoute(positions, r.fromPositionId, r.toPositionId, '?') ?? t('transfer.label')
+                    : cat?.name ?? '—'
                   return (
                     <tr key={r.id} className={`border-b border-line last:border-0 hover:bg-surface-2 ${r.active ? '' : 'opacity-60'}`}>
                       <td className="px-4 py-2 sm:px-2">
-                        <p className="font-medium">{r.description || (cat?.name ?? '—')}</p>
-                        <p className="flex items-center gap-1.5 text-xs text-muted">
-                          <span className="size-2 rounded-full" style={{ background: cat?.color }} aria-hidden />
-                          {cat?.name ?? '—'}
-                        </p>
+                        <p className="font-medium">{r.description || fallback}</p>
+                        <div className="text-xs text-muted">
+                          <EntryTarget kind={r.kind} categoryId={r.categoryId} from={r.fromPositionId} to={r.toPositionId}
+                            categories={byId} positions={positions} />
+                        </div>
                       </td>
                       <td className="px-2 py-2 text-ink-2">
                         {t(`recurring.freq.${r.frequency}` as MessageKey)}
@@ -90,8 +96,8 @@ export function RecurringPage() {
                         {!r.active ? <Badge>{t('recurring.paused')}</Badge>
                           : r.nextDate ? date(r.nextDate) : <Badge>{t('recurring.ended')}</Badge>}
                       </td>
-                      <td className={`tabular px-2 py-2 text-right font-medium ${r.kind === 'INCOME' ? 'text-good' : 'text-ink'}`}>
-                        {r.kind === 'INCOME' ? '+' : '−'} {money(r.amount, r.currency)}
+                      <td className={`tabular px-2 py-2 text-right font-medium ${style.className}`}>
+                        {style.sign}{money(r.amount, r.currency)}
                       </td>
                       <td className="px-2 py-2">
                         <div className="flex justify-end gap-1">
@@ -140,6 +146,8 @@ function RecurringForm({ rule, onDone }: { rule: RecurringEntry | null; onDone: 
   const [frequency, setFrequency] = useState<Frequency>(rule?.frequency ?? 'MONTHLY')
   const [startDate, setStartDate] = useState(rule?.startDate ?? today())
   const [endDate, setEndDate] = useState(rule?.endDate ?? '')
+  const [route, setRoute] = useState({ from: rule?.fromPositionId ?? null, to: rule?.toPositionId ?? null })
+  const isTransfer = kind === 'TRANSFER'
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
@@ -153,8 +161,12 @@ function RecurringForm({ rule, onDone }: { rule: RecurringEntry | null; onDone: 
       setFieldErrors({ amount: t('entryForm.amountRequired') })
       return
     }
-    if (categoryId === '') {
+    if (!isTransfer && categoryId === '') {
       setFieldErrors({ categoryId: t('entryForm.categoryRequired') })
+      return
+    }
+    if (isTransfer && route.from !== null && route.from === route.to) {
+      setFieldErrors({ to: t('error.transfer_same_position') })
       return
     }
     setFieldErrors({})
@@ -162,7 +174,9 @@ function RecurringForm({ rule, onDone }: { rule: RecurringEntry | null; onDone: 
       await save.mutateAsync({
         id: rule?.id,
         kind,
-        categoryId,
+        categoryId: isTransfer || categoryId === '' ? null : categoryId,
+        fromPositionId: isTransfer ? route.from : null,
+        toPositionId: isTransfer ? route.to : null,
         amount: parsed,
         currency: currency.toUpperCase(),
         description: description.trim() || null,
@@ -188,21 +202,28 @@ function RecurringForm({ rule, onDone }: { rule: RecurringEntry | null; onDone: 
         options={[
           { value: 'EXPENSE', label: t('entryForm.expense') },
           { value: 'INCOME', label: t('entryForm.income') },
+          { value: 'TRANSFER', label: t('entryForm.transfer') },
         ]}
       />
       <Field label={t('entryForm.descriptionOptional')} error={fieldErrors.description}>
         {(id) => <input id={id} className="input" maxLength={500} value={description} onChange={(e) => setDescription(e.target.value)} />}
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label={t('entries.category')} error={fieldErrors.categoryId}>
-          {(id) => (
-            <select id={id} className="input" required value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : '')}>
-              <option value="">{t('entryForm.choose')}</option>
-              {options.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          )}
-        </Field>
+        {isTransfer ? (
+          <TransferFields from={route.from} to={route.to}
+            onChange={(next) => { setRoute(next); setFieldErrors(({ to: _to, ...rest }) => rest) }}
+            errors={{ from: fieldErrors.fromPositionId, to: fieldErrors.to ?? fieldErrors.toPositionId }} />
+        ) : (
+          <Field label={t('entries.category')} error={fieldErrors.categoryId}>
+            {(id) => (
+              <select id={id} className="input" required value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : '')}>
+                <option value="">{t('entryForm.choose')}</option>
+                {options.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            )}
+          </Field>
+        )}
         <Field label={t('recurring.frequency')} error={fieldErrors.frequency}>
           {(id) => (
             <select id={id} className="input" value={frequency} onChange={(e) => setFrequency(e.target.value as Frequency)}>

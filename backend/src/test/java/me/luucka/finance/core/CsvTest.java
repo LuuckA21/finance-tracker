@@ -62,7 +62,7 @@ class CsvTest {
 
     @Test
     void decodesUtf8WithBomAndFallsBackToWindows1252() {
-        byte[] utf8 = ("﻿caffè;€").getBytes(StandardCharsets.UTF_8);
+        byte[] utf8 = ("\uFEFFcaffè;€").getBytes(StandardCharsets.UTF_8);
         assertEquals("caffè;€", CsvReader.decode(utf8));
         byte[] ansi = "caffè;€".getBytes(Charset.forName("windows-1252"));
         assertEquals("caffè;€", CsvReader.decode(ansi));
@@ -120,7 +120,11 @@ class CsvTest {
         assertTrue(EntryCsvFormat.column("saldo").isEmpty());
         assertEquals(EntryKind.EXPENSE, EntryCsvFormat.kind("Uscita").orElseThrow());
         assertEquals(EntryKind.INCOME, EntryCsvFormat.kind("income").orElseThrow());
-        assertTrue(EntryCsvFormat.kind("transfer").isEmpty());
+        assertEquals(EntryKind.TRANSFER, EntryCsvFormat.kind("Trasferimento").orElseThrow());
+        assertEquals(EntryKind.TRANSFER, EntryCsvFormat.kind("Umbuchung").orElseThrow());
+        assertTrue(EntryCsvFormat.kind("rimborso").isEmpty());
+        assertEquals(Optional.of(Column.TO), EntryCsvFormat.column("Verso"));
+        assertEquals(Optional.of(Column.FROM), EntryCsvFormat.column("from"));
         // Control and bidi-override characters become spaces; the export prefix is removed
         assertEquals("a b c", EntryCsvFormat.text(" a‮b\tc "));
         assertEquals("=1+1", EntryCsvFormat.text("'=1+1"));

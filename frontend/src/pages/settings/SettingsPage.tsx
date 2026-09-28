@@ -17,7 +17,7 @@ import {
   useSaveFxRate,
   useUpdateSettings,
 } from '../../api/hooks'
-import type { Category, EntryKind } from '../../api/types'
+import type { Category, CategoryKind } from '../../api/types'
 import { Badge, Button, Card, EmptyState, ErrorAlert, Field, Modal, PageHeader, Segmented, Spinner } from '../../components/ui'
 import { LANGUAGES, LANGUAGE_NAMES, useI18n, type Language, type MessageKey } from '../../i18n'
 import { applyPreferences } from '../../preferences'
@@ -168,7 +168,7 @@ function LoginHistory() {
 function CategoriesTab() {
   const categories = useCategories()
   const remove = useDeleteCategory()
-  const [editing, setEditing] = useState<Category | { kind: EntryKind } | null>(null)
+  const [editing, setEditing] = useState<Category | { kind: CategoryKind } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const { t } = useI18n()
 
@@ -187,7 +187,7 @@ function CategoriesTab() {
     <>
       <ErrorAlert message={error} />
       <div className="mt-2 grid gap-4 lg:grid-cols-2">
-        {(['EXPENSE', 'INCOME'] as EntryKind[]).map((kind) => (
+        {(['EXPENSE', 'INCOME'] as CategoryKind[]).map((kind) => (
           <Card key={kind} title={kind === 'EXPENSE' ? t('categories.expense') : t('categories.income')}
             actions={<Button onClick={() => setEditing({ kind })}>{t('common.add')}</Button>}>
             <ul className="divide-y divide-line">
@@ -217,7 +217,7 @@ function CategoriesTab() {
   )
 }
 
-function CategoryForm({ initial, onDone }: { initial: Category | { kind: EntryKind }; onDone: () => void }) {
+function CategoryForm({ initial, onDone }: { initial: Category | { kind: CategoryKind }; onDone: () => void }) {
   const save = useSaveCategory()
   const { t } = useI18n()
   const existing = 'id' in initial ? initial : null

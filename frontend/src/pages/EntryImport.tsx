@@ -1,16 +1,18 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { ChevronLeft, ChevronRight, Download, FileUp } from 'lucide-react'
 import { ApiError, errorMessage, saveBlob } from '../api/client'
-import { useCategories, useImportEntries, useImportPreview, useMe } from '../api/hooks'
-import type { Category, EntryKind, ImportPreview, ImportPreviewRow, ImportRowError } from '../api/types'
+import { useCategories, useImportEntries, useImportPreview, useMe, usePositions } from '../api/hooks'
+import type { Category, EntryKind, ImportPreview, ImportPreviewRow, ImportRowError, Position } from '../api/types'
+import { transferOptions } from '../components/TransferFields'
 import { Badge, Button, ErrorAlert, Field, Modal, Segmented } from '../components/ui'
 import { useI18n, type MessageKey } from '../i18n'
 import { date, money } from '../lib/format'
 
 type Mode = 'all' | 'review'
 
-/** Problems the review can fix by choosing type or category; the others need a corrected file. */
-const FIXABLE: ImportRowError[] = ['invalid_kind', 'missing_category', 'unknown_category', 'category_kind_mismatch']
+/** Problems the review can fix by choosing type, category or positions; the others need a corrected file. */
+const FIXABLE: ImportRowError[] = ['invalid_kind', 'missing_category', 'unknown_category', 'category_kind_mismatch',
+  'unknown_position', 'transfer_same_position']
 const REVIEW_PAGE = 100
 const MAX_FILE_BYTES = 2 * 1024 * 1024
 
@@ -18,6 +20,8 @@ interface ReviewRow {
   source: ImportPreviewRow
   kind: EntryKind | null
   categoryId: number | null
+  from: number | null
+  to: number | null
   include: boolean
 }
 
@@ -30,8 +34,10 @@ type Step =
 const blocking = (row: ImportPreviewRow) => row.errors.filter((e) => !FIXABLE.includes(e))
 
 function isReady(row: ReviewRow, categories: Category[]) {
-  return blocking(row.source).length === 0 && row.kind !== null && row.categoryId !== null
-    && categories.some((c) => c.id === row.categoryId && c.kind === row.kind)
+  if (blocking(row.source).length > 0 || row.kind === null) return false
+  // Transfers: no category, positions optional but different
+  if (row.kind === 'TRANSFER') return row.from === null || row.from !== row.to
+  return row.categoryId !== null && categories.some((c) => c.id === row.categoryId && c.kind === row.kind)
 }
 
 export function ImportModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -103,9 +109,9 @@ function SelectStep({ onStep }: { onStep: (step: Step) => void }) {
     const expense = categories.find((c) => c.kind === 'EXPENSE')?.name ?? ''
     const income = categories.find((c) => c.kind === 'INCOME')?.name ?? ''
     const csv = language === 'EN'
-      ? `date;type;category;amount;currency;description\r\n2026-08-01;Expense;${expense};45.20;CHF;Supermarket\r\n2026-08-25;Income;${income};6000;CHF;\r\n`
-      : `data;tipo;categoria;importo;valuta;descrizione\r\n2026-08-01;Uscita;${expense};45.20;CHF;Supermercato\r\n2026-08-25;Entrata;${income};6000;CHF;\r\n`
-    saveBlob(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), language === 'EN' ? 'template.csv' : 'modello.csv')
+      ? `date;type;category;amount;currency;description;from;to\r\n2026-08-01;Expense;${expense};45.20;CHF;Supermarket;;\r\n2026-08-25;Income;${income};6000;CHF;;;\r\n2026-08-28;Transfer;;500;CHF;Savings;;\r\n`
+      : `data;tipo;categoria;importo;valuta;descrizione;da;verso\r\n2026-08-01;Uscita;${expense};45.20;CHF;Supermercato;;\r\n2026-08-25;Entrata;${income};6000;CHF;;;\r\n2026-08-28;Trasferimento;;500;CHF;Risparmio;;\r\n`
+    saveBlob(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }), language === 'EN' ? 'template.csv' : 'modello.csv')
   }
 
   return (
@@ -116,6 +122,7 @@ function SelectStep({ onStep }: { onStep: (step: Step) => void }) {
           <li>{t('import.helpColumns')}</li>
           <li>{t('import.helpFormats')}</li>
           <li>{t('import.helpKind')}</li>
+          <li>{t('import.helpTransfer')}</li>
         </ul>
         <button type="button" onClick={downloadTemplate} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline">
           <Download className="size-3.5" /> {t('import.template')}
@@ -170,14 +177,18 @@ function InvalidStep({ preview, onReview, onBack }: { preview: ImportPreview; on
 function ReviewStep({ preview, onStep }: { preview: ImportPreview; onStep: (step: Step) => void }) {
   const { t } = useI18n()
   const categories = useCategories().data ?? []
+  const positions = usePositions().data ?? []
   const baseCurrency = useMe().data?.baseCurrency ?? 'CHF'
   const save = useImportEntries()
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(0)
   const [onlyToCheck, setOnlyToCheck] = useState(false)
   const [rows, setRows] = useState<ReviewRow[]>(() => preview.rows.map((source) => {
-    const row: ReviewRow = { source, kind: source.kind, categoryId: source.categoryId, include: false }
-    return { ...row, include: isReady(row, categories) && !source.duplicate }
+    const row: ReviewRow = {
+      source, kind: source.kind, categoryId: source.categoryId, from: source.fromPositionId, to: source.toPositionId, include: false,
+    }
+    // A row with any problem waits for the user, even one the review can fix
+    return { ...row, include: isReady(row, categories) && !source.duplicate && source.errors.length === 0 }
   }))
 
   const visible = useMemo(() => rows
@@ -191,9 +202,13 @@ function ReviewStep({ preview, onStep }: { preview: ImportPreview; onStep: (step
     setRows((all) => all.map((row, i) => {
       if (i !== index) return row
       const next = { ...row, ...patch }
-      // A category of the other type no longer fits
+      // A category of the other type no longer fits; only transfers have positions
       if (patch.kind && !categories.some((c) => c.id === next.categoryId && c.kind === patch.kind)) next.categoryId = null
-      if (patch.kind !== undefined || patch.categoryId !== undefined) next.include = isReady(next, categories)
+      if (patch.kind && patch.kind !== 'TRANSFER') { next.from = null; next.to = null }
+      if (patch.kind !== undefined || patch.categoryId !== undefined || patch.from !== undefined || patch.to !== undefined) {
+        // Fixing a row selects it, except rows already present: those stay a manual choice
+        next.include = isReady(next, categories) && !next.source.duplicate
+      }
       return next
     }))
   }
@@ -205,7 +220,10 @@ function ReviewStep({ preview, onStep }: { preview: ImportPreview; onStep: (step
   async function submit() {
     setError(null)
     try {
-      await save.mutateAsync(selected.map((r) => toInput({ ...r.source, kind: r.kind, categoryId: r.categoryId })))
+      await save.mutateAsync(selected.map((r) => toInput({
+        ...r.source, kind: r.kind, categoryId: r.kind === 'TRANSFER' ? null : r.categoryId,
+        fromPositionId: r.kind === 'TRANSFER' ? r.from : null, toPositionId: r.kind === 'TRANSFER' ? r.to : null,
+      })))
       onStep({ name: 'done', imported: selected.length, skipped: rows.length - selected.length })
     } catch (err) {
       const row = err instanceof ApiError && typeof err.row === 'number' ? selected[err.row] : undefined
@@ -268,9 +286,14 @@ function ReviewStep({ preview, onStep }: { preview: ImportPreview; onStep: (step
                       {row.kind === null && <option value="">—</option>}
                       <option value="EXPENSE">{t('entryForm.expense')}</option>
                       <option value="INCOME">{t('entryForm.income')}</option>
+                      <option value="TRANSFER">{t('entryForm.transfer')}</option>
                     </select>
                   </td>
                   <td className="px-2 py-1.5">
+                    {row.kind === 'TRANSFER' ? (
+                      <TransferCell row={row} positions={positions} disabled={fatal.length > 0}
+                        onChange={(patch) => change(index, patch)} />
+                    ) : (<>
                     <select className={`input py-1 ${row.categoryId === null && fatal.length === 0 ? 'border-bad' : ''}`}
                       aria-label={t('entries.category')} value={row.categoryId ?? ''} disabled={fatal.length > 0 || row.kind === null}
                       onChange={(e) => change(index, { categoryId: e.target.value ? Number(e.target.value) : null })}>
@@ -280,6 +303,7 @@ function ReviewStep({ preview, onStep }: { preview: ImportPreview; onStep: (step
                     {row.source.raw.category && row.categoryId === null && (
                       <p className="mt-0.5 text-xs text-muted">{t('import.inFile', { value: row.source.raw.category })}</p>
                     )}
+                    </>)}
                   </td>
                   <td className="tabular px-2 py-1.5 text-right">
                     {row.source.amount !== null
@@ -290,7 +314,7 @@ function ReviewStep({ preview, onStep }: { preview: ImportPreview; onStep: (step
                   <td className="px-2 py-1.5">
                     <div className="flex flex-wrap gap-1">
                       {row.source.duplicate && <Badge tone="accent">{t('import.duplicate')}</Badge>}
-                      {row.source.errors.filter((e) => !FIXABLE.includes(e) || !ready).map((e) => (
+                      {row.source.errors.filter((e) => showError(e, row, ready)).map((e) => (
                         <Badge key={e} tone={FIXABLE.includes(e) ? 'neutral' : 'bad'}>{rowErrorText(e, row.source, t)}</Badge>
                       ))}
                     </div>
@@ -322,21 +346,67 @@ function ReviewStep({ preview, onStep }: { preview: ImportPreview; onStep: (step
   )
 }
 
-function toInput(row: Pick<ImportPreviewRow, 'date' | 'kind' | 'categoryId' | 'amount' | 'currency' | 'description'>) {
+/**
+ * Problems the file cannot fix are always shown; fixable ones until resolved. An unknown position
+ * does not block a transfer (both sides are optional), so it stays visible while left empty.
+ */
+function showError(error: ImportRowError, row: ReviewRow, ready: boolean) {
+  if (!FIXABLE.includes(error)) return true
+  if (error === 'unknown_position') {
+    return row.kind === 'TRANSFER' && ((row.from === null && !!row.source.raw.from) || (row.to === null && !!row.source.raw.to))
+  }
+  return !ready
+}
+
+function toInput(row: Pick<ImportPreviewRow, 'date' | 'kind' | 'categoryId' | 'amount' | 'currency' | 'description'
+  | 'fromPositionId' | 'toPositionId'>) {
   return {
     date: row.date!,
     kind: row.kind!,
-    categoryId: row.categoryId!,
+    categoryId: row.categoryId,
     amount: row.amount!,
     currency: row.currency!,
     description: row.description,
+    fromPositionId: row.fromPositionId,
+    toPositionId: row.toPositionId,
   }
+}
+
+/** From/to selects of a transfer row, with the names the file used when they did not match. */
+function TransferCell({ row, positions, disabled, onChange }: {
+  row: ReviewRow
+  positions: Position[]
+  disabled: boolean
+  onChange: (patch: Partial<ReviewRow>) => void
+}) {
+  const { t } = useI18n()
+  const options = transferOptions(positions, [row.from, row.to])
+  const select = (label: string, value: number | null, raw: string | undefined, key: 'from' | 'to') => (
+    <div>
+      <select className="input py-1" aria-label={label} value={value ?? ''} disabled={disabled}
+        onChange={(e) => onChange({ [key]: e.target.value ? Number(e.target.value) : null })}>
+        <option value="">{label}: {t('transfer.none')}</option>
+        {options.map((p) => <option key={p.id} value={p.id}>{label}: {p.name}</option>)}
+      </select>
+      {raw && value === null && <p className="mt-0.5 text-xs text-muted">{t('import.inFile', { value: raw })}</p>}
+    </div>
+  )
+  return (
+    <div className="flex flex-col gap-1">
+      {select(t('transfer.from'), row.from, row.source.raw.from, 'from')}
+      {select(t('transfer.to'), row.to, row.source.raw.to, 'to')}
+    </div>
+  )
 }
 
 type Translate = ReturnType<typeof useI18n>['t']
 
 function rowErrorText(error: ImportRowError, row: ImportPreviewRow, t: Translate) {
-  return t(`import.error.${error}` as MessageKey, { value: row.raw.category ?? row.raw.kind ?? '' })
+  // Only the side that did not match one of the user's positions
+  const value = error === 'unknown_position'
+    ? [row.fromPositionId === null ? row.raw.from : null, row.toPositionId === null ? row.raw.to : null].filter(Boolean).join(', ')
+    : error === 'invalid_kind' ? row.raw.kind : row.raw.category
+  return t(`import.error.${error}` as MessageKey, { value: value ?? '' })
 }
 
 /** File-level problems (not a CSV, missing columns, too large) with the line when known. */

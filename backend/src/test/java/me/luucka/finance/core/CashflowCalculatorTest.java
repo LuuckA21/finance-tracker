@@ -71,4 +71,37 @@ class CashflowCalculatorTest {
         assertEquals(2026, result.years().get(1).year());
         assertEquals(new BigDecimal("8210.00"), result.years().get(1).totals().net());
     }
+
+    @Test
+    void transfersAreNeitherIncomeNorExpense() {
+        List<CashflowEntry> withTransfers = new java.util.ArrayList<>(ENTRIES_FOR_TRANSFERS);
+        withTransfers.add(new CashflowEntry(LocalDate.of(2026, 1, 28), EntryKind.TRANSFER, new BigDecimal("1000"),
+                "CHF", null, me.luucka.finance.core.AssetClass.PENSION));
+        withTransfers.add(new CashflowEntry(LocalDate.of(2026, 1, 29), EntryKind.TRANSFER, new BigDecimal("500"),
+                "CHF", null, null));
+        withTransfers.add(new CashflowEntry(LocalDate.of(2026, 2, 3), EntryKind.TRANSFER, new BigDecimal("100"),
+                "EUR", null, me.luucka.finance.core.AssetClass.PENSION));
+        FxTable fx = new FxTable("CHF").put("EUR", LocalDate.of(2026, 1, 1), new BigDecimal("0.95"));
+
+        var result = CashflowCalculator.year(withTransfers, fx, 2026);
+        var january = result.months().get(0).totals();
+        assertEquals(new BigDecimal("6000.00"), january.income());
+        assertEquals(new BigDecimal("1800.00"), january.expense());
+        assertEquals(new BigDecimal("70.0"), january.savingsRate());
+        assertEquals(new BigDecimal("1500.00"), january.transferred());
+        assertEquals(new BigDecimal("1595.00"), result.totals().transferred());
+        assertEquals(List.of(
+                new CashflowCalculator.TransferResult(me.luucka.finance.core.AssetClass.PENSION, new BigDecimal("1095.00")),
+                new CashflowCalculator.TransferResult(null, new BigDecimal("500.00"))), result.transfers());
+        // No category rows for transfers
+        assertEquals(2, result.byCategory().size());
+
+        var years = CashflowCalculator.years(withTransfers, fx);
+        assertEquals(new BigDecimal("1595.00"), years.years().getFirst().totals().transferred());
+        assertEquals(new BigDecimal("6000.00"), years.years().getFirst().totals().income());
+    }
+
+    private static final List<CashflowEntry> ENTRIES_FOR_TRANSFERS = List.of(
+            new CashflowEntry(LocalDate.of(2026, 1, 25), EntryKind.INCOME, new BigDecimal("6000"), "CHF", SALARY),
+            new CashflowEntry(LocalDate.of(2026, 1, 1), EntryKind.EXPENSE, new BigDecimal("1800"), "CHF", RENT));
 }
