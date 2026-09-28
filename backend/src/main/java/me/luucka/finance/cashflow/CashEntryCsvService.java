@@ -28,7 +28,6 @@ import me.luucka.finance.position.AssetPosition;
 import me.luucka.finance.position.AssetPositionRepository;
 import me.luucka.finance.user.AppUser;
 import me.luucka.finance.user.AppUserRepository;
-import me.luucka.finance.user.Language;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -81,7 +80,7 @@ public class CashEntryCsvService {
     /** UTF-8 with BOM (so Excel reads accents), {@code ;} delimiter, ISO dates, dot decimals. */
     @Transactional(readOnly = true)
     public byte[] export(long userId, CashEntryService.Filter filter) {
-        Locale language = locale(user(userId).getLanguage());
+        Locale language = user(userId).getLanguage().locale();
         Map<Long, String> names = categories.owned(userId).stream()
                 .collect(Collectors.toMap(Category::getId, Category::getName));
         Map<Long, String> positionNames = positions.findByUserIdOrderByArchivedAscNameAsc(userId).stream()
@@ -106,8 +105,13 @@ public class CashEntryCsvService {
     }
 
     public String exportFileName(long userId, LocalDate today) {
-        boolean english = user(userId).getLanguage() == Language.EN;
-        return (english ? "entries-" : "movimenti-") + today + ".csv";
+        String name = switch (user(userId).getLanguage()) {
+            case IT -> "movimenti-";
+            case EN -> "entries-";
+            case DE -> "buchungen-";
+            case FR -> "operations-";
+        };
+        return name + today + ".csv";
     }
 
     // ------------------------------------------------------------------ import preview
@@ -331,9 +335,5 @@ public class CashEntryCsvService {
 
     private AppUser user(long userId) {
         return users.findById(userId).orElseThrow(() -> ApiException.notFound("User"));
-    }
-
-    private static Locale locale(Language language) {
-        return language == Language.EN ? Locale.ENGLISH : Locale.ITALIAN;
     }
 }

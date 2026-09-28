@@ -13,6 +13,8 @@ import me.luucka.finance.support.TestUsers;
 import me.luucka.finance.user.AppUser;
 import me.luucka.finance.user.Role;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -188,27 +190,29 @@ class AuthFlowIT {
         assertEquals(400, selfDemote.getResponse().getStatus());
     }
 
-    @Test
-    void newUserGetsLanguageAndStartingCategoriesInIt() throws Exception {
+    @ParameterizedTest
+    @CsvSource({"EN, Salary, Groceries", "DE, Lohn, Lebensmittel", "FR, Salaire, Alimentation"})
+    void newUserGetsLanguageAndStartingCategoriesInIt(String language, String salary, String groceries)
+            throws Exception {
         AppUser admin = testUsers.create("admin", Role.ADMIN);
         ApiClient adminClient = new ApiClient(mvc);
         assertEquals(200, adminClient.login(admin.getUsername(), TestUsers.PASSWORD));
 
-        String username = "english-" + System.nanoTime() % 100_000;
+        String username = language.toLowerCase() + "-" + System.nanoTime() % 100_000;
         MvcResult created = adminClient.post("/api/admin/users",
-                "{\"username\":\"%s\",\"role\":\"USER\",\"language\":\"EN\"}".formatted(username));
+                "{\"username\":\"%s\",\"role\":\"USER\",\"language\":\"%s\"}".formatted(username, language));
         assertEquals(201, created.getResponse().getStatus());
 
         String temporary = json(created, "$.temporaryPassword");
         ApiClient newUser = new ApiClient(mvc);
         assertEquals(200, newUser.login(username, temporary));
-        assertEquals("EN", json(newUser.get("/api/auth/me"), "$.language"));
+        assertEquals(language, json(newUser.get("/api/auth/me"), "$.language"));
         assertEquals(200, newUser.put("/api/account/password",
                 "{\"currentPassword\":\"%s\",\"newPassword\":\"%s\"}".formatted(temporary, TestUsers.PASSWORD))
                 .getResponse().getStatus());
         newUser.refreshCsrf();
         List<String> names = json(newUser.get("/api/categories"), "$[*].name");
-        assertTrue(names.contains("Salary") && names.contains("Groceries"), names.toString());
+        assertTrue(names.contains(salary) && names.contains(groceries), names.toString());
         assertTrue(!names.contains("Stipendio"), names.toString());
     }
 }

@@ -18,7 +18,7 @@ import me.luucka.finance.core.EntryKind;
 /**
  * Columns and value formats of the income/expense CSV, shared by export and import.
  * <p>
- * Import is lenient where spreadsheets and banks differ (Italian, English or German headers,
+ * Import is lenient where spreadsheets and banks differ (Italian, English, German or French headers,
  * {@code ;} or {@code ,}, decimal comma, Swiss apostrophes, dd.MM.yyyy dates) and strict about
  * everything else: a value that cannot be read unambiguously is reported, never guessed.
  */
@@ -30,30 +30,38 @@ public final class EntryCsvFormat {
     /** Export headers per interface language. */
     public static final Map<Locale, List<String>> HEADERS = Map.of(
             Locale.ITALIAN, List.of("data", "tipo", "categoria", "importo", "valuta", "descrizione", "da", "verso"),
-            Locale.ENGLISH, List.of("date", "type", "category", "amount", "currency", "description", "from", "to"));
+            Locale.ENGLISH, List.of("date", "type", "category", "amount", "currency", "description", "from", "to"),
+            Locale.GERMAN, List.of("datum", "art", "kategorie", "betrag", "währung", "beschreibung", "von", "nach"),
+            Locale.FRENCH, List.of("date", "type", "catégorie", "montant", "monnaie", "description", "de", "vers"));
 
     private static final Map<Column, List<String>> ALIASES = new EnumMap<>(Map.of(
             Column.DATE, List.of("data", "date", "datum", "giorno", "day"),
             Column.KIND, List.of("tipo", "type", "kind", "typ", "art"),
-            Column.CATEGORY, List.of("categoria", "category", "kategorie"),
-            Column.AMOUNT, List.of("importo", "amount", "betrag", "valore", "value", "somma"),
-            Column.CURRENCY, List.of("valuta", "currency", "wahrung", "divisa"),
+            Column.CATEGORY, List.of("categoria", "category", "kategorie", "categorie"),
+            Column.AMOUNT, List.of("importo", "amount", "betrag", "valore", "value", "somma", "montant"),
+            Column.CURRENCY, List.of("valuta", "currency", "wahrung", "waehrung", "divisa", "monnaie", "devise"),
             Column.DESCRIPTION, List.of("descrizione", "description", "beschreibung", "note", "nota", "notes",
-                    "causale", "memo"),
-            Column.FROM, List.of("da", "from", "von", "origine", "source"),
-            Column.TO, List.of("verso", "a", "to", "nach", "destinazione", "destination")));
+                    "causale", "memo", "buchungstext", "libelle"),
+            Column.FROM, List.of("da", "from", "von", "de", "origine", "source"),
+            Column.TO, List.of("verso", "a", "to", "nach", "vers", "destinazione", "destination")));
 
     private static final Map<String, EntryKind> KINDS = Map.ofEntries(
             Map.entry("entrata", EntryKind.INCOME), Map.entry("entrate", EntryKind.INCOME),
             Map.entry("income", EntryKind.INCOME), Map.entry("einnahme", EntryKind.INCOME),
+            Map.entry("einnahmen", EntryKind.INCOME), Map.entry("revenu", EntryKind.INCOME),
+            Map.entry("revenus", EntryKind.INCOME),
             Map.entry("in", EntryKind.INCOME), Map.entry("+", EntryKind.INCOME),
             Map.entry("uscita", EntryKind.EXPENSE), Map.entry("uscite", EntryKind.EXPENSE),
             Map.entry("spesa", EntryKind.EXPENSE), Map.entry("expense", EntryKind.EXPENSE),
-            Map.entry("ausgabe", EntryKind.EXPENSE), Map.entry("out", EntryKind.EXPENSE),
+            Map.entry("expenses", EntryKind.EXPENSE), Map.entry("ausgabe", EntryKind.EXPENSE),
+            Map.entry("ausgaben", EntryKind.EXPENSE), Map.entry("depense", EntryKind.EXPENSE),
+            Map.entry("depenses", EntryKind.EXPENSE), Map.entry("out", EntryKind.EXPENSE),
             Map.entry("-", EntryKind.EXPENSE),
             Map.entry("trasferimento", EntryKind.TRANSFER), Map.entry("trasferimenti", EntryKind.TRANSFER),
             Map.entry("transfer", EntryKind.TRANSFER), Map.entry("umbuchung", EntryKind.TRANSFER),
-            Map.entry("giroconto", EntryKind.TRANSFER));
+            Map.entry("giroconto", EntryKind.TRANSFER), Map.entry("umbuchungen", EntryKind.TRANSFER),
+            Map.entry("virement", EntryKind.TRANSFER), Map.entry("virements", EntryKind.TRANSFER),
+            Map.entry("transfert", EntryKind.TRANSFER));
 
     private static final List<DateTimeFormatter> DATE_FORMATS = List.of(
             DateTimeFormatter.ofPattern("uuuu-MM-dd").withResolverStyle(ResolverStyle.STRICT),
@@ -70,7 +78,7 @@ public final class EntryCsvFormat {
     private EntryCsvFormat() {
     }
 
-    /** Headers of the export in the user's language (Italian unless English). */
+    /** Headers of the export in the user's language (Italian for an unknown one). */
     public static List<String> headers(Locale language) {
         return HEADERS.getOrDefault(language, HEADERS.get(Locale.ITALIAN));
     }
@@ -86,18 +94,23 @@ public final class EntryCsvFormat {
         return Optional.empty();
     }
 
-    /** Income/expense word in Italian, English or German, or a sign; empty if unknown. */
+    /** Kind word in Italian, English, German or French, or a sign; empty if unknown. */
     public static Optional<EntryKind> kind(String value) {
         return Optional.ofNullable(KINDS.get(fold(value)));
     }
 
     /** Export label of a kind in the user's language. */
     public static String kindLabel(EntryKind kind, Locale language) {
-        boolean english = Locale.ENGLISH.equals(language);
+        List<String> labels = switch (language.getLanguage()) {
+            case "en" -> List.of("Income", "Expense", "Transfer");
+            case "de" -> List.of("Einnahme", "Ausgabe", "Umbuchung");
+            case "fr" -> List.of("Revenu", "Dépense", "Virement");
+            default -> List.of("Entrata", "Uscita", "Trasferimento");
+        };
         return switch (kind) {
-            case INCOME -> english ? "Income" : "Entrata";
-            case EXPENSE -> english ? "Expense" : "Uscita";
-            case TRANSFER -> english ? "Transfer" : "Trasferimento";
+            case INCOME -> labels.get(0);
+            case EXPENSE -> labels.get(1);
+            case TRANSFER -> labels.get(2);
         };
     }
 

@@ -78,7 +78,7 @@ export function BulkUpdatePage() {
               {t('bulk.date')}
               <input type="date" className="input" required value={day} max={today()} onChange={(e) => setDay(e.target.value)} />
             </label>
-            <div className="-mx-4 overflow-x-auto sm:mx-0">
+            <div className="relative -mx-4 overflow-x-auto sm:mx-0">
               <table className="w-full min-w-[40rem] text-sm">
                 <thead>
                   <tr className="border-b border-line text-left text-xs text-muted">

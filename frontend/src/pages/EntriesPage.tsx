@@ -99,7 +99,7 @@ export function EntriesPage() {
         {entries.isPending ? <Spinner /> : !page || page.content.length === 0 ? (
           <EmptyState title={t('entries.emptyTitle')}>{t('entries.emptyHelp')}</EmptyState>
         ) : (
-          <div className="-mx-4 overflow-x-auto sm:mx-0">
+          <div className="relative -mx-4 overflow-x-auto sm:mx-0">
             <table className="w-full min-w-[36rem] text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-xs text-muted">

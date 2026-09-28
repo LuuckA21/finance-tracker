@@ -20,29 +20,38 @@ public class CategoryService {
         }
     }
 
-    private record Default(String italian, String english, EntryKind kind, String color) {
+    private record Default(String italian, String english, String german, String french, EntryKind kind,
+                           String color) {
         String name(Language language) {
-            return language == Language.EN ? english : italian;
+            return switch (language) {
+                case IT -> italian;
+                case EN -> english;
+                case DE -> german;
+                case FR -> french;
+            };
         }
     }
 
     /** Categories every new user starts with, named in their language; afterwards they are the user's own. */
     private static final List<Default> DEFAULTS = List.of(
-            new Default("Stipendio", "Salary", EntryKind.INCOME, "#16a34a"),
-            new Default("Bonus", "Bonus", EntryKind.INCOME, "#22c55e"),
-            new Default("Interessi e dividendi", "Interest & dividends", EntryKind.INCOME, "#0d9488"),
-            new Default("Altre entrate", "Other income", EntryKind.INCOME, "#65a30d"),
-            new Default("Casa", "Housing", EntryKind.EXPENSE, "#2563eb"),
-            new Default("Spesa alimentare", "Groceries", EntryKind.EXPENSE, "#ea580c"),
-            new Default("Trasporti", "Transport", EntryKind.EXPENSE, "#7c3aed"),
-            new Default("Assicurazioni", "Insurance", EntryKind.EXPENSE, "#0891b2"),
-            new Default("Salute", "Health", EntryKind.EXPENSE, "#db2777"),
-            new Default("Ristoranti", "Restaurants", EntryKind.EXPENSE, "#d97706"),
-            new Default("Svago", "Leisure", EntryKind.EXPENSE, "#9333ea"),
-            new Default("Viaggi", "Travel", EntryKind.EXPENSE, "#0284c7"),
-            new Default("Abbonamenti", "Subscriptions", EntryKind.EXPENSE, "#4f46e5"),
-            new Default("Tasse", "Taxes", EntryKind.EXPENSE, "#dc2626"),
-            new Default("Altre uscite", "Other expenses", EntryKind.EXPENSE, "#6b7280"));
+            new Default("Stipendio", "Salary", "Lohn", "Salaire", EntryKind.INCOME, "#16a34a"),
+            new Default("Bonus", "Bonus", "Bonus", "Bonus", EntryKind.INCOME, "#22c55e"),
+            new Default("Interessi e dividendi", "Interest & dividends", "Zinsen und Dividenden",
+                    "Intérêts et dividendes", EntryKind.INCOME, "#0d9488"),
+            new Default("Altre entrate", "Other income", "Sonstige Einnahmen", "Autres revenus",
+                    EntryKind.INCOME, "#65a30d"),
+            new Default("Casa", "Housing", "Wohnen", "Logement", EntryKind.EXPENSE, "#2563eb"),
+            new Default("Spesa alimentare", "Groceries", "Lebensmittel", "Alimentation", EntryKind.EXPENSE, "#ea580c"),
+            new Default("Trasporti", "Transport", "Verkehr", "Transports", EntryKind.EXPENSE, "#7c3aed"),
+            new Default("Assicurazioni", "Insurance", "Versicherungen", "Assurances", EntryKind.EXPENSE, "#0891b2"),
+            new Default("Salute", "Health", "Gesundheit", "Santé", EntryKind.EXPENSE, "#db2777"),
+            new Default("Ristoranti", "Restaurants", "Restaurants", "Restaurants", EntryKind.EXPENSE, "#d97706"),
+            new Default("Svago", "Leisure", "Freizeit", "Loisirs", EntryKind.EXPENSE, "#9333ea"),
+            new Default("Viaggi", "Travel", "Reisen", "Voyages", EntryKind.EXPENSE, "#0284c7"),
+            new Default("Abbonamenti", "Subscriptions", "Abonnemente", "Abonnements", EntryKind.EXPENSE, "#4f46e5"),
+            new Default("Tasse", "Taxes", "Steuern", "Impôts", EntryKind.EXPENSE, "#dc2626"),
+            new Default("Altre uscite", "Other expenses", "Sonstige Ausgaben", "Autres dépenses",
+                    EntryKind.EXPENSE, "#6b7280"));
 
     private final CategoryRepository categories;
     private final CashEntryRepository entries;

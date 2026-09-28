@@ -60,7 +60,7 @@ export function number(value: number | null | undefined, maxDigits = 8): string 
 
 export function percent(value: number | null | undefined): string {
   if (value === null || value === undefined) return '—'
-  return `${numberFormat({ maximumFractionDigits: 1 }).format(value)} %`
+  return `${numberFormat({ maximumFractionDigits: 1 }).format(value)}\u00a0%`
 }
 
 export function date(iso: string | null | undefined): string {

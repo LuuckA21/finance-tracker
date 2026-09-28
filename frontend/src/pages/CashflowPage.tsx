@@ -125,7 +125,7 @@ function TotalsTable({ rows, footer, currency, firstHeader }: {
     </>
   )
   return (
-    <div className="-mx-4 overflow-x-auto sm:mx-0">
+    <div className="relative -mx-4 overflow-x-auto sm:mx-0">
       <table className="w-full min-w-[38rem] text-sm">
         <thead>
           <tr className="border-b border-line text-left text-xs text-muted">

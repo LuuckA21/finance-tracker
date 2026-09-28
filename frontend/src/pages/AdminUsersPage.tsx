@@ -39,7 +39,7 @@ export function AdminUsersPage() {
       <ErrorAlert message={error} />
       <Card className="mt-2">
         {users.isPending ? <Spinner /> : (
-          <div className="-mx-4 overflow-x-auto sm:mx-0">
+          <div className="relative -mx-4 overflow-x-auto sm:mx-0">
             <table className="w-full min-w-[44rem] text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-xs text-muted">

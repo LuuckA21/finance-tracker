@@ -3,6 +3,8 @@ package me.luucka.finance;
 import static me.luucka.finance.support.ApiClient.json;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.util.List;
+
 import me.luucka.finance.support.ApiClient;
 import me.luucka.finance.support.IntegrationTest;
 import me.luucka.finance.support.TestUsers;
@@ -56,9 +58,19 @@ class AccountSettingsIT {
     }
 
     @Test
+    void everyInterfaceLanguageIsSaved() throws Exception {
+        ApiClient client = loggedIn();
+        for (String language : List.of("DE", "FR", "EN", "IT")) {
+            assertEquals(200, client.put("/api/account/settings", "{\"language\":\"%s\"}".formatted(language))
+                    .getResponse().getStatus());
+            assertEquals(language, json(client.get("/api/auth/me"), "$.language"));
+        }
+    }
+
+    @Test
     void unknownValuesAreRejected() throws Exception {
         ApiClient client = loggedIn();
-        assertEquals(400, client.put("/api/account/settings", "{\"language\":\"FR\"}").getResponse().getStatus());
+        assertEquals(400, client.put("/api/account/settings", "{\"language\":\"ES\"}").getResponse().getStatus());
         assertEquals(400, client.put("/api/account/settings", "{\"theme\":\"BLUE\"}").getResponse().getStatus());
         assertEquals(400, client.put("/api/account/settings", "{\"baseCurrency\":\"XXXX\"}").getResponse().getStatus());
         assertEquals("IT", json(client.get("/api/auth/me"), "$.language"));
