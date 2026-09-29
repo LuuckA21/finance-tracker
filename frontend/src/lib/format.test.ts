@@ -60,7 +60,9 @@ describe('numbers in Swiss formats', () => {
 
   it('follows the interface language', async () => {
     await setLanguage('FR')
-    expect(plain(money(12345.5, 'CHF'))).toBe('12 345.50 CHF')
+    // The amount before the currency code; the thousands separator is a space up to ICU 78.2 and an
+    // apostrophe from 78.3 (Node 22.23.3), so either is accepted
+    expect(plain(money(12345.5, 'CHF'))).toMatch(/^12[ ']345\.50 CHF$/)
     await setLanguage('DE')
     expect(plain(money(12345.5, 'CHF'))).toBe("CHF 12'345.50")
   })
