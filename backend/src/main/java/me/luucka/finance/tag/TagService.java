@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 import me.luucka.finance.cashflow.CashEntry;
 import me.luucka.finance.cashflow.CashEntryRepository;
 import me.luucka.finance.common.ApiException;
+import me.luucka.finance.core.EntryKind;
 import me.luucka.finance.core.Money;
 import me.luucka.finance.core.TagNames;
 import me.luucka.finance.core.fx.FxTable;
@@ -33,10 +34,16 @@ public class TagService {
     /**
      * A tag with the totals of its entries in the base currency, all dates.
      *
-     * @param firstDate null for a tag without entries
+     * @param firstDate  null for a tag without entries
+     * @param categories income and expenses split by category, largest first (transfers have none)
      */
     public record TagSummary(long id, String name, int entryCount, BigDecimal income, BigDecimal expense,
-                             BigDecimal transferred, LocalDate firstDate, LocalDate lastDate) {
+                             BigDecimal transferred, LocalDate firstDate, LocalDate lastDate,
+                             List<CategoryAmount> categories) {
+    }
+
+    /** What the entries of a tag add up to in one category, in the base currency. */
+    public record CategoryAmount(long categoryId, EntryKind kind, BigDecimal amount) {
     }
 
     public record TagsResponse(String baseCurrency, List<TagSummary> tags, SortedSet<String> unconvertedCurrencies) {
@@ -161,6 +168,8 @@ public class TagService {
         private BigDecimal transferred = BigDecimal.ZERO;
         private LocalDate first;
         private LocalDate last;
+        private final Map<Long, BigDecimal> byCategory = new HashMap<>();
+        private final Map<Long, EntryKind> categoryKinds = new HashMap<>();
 
         void add(CashEntry entry, BigDecimal value) {
             count++;
@@ -174,11 +183,20 @@ public class TagService {
                 case EXPENSE -> expense = expense.add(value, Money.CONTEXT);
                 case TRANSFER -> transferred = transferred.add(value, Money.CONTEXT);
             }
+            if (entry.getCategoryId() != null) {
+                byCategory.merge(entry.getCategoryId(), value, (a, b) -> a.add(b, Money.CONTEXT));
+                categoryKinds.put(entry.getCategoryId(), entry.getKind());
+            }
         }
 
         TagSummary summary(Tag tag) {
+            List<CategoryAmount> categories = byCategory.entrySet().stream()
+                    .map(e -> new CategoryAmount(e.getKey(), categoryKinds.get(e.getKey()), Money.round(e.getValue())))
+                    .sorted(Comparator.comparing(CategoryAmount::amount).reversed()
+                            .thenComparing(CategoryAmount::categoryId))
+                    .toList();
             return new TagSummary(tag.getId(), tag.getName(), count, Money.round(income), Money.round(expense),
-                    Money.round(transferred), first, last);
+                    Money.round(transferred), first, last, categories);
         }
     }
 }

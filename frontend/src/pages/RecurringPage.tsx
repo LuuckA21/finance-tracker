@@ -1,8 +1,9 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Pause, Pencil, Play, Plus, Trash2 } from 'lucide-react'
 import { ApiError, errorMessage } from '../api/client'
-import { useCategories, useDeleteRecurring, useMe, usePositions, useRecurringEntries, useSaveRecurring } from '../api/hooks'
+import { useCategories, useDeleteRecurring, useMe, usePositions, useRecurringEntries, useSaveRecurring, useTags } from '../api/hooks'
 import type { Category, EntryKind, Frequency, RecurringEntry } from '../api/types'
+import { TagChip, TagInput } from '../components/TagInput'
 import { amountStyle, EntryTarget, TransferFields, transferRoute } from '../components/TransferFields'
 import { Badge, Button, Card, EmptyState, ErrorAlert, Field, Modal, PageHeader, Segmented, Spinner } from '../components/ui'
 import { useI18n, type MessageKey } from '../i18n'
@@ -90,6 +91,9 @@ export function RecurringPage() {
                           <EntryTarget kind={r.kind} categoryId={r.categoryId} from={r.fromPositionId} to={r.toPositionId}
                             categories={byId} positions={positions} />
                         </div>
+                        {r.tags.length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-1">{r.tags.map((name) => <TagChip key={name} name={name} />)}</div>
+                        )}
                       </td>
                       <td className="px-2 py-2 text-ink-2">
                         {t(`recurring.freq.${r.frequency}` as MessageKey)}
@@ -140,6 +144,7 @@ function RecurringForm({ rule, onDone }: { rule: RecurringEntry | null; onDone: 
   const me = useMe().data
   const categories = useCategories().data ?? NO_CATEGORIES
   const save = useSaveRecurring()
+  const tagNames = (useTags().data?.tags ?? []).map((tag) => tag.name)
 
   const [kind, setKind] = useState<EntryKind>(rule?.kind ?? 'EXPENSE')
   const [categoryId, setCategoryId] = useState<number | ''>(rule?.categoryId ?? '')
@@ -150,6 +155,7 @@ function RecurringForm({ rule, onDone }: { rule: RecurringEntry | null; onDone: 
   const [startDate, setStartDate] = useState(rule?.startDate ?? today())
   const [endDate, setEndDate] = useState(rule?.endDate ?? '')
   const [route, setRoute] = useState({ from: rule?.fromPositionId ?? null, to: rule?.toPositionId ?? null })
+  const [tags, setTags] = useState<string[]>(rule?.tags ?? [])
   const isTransfer = kind === 'TRANSFER'
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
@@ -187,6 +193,7 @@ function RecurringForm({ rule, onDone }: { rule: RecurringEntry | null; onDone: 
         startDate,
         endDate: endDate || null,
         active: rule?.active ?? true,
+        tags,
       })
       onDone()
     } catch (err) {
@@ -256,6 +263,9 @@ function RecurringForm({ rule, onDone }: { rule: RecurringEntry | null; onDone: 
           {(id) => <input id={id} type="date" className="input" min={startDate} value={endDate} onChange={(e) => setEndDate(e.target.value)} />}
         </Field>
       </div>
+      <Field label={t('tags.label')} hint={t('recurring.tagsHint')} error={fieldErrors.tags}>
+        {(id) => <TagInput id={id} value={tags} onChange={setTags} suggestions={tagNames} />}
+      </Field>
       <ErrorAlert message={error} />
       <div className="flex justify-end">
         <Button type="submit" variant="primary" loading={save.isPending}>{t('common.save')}</Button>

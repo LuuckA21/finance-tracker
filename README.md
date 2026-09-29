@@ -18,8 +18,9 @@ Self-hosted personal finance app for a small group of users (you and your family
   spending in categories without a budget, with a suggestion from the last 3 months' average.
 - **Tags** – free labels on entries across categories ("Holidays 2026", "Wedding"): typed on
   the entry (existing ones suggested, case does not matter, up to 10 per entry), clickable to
-  filter the list, with the totals of each tag (spent, received, transferred, period). They can be
-  renamed or deleted in the settings, and travel through the CSV export and import.
+  filter the list, with the totals of each tag (spent, received, transferred, period) and their
+  split by category. Recurring rules can carry tags too: every entry they create gets them. Tags
+  can be renamed or deleted in the settings, and travel through the CSV export and import.
 - **Savings goals** – either a balance to reach on some positions (an emergency fund, a home
   deposit), optionally by a date, or a yearly amount to put into them (e.g. the pillar 3a
   maximum). Each goal shows its progress, the pace of the last 6 months and the month the target
@@ -347,11 +348,11 @@ encrypted with it).
 | Account | `PUT /api/account/password`, `PUT /api/account/settings` (partial: `baseCurrency`, `language` `IT\|EN\|DE\|FR`, `theme` `SYSTEM\|LIGHT\|DARK`), `GET /api/account/logins`, `POST /api/account/mfa/{setup,enable,disable,recovery-codes}` |
 | Categories | `GET/POST /api/categories`, `PUT/DELETE /api/categories/{id}` |
 | Entries | `GET /api/cash-entries?from&to&kind&categoryId&q&tagId&page&size` (each entry has `tags`: names; unknown names sent on save become new tags) (kind `INCOME\|EXPENSE\|TRANSFER`; transfers take `fromPositionId`/`toPositionId` instead of `categoryId`), `POST`, `PUT/DELETE /{id}`, `GET /export?filters` (CSV), `POST /import/preview` (multipart `file`), `POST /import` (`{entries:[…]}`) |
-| Recurring | `GET/POST /api/recurring-entries`, `PUT/DELETE /{id}` (frequency `DAILY\|WEEKLY\|MONTHLY\|QUARTERLY\|FOUR_MONTHLY\|SEMIANNUAL\|YEARLY`) |
+| Recurring | `GET/POST /api/recurring-entries`, `PUT/DELETE /{id}` (frequency `DAILY\|WEEKLY\|MONTHLY\|QUARTERLY\|FOUR_MONTHLY\|SEMIANNUAL\|YEARLY`; `tags` are copied to the entries created) |
 | Positions | `GET/POST /api/positions`, `GET/PUT/DELETE /{id}`, `GET/POST /{id}/snapshots`, `PUT/DELETE /{id}/snapshots/{sid}`, `POST /api/positions/snapshots/bulk` |
 | FX | `GET/POST /api/fx-rates`, `DELETE /{id}` (manual rates), `GET /api/fx-rates/central?date` (ECB rates in the base currency on a day, default today) |
 | Budgets | `GET /api/budgets`, `PUT/DELETE /api/budgets/{categoryId}` (`{amount,currency}`), `GET /api/budgets/status?month=yyyy-MM` |
-| Tags | `GET /api/tags` (with totals in the base currency), `PUT/DELETE /api/tags/{id}` (`{name}`; deleting keeps the entries) |
+| Tags | `GET /api/tags` (with totals in the base currency, also per category), `PUT/DELETE /api/tags/{id}` (`{name}`; deleting keeps the entries) |
 | Goals | `GET/POST /api/goals` (list with progress), `PUT/DELETE /api/goals/{id}` (`{name,kind:BALANCE\|YEARLY,targetAmount,currency,targetDate?,positionIds}`) |
 | Dashboards | `GET /api/dashboard/cashflow?year`, `/cashflow/years`, `/net-worth?granularity=MONTH\|YEAR&from=yyyy-MM&to=yyyy-MM`, `/net-worth/detail?date` |
 | Admin | `GET/POST /api/admin/users`, `PATCH/DELETE /{id}`, `POST /{id}/{reset-password,unlock,reset-mfa}`, `GET /api/admin/fx`, `POST /api/admin/fx/refresh`, `POST /api/admin/fx/history` (202, runs in background) |

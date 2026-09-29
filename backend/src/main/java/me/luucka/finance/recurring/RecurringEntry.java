@@ -3,14 +3,20 @@ package me.luucka.finance.recurring;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.Set;
 
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -74,6 +80,12 @@ public class RecurringEntry {
 
     @Column(nullable = false)
     private boolean active = true;
+
+    /** Tags given to every entry the rule creates. */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "recurring_entry_tag", joinColumns = @JoinColumn(name = "rule_id"))
+    @Column(name = "tag_id", nullable = false)
+    private Set<Long> tagIds = new HashSet<>();
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -213,5 +225,14 @@ public class RecurringEntry {
 
     public void setToPositionId(Long toPositionId) {
         this.toPositionId = toPositionId;
+    }
+
+    public Set<Long> getTagIds() {
+        return tagIds;
+    }
+
+    public void setTagIds(Set<Long> tagIds) {
+        this.tagIds.clear();
+        this.tagIds.addAll(tagIds);
     }
 }

@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Download, FileUp, Pencil, Plus, Repeat, Tras
 import { download, errorMessage } from '../api/client'
 import { entryFilterParams, useCategories, useDeleteEntry, useEntries, usePositions, useTags, type EntryFilter } from '../api/hooks'
 import type { CashEntry, Category, EntryKind } from '../api/types'
+import { TagCategories } from '../components/TagCategories'
 import { TagChip } from '../components/TagInput'
 import { amountStyle, EntryTarget } from '../components/TransferFields'
 import { Button, Card, EmptyState, ErrorAlert, PageHeader, Spinner } from '../components/ui'
@@ -109,7 +110,8 @@ export function EntriesPage() {
         </div>
 
         {selectedTag && tags && (
-          <p className="mb-4 flex flex-wrap gap-x-4 gap-y-1 rounded-lg bg-surface-2 px-3 py-2 text-sm" role="status">
+          <div className="mb-4 flex flex-col gap-1.5 rounded-lg bg-surface-2 px-3 py-2 text-sm" role="status">
+            <p className="flex flex-wrap gap-x-4 gap-y-1">
             <strong>{selectedTag.name}</strong>
             <span>{t('tags.entries', { count: selectedTag.entryCount })}</span>
             {selectedTag.expense > 0 && <span>{t('tags.expense', { amount: money(selectedTag.expense, tags.baseCurrency) })}</span>}
@@ -118,7 +120,9 @@ export function EntriesPage() {
             {selectedTag.firstDate && (
               <span className="text-muted">{selectedTag.firstDate === selectedTag.lastDate ? date(selectedTag.firstDate) : `${date(selectedTag.firstDate)} – ${date(selectedTag.lastDate)}`}</span>
             )}
-          </p>
+            </p>
+            <TagCategories rows={selectedTag.categories} categories={byId} currency={tags.baseCurrency} />
+          </div>
         )}
 
         <ErrorAlert message={error} />

@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 import me.luucka.finance.cashflow.CashEntry;
 import me.luucka.finance.cashflow.CashEntryRepository;
@@ -14,6 +16,7 @@ import me.luucka.finance.core.Currencies;
 import me.luucka.finance.core.EntryKind;
 import me.luucka.finance.position.AssetPositionRepository;
 import me.luucka.finance.core.recurrence.Frequency;
+import me.luucka.finance.tag.TagService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,17 +32,20 @@ public class RecurringEntryService {
     /** {@code categoryId} applies to income/expense, the positions to transfers only. */
     public record RuleData(EntryKind kind, Long categoryId, BigDecimal amount, String currency, String description,
                            Frequency frequency, LocalDate startDate, LocalDate endDate, boolean active,
-                           Long fromPositionId, Long toPositionId) {
+                           Long fromPositionId, Long toPositionId, List<String> tags) {
     }
 
+    /** {@code tags}: names, sorted; the entries the rule creates get them. */
     public record RuleResponse(long id, EntryKind kind, Long categoryId, BigDecimal amount, String currency,
                                String description, Frequency frequency, LocalDate startDate, LocalDate endDate,
                                boolean active, LocalDate lastGenerated, LocalDate nextDate,
-                               Long fromPositionId, Long toPositionId) {
-        static RuleResponse of(RecurringEntry r) {
+                               Long fromPositionId, Long toPositionId, List<String> tags) {
+        static RuleResponse of(RecurringEntry r, Map<Long, String> tagNames) {
             return new RuleResponse(r.getId(), r.getKind(), r.getCategoryId(), r.getAmount(), r.getCurrency(),
                     r.getDescription(), r.getFrequency(), r.getStartDate(), r.getEndDate(), r.isActive(),
-                    r.getLastGenerated(), r.nextDate(), r.getFromPositionId(), r.getToPositionId());
+                    r.getLastGenerated(), r.nextDate(), r.getFromPositionId(), r.getToPositionId(),
+                    r.getTagIds().stream().map(tagNames::get).filter(Objects::nonNull)
+                            .sorted(String.CASE_INSENSITIVE_ORDER).toList());
         }
     }
 
@@ -47,20 +53,26 @@ public class RecurringEntryService {
     private final CashEntryRepository entries;
     private final CategoryService categories;
     private final AssetPositionRepository positions;
+    private final TagService tags;
     private final Clock clock;
 
     public RecurringEntryService(RecurringEntryRepository rules, CashEntryRepository entries,
-                                 CategoryService categories, AssetPositionRepository positions, Clock clock) {
+                                 CategoryService categories, AssetPositionRepository positions, TagService tags,
+                                 Clock clock) {
         this.rules = rules;
         this.entries = entries;
         this.categories = categories;
         this.positions = positions;
+        this.tags = tags;
         this.clock = clock;
     }
 
     @Transactional(readOnly = true)
     public List<RuleResponse> list(long userId) {
-        return rules.findByUserIdOrderByKindAscStartDateAsc(userId).stream().map(RuleResponse::of).toList();
+        Map<Long, String> tagNames = tags.names(userId);
+        return rules.findByUserIdOrderByKindAscStartDateAsc(userId).stream()
+                .map(r -> RuleResponse.of(r, tagNames))
+                .toList();
     }
 
     /** Creates the rule and, when the start date is today or earlier, the entries already due. */
@@ -71,7 +83,7 @@ public class RecurringEntryService {
         rule.setActive(data.active());
         rule = rules.save(rule);
         generateDue(rule);
-        return RuleResponse.of(rule);
+        return RuleResponse.of(rule, tags.names(userId));
     }
 
     /**
@@ -91,7 +103,7 @@ public class RecurringEntryService {
             }
         }
         generateDue(rule);
-        return RuleResponse.of(rule);
+        return RuleResponse.of(rule, tags.names(userId));
     }
 
     /** Deletes the rule; the entries it created are kept (their link is cleared by the database). */
@@ -125,6 +137,7 @@ public class RecurringEntryService {
                 entry.setCurrency(rule.getCurrency());
                 entry.setDescription(rule.getDescription());
                 entry.setRecurringEntryId(rule.getId());
+                entry.setTagIds(rule.getTagIds());
                 entries.save(entry);
                 created++;
             }
@@ -156,6 +169,7 @@ public class RecurringEntryService {
         rule.setFrequency(data.frequency());
         rule.setStartDate(data.startDate());
         rule.setEndDate(data.endDate());
+        rule.setTagIds(tags.resolver(userId).ids(data.tags()));
     }
 
     private RecurringEntry get(long userId, long id) {

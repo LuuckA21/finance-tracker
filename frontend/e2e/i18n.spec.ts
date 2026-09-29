@@ -14,7 +14,10 @@ test('the interface switches language, and the choice survives a reload', async 
   await page.goto('/impostazioni')
   let label = 'Lingua'
   for (const language of LANGUAGES) {
+    // The language is shown at once and saved in the background: reload only once it is saved
+    const saved = page.waitForResponse((r) => r.url().endsWith('/api/account/settings') && r.request().method() === 'PUT')
     await page.getByLabel(label, { exact: true }).selectOption({ label: language.name })
+    expect((await saved).ok()).toBe(true)
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(language.settings)
     await expect(page.locator('html')).toHaveAttribute('lang', language.code.toLowerCase())
     label = language.label

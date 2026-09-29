@@ -200,8 +200,8 @@ export function useRenameTag() {
   const invalidate = useInvalidate()
   return useMutation({
     mutationFn: ({ id, name }: { id: number; name: string }) => put<unknown>(`/api/tags/${id}`, { name }),
-    // Entries show tag names: refresh them too
-    onSuccess: () => invalidate([['tags'], ['entries']]),
+    // Entries and recurring rules show tag names: refresh them too
+    onSuccess: () => invalidate([['tags'], ['entries'], ['recurring']]),
   })
 }
 
@@ -209,7 +209,7 @@ export function useDeleteTag() {
   const invalidate = useInvalidate()
   return useMutation({
     mutationFn: (id: number) => del(`/api/tags/${id}`),
-    onSuccess: () => invalidate([['tags'], ['entries']]),
+    onSuccess: () => invalidate([['tags'], ['entries'], ['recurring']]),
   })
 }
 

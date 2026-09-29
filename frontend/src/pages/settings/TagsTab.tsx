@@ -1,16 +1,22 @@
-import { useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { Pencil, Trash2 } from 'lucide-react'
 import { errorMessage } from '../../api/client'
-import { useDeleteTag, useRenameTag, useTags } from '../../api/hooks'
-import type { TagSummary } from '../../api/types'
+import { useCategories, useDeleteTag, useRenameTag, useTags } from '../../api/hooks'
+import type { Category, TagSummary } from '../../api/types'
+import { TagCategories } from '../../components/TagCategories'
 import { MAX_TAG_LENGTH } from '../../components/TagInput'
 import { Button, Card, EmptyState, ErrorAlert, Field, MissingRatesNotice, Modal, Spinner } from '../../components/ui'
 import { useI18n } from '../../i18n'
 import { date, money } from '../../lib/format'
 
+/** Stable while categories load, so the lookup below is not rebuilt on every render. */
+const NO_CATEGORIES: Category[] = []
+
 /** The user's tags with their totals: rename or delete them (their entries stay). */
 export function TagsTab() {
   const tags = useTags()
+  const categories = useCategories().data ?? NO_CATEGORIES
+  const byId = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
   const remove = useDeleteTag()
   const [renaming, setRenaming] = useState<TagSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -41,7 +47,7 @@ export function TagsTab() {
           <ul className="divide-y divide-line">
             {rows.map((tag) => (
               <li key={tag.id} className="flex items-start justify-between gap-2 py-2.5 text-sm">
-                <div className="min-w-0">
+                <div className="flex min-w-0 flex-col gap-1">
                   <p className="font-medium">{tag.name}</p>
                   <p className="flex flex-wrap gap-x-3 text-xs text-ink-2">
                     <span>{t('tags.entries', { count: tag.entryCount })}</span>
@@ -52,6 +58,7 @@ export function TagsTab() {
                       <span className="text-muted">{tag.firstDate === tag.lastDate ? date(tag.firstDate) : `${date(tag.firstDate)} – ${date(tag.lastDate)}`}</span>
                     )}
                   </p>
+                  <TagCategories rows={tag.categories} categories={byId} currency={currency} />
                 </div>
                 <span className="flex shrink-0 gap-1">
                   <button type="button" className="rounded p-1.5 text-muted hover:text-ink" aria-label={t('tags.rename', { name: tag.name })} onClick={() => setRenaming(tag)}>
