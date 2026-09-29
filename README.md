@@ -135,7 +135,7 @@ ops/systemd/     backup service and timer (user units)
 
 ## Run locally (development)
 
-Requirements: JDK 25, Maven 3.9+, Node 22+, Docker (for Postgres and the integration tests).
+Requirements: JDK 25, Maven 3.9+, Node 26 (the exact version is in `frontend/Dockerfile`), Docker (for Postgres and the integration tests).
 
 ```bash
 # 1. Database
@@ -188,7 +188,10 @@ login/CSRF/session rotation, lockout, forced password change, session revocation
 GitHub Actions (`.github/workflows/ci.yml`) runs the same checks on every pull request and on
 pushes to `master`: `mvn verify` on JDK 25 (Testcontainers uses the runner's Docker), the
 frontend lint, unit tests, typecheck + build, and the end-to-end suite against a PostgreSQL
-service container.
+service container. The Node version is not written in the workflow: `scripts/node-version.sh` reads
+it from the build stage of `frontend/Dockerfile` (`FROM node:X.Y.Z-alpine AS build`), so CI tests on
+exactly the Node that builds the production image. Dependabot proposes patch and minor updates of
+that line; a new major is chosen by hand.
 
 The linter is [oxlint](https://oxc.rs) (`frontend/.oxlintrc.json`) rather than ESLint, because
 typescript-eslint does not support TypeScript 7 yet. Two rules are off on purpose: `no-autofocus`

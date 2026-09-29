@@ -29,6 +29,10 @@ updates:
       # Dependabot reads 3-eclipse-temurin-24 as newer: a JDK downgrade. The floating 3.9 tag
       # already picks up Maven patches; move to a new JDK together with eclipse-temurin by hand.
       - dependency-name: maven
+      # The Node version of the frontend (CI runs on the same one): patches and minors come as PRs,
+      # a new major (every six months; odd ones never become LTS) is chosen by hand
+      - dependency-name: node
+        update-types: [version-update:semver-major]
 
   # postgres image in docker-compose.yml. A major version needs a dump/restore, so only minors
   - package-ecosystem: docker-compose
