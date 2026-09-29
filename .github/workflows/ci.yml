@@ -41,7 +41,7 @@ jobs:
 
       # Integration tests start PostgreSQL with Testcontainers on the runner's Docker
       - name: Test
-        run: mvn -B -ntp verify
+        run: ./mvnw -B -ntp verify
 
       - name: Upload test reports
         if: failure()
@@ -146,7 +146,7 @@ jobs:
 
       - name: Build backend
         working-directory: backend
-        run: mvn -B -ntp -DskipTests package
+        run: ./mvnw -B -ntp -DskipTests package
 
       - name: Install frontend dependencies and browser
         working-directory: frontend

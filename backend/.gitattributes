@@ -1,0 +1,3 @@
+# mvnw runs in Linux containers and CI: keep LF even on a Windows checkout
+/mvnw text eol=lf
+*.cmd text eol=crlf

@@ -18,6 +18,11 @@ if [ -z "$tag" ] || [ "$parts" -lt 2 ] || [ "$parts" -gt 3 ]; then
     echo "No exact JDK version in $dockerfile: expected 'FROM eclipse-temurin:X.Y.Z_B-jre'" >&2
     exit 1
 fi
+build_tag=$(sed -n 's/^FROM eclipse-temurin:\(.*\)-jdk AS build$/\1/p' "$dockerfile")
+if [ "$build_tag" != "$tag" ]; then
+    echo "The build stage of $dockerfile must use the runtime's JDK: 'FROM eclipse-temurin:${tag}-jdk AS build'" >&2
+    exit 1
+fi
 major=${version%%.*}
 lts=
 if [ "$major" -ge 17 ] && [ $(((major - 17) % 4)) -eq 0 ]; then

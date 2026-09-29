@@ -1,13 +1,16 @@
 # ---- build ----
-# Exact Maven, same JDK major as the runtime: this stage only compiles and packages, no code of the
-# application runs here. Updated by hand (see .github/dependabot.yml).
-FROM maven:3.9.16-eclipse-temurin-25 AS build
+# The JDK of the runtime below (scripts/java-version.sh checks both lines match) and the Maven of
+# the wrapper (.mvn/wrapper/maven-wrapper.properties). unzip: the wrapper checks the SHA-256 of the
+# .zip distribution, and without unzip it would fetch the .tar.gz instead.
+FROM eclipse-temurin:25.0.4.1_1-jdk AS build
+RUN apt-get update && apt-get install -y --no-install-recommends unzip && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
-COPY pom.xml .
-RUN mvn -q -B dependency:go-offline
+COPY mvnw pom.xml ./
+COPY .mvn .mvn
+RUN ./mvnw -q -B dependency:go-offline
 COPY src ./src
-# Integration tests need Docker (Testcontainers): run them outside the image build with `mvn verify`
-RUN mvn -q -B package -DskipTests
+# Integration tests need Docker (Testcontainers): run them outside the image build with `./mvnw verify`
+RUN ./mvnw -q -B package -DskipTests
 
 # ---- runtime ----
 # The exact JDK of the backend: CI reads it from this line (scripts/java-version.sh), so the unit,
