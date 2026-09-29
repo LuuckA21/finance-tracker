@@ -135,8 +135,9 @@ ops/systemd/     backup service and timer (user units)
 
 ## Run locally (development)
 
-Requirements: JDK 25, Maven 3.9+, Node 26 (the exact versions CI uses are in `backend/Dockerfile` and
-`frontend/Dockerfile`), Docker (for Postgres and the integration tests).
+Requirements: JDK 25, Node 26 (the exact versions CI uses are in `backend/Dockerfile` and
+`frontend/Dockerfile`), Docker (for Postgres and the integration tests). Maven comes with the
+backend: `./mvnw` downloads the version the project uses, checks its SHA-256 and runs it.
 
 ```bash
 # 1. Database
@@ -146,7 +147,7 @@ docker run -d --name finance-db -p 5432:5432 \
 # 2. Backend (dev profile: insecure cookie for http, dev-only encryption key,
 #    admin "admin" / "dev-password-change-me")
 cd backend
-mvn spring-boot:run -Dspring-boot.run.profiles=dev
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 
 # 3. Frontend (proxies /api to :8080)
 cd frontend
@@ -154,20 +155,18 @@ npm install
 npm run dev          # http://localhost:5173
 ```
 
-Optionally add the Maven wrapper once: `mvn wrapper:wrapper`.
-
 ## Tests
 
 ```bash
 cd backend
-mvn verify           # unit tests (surefire) + integration tests *IT (failsafe, needs Docker)
+./mvnw verify        # unit tests (surefire) + integration tests *IT (failsafe, needs Docker)
 cd ../frontend
 npm run lint         # oxlint: React hooks rules, accessibility, common bugs (warnings fail too)
 npm test             # Vitest: formatting, translations, API error messages
 npm run typecheck && npm run build
 
 # End-to-end: the production build (vite preview) against the real backend and PostgreSQL.
-# Playwright starts backend/target/finance-tracker-*.jar (after `mvn package`) unless a backend
+# Playwright starts backend/target/finance-tracker-*.jar (after `./mvnw package`) unless a backend
 # already listens on :8080; start the database first (see "Run locally").
 npx playwright install chromium        # once
 SPRING_PROFILES_ACTIVE=dev APP_ECB_ENABLED=false npm run e2e
@@ -187,7 +186,7 @@ login/CSRF/session rotation, lockout, forced password change, session revocation
 2FA enrolment + replay protection + recovery codes, per-user data isolation, dashboard math.
 
 GitHub Actions (`.github/workflows/ci.yml`) runs the same checks on every pull request and on
-pushes to `master`: `mvn verify` on JDK 25 (Testcontainers uses the runner's Docker), the
+pushes to `master`: `./mvnw verify` on JDK 25 (Testcontainers uses the runner's Docker), the
 frontend lint, unit tests, typecheck + build, and the end-to-end suite against a PostgreSQL
 service container. The Java and Node versions are not written in the workflow: CI reads them from
 the Dockerfiles, so it tests on exactly the versions of the production images.
@@ -195,7 +194,11 @@ the Dockerfiles, so it tests on exactly the versions of the production images.
 (`FROM eclipse-temurin:X.Y.Z_B-jre`; a step then checks `java -version`), `scripts/node-version.sh`
 takes Node from the build stage of `frontend/Dockerfile` (`FROM node:X.Y.Z-alpine AS build`).
 Dependabot proposes updates within the current major of both; a new major (Java LTS, Node) is
-chosen by hand, as is the Maven version of the backend build stage.
+chosen by hand. The backend image builds on the same JDK, and `scripts/java-version.sh` fails if
+its two `eclipse-temurin` lines differ. Maven is the version of the wrapper, in CI and in the image
+build alike: to update it, change the version in `distributionUrl` of
+`backend/.mvn/wrapper/maven-wrapper.properties` and `distributionSha256Sum` to the SHA-256 of that
+`apache-maven-X.Y.Z-bin.zip` (Maven Central publishes its SHA-512 to check the download against).
 
 The linter is [oxlint](https://oxc.rs) (`frontend/.oxlintrc.json`) rather than ESLint, because
 typescript-eslint does not support TypeScript 7 yet. Two rules are off on purpose: `no-autofocus`
