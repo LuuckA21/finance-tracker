@@ -257,7 +257,7 @@ function BudgetForm({ draft, taken, onDone }: { draft: Draft; taken: number[]; o
             <>
               <input id={id} className="input uppercase" list="budget-currencies" maxLength={3} required value={currency}
                 onChange={(e) => setCurrency(e.target.value.toUpperCase())} />
-              <datalist id="budget-currencies">{COMMON_CURRENCIES.map((c) => <option key={c} value={c} />)}</datalist>
+              <datalist id="budget-currencies">{COMMON_CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}</datalist>
             </>
           )}
         </Field>

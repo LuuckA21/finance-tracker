@@ -30,7 +30,7 @@ export function NetWorthPage() {
   const byClass = Object.entries(detail.data?.byClass ?? {})
     .map(([c, v]) => ({ c: c as AssetClass, v: v ?? 0 }))
     .filter((x) => x.v !== 0)
-    .sort((a, b) => b.v - a.v)
+    .toSorted((a, b) => b.v - a.v)
 
   return (
     <>
@@ -81,7 +81,7 @@ export function NetWorthPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {[...points].reverse().map((p) => (
+                    {points.toReversed().map((p) => (
                       <tr key={p.period} className="border-b border-line last:border-0">
                         <td className="px-4 py-2 sm:px-2">{periodLabel(p.period)}</td>
                         {ASSET_CLASSES.filter((c) => points.some((q) => q.byClass[c])).map((c) => (

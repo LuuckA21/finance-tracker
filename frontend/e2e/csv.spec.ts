@@ -43,7 +43,7 @@ test('import row by row: fix a category, skip a broken row, then export', async 
   const file = await download
   expect(file.suggestedFilename()).toMatch(/^movimenti-\d{4}-\d{2}-\d{2}\.csv$/)
   const csv = await readFile((await file.path())!, 'utf8')
-  expect(csv.startsWith('﻿data;tipo;categoria;importo;valuta;descrizione;da;verso\r\n')).toBe(true)
+  expect(csv.startsWith('\uFEFFdata;tipo;categoria;importo;valuta;descrizione;da;verso\r\n')).toBe(true)
   expect(csv).toContain('2026-08-02;Uscita;Ristoranti;32.5;CHF;Pizzeria;;')
   expect(csv).toContain('2026-08-03;Entrata;Stipendio;6000;CHF;Stipendio agosto;;')
 })

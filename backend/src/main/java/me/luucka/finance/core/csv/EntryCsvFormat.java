@@ -137,7 +137,7 @@ public final class EntryCsvFormat {
      * digits.
      */
     public static Optional<BigDecimal> amount(String value) {
-        String text = value.strip().replace("'", "").replace("’", "").replace(" ", "").replace(" ", "");
+        String text = value.strip().replace("'", "").replace("’", "").replace(" ", "").replace("\u00a0", "");
         boolean negative = false;
         if (text.startsWith("-") || text.startsWith("+")) {
             negative = text.startsWith("-");

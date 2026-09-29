@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router'
 import { AlertTriangle, ArrowRight } from 'lucide-react'
 import { useBudgetStatus, useCashflowYear, useMe, useNetWorthDetail, useNetWorthSeries } from '../api/hooks'
@@ -10,7 +11,8 @@ import { money, monthName, monthShort, monthsAgo, percent, date } from '../lib/f
 export function OverviewPage() {
   const me = useMe().data
   const { t } = useI18n()
-  const now = new Date()
+  // Read once: the page keeps showing the month it was opened in
+  const [now] = useState(() => new Date())
   const year = now.getFullYear()
   const month = now.getMonth()
 

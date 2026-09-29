@@ -52,7 +52,7 @@ const CLASS_SLOT: Record<AssetClass, number | null> = {
 }
 
 /** Asset classes in slot order: stacks and legends follow it so adjacent colours stay distinguishable. */
-export const CLASS_ORDER = (Object.keys(CLASS_SLOT) as AssetClass[]).sort(
+export const CLASS_ORDER = (Object.keys(CLASS_SLOT) as AssetClass[]).toSorted(
   (a, b) => (CLASS_SLOT[a] ?? 99) - (CLASS_SLOT[b] ?? 99),
 )
 
