@@ -5,7 +5,7 @@ test('the menu goes from the overview through cash flow and net worth to the rep
   const menu = page.getByRole('navigation', { name: 'Navigazione principale' })
   await expect(menu.getByRole('link')).toHaveText([
     'Panoramica',
-    'Movimenti', 'Ricorrenti', 'Budget', 'Entrate e uscite',
+    'Movimenti', 'Ricorrenti', 'Budget', 'Entrate e uscite', 'Previsione',
     'Posizioni', 'Aggiorna valori', 'Obiettivi', 'Patrimonio',
     'Riepilogo annuale',
     'Impostazioni',

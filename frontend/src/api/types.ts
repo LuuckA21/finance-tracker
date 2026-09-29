@@ -253,6 +253,54 @@ export interface CashflowYear {
   unconvertedCurrencies: string[]
 }
 
+export type ForecastSchedule = 'MONTHLY' | 'ONCE'
+
+/** An extra item of a forecast, in the base currency; negative to take something away. */
+export interface ForecastItem {
+  description: string
+  kind: CategoryKind
+  categoryId: number | null
+  amount: number
+  schedule: ForecastSchedule
+  startMonth: number
+  /** MONTHLY: last month, December when null */
+  endMonth: number | null
+}
+
+export interface ForecastInput {
+  name: string
+  year: number
+  /** Percent over the base: 3 for +3% */
+  incomeGrowth: number
+  expenseGrowth: number
+  excludedTagIds: number[]
+  excludedCategoryIds: number[]
+  items: ForecastItem[]
+}
+
+export interface ForecastScenario extends ForecastInput {
+  id: number
+  updatedAt: string
+}
+
+export interface Forecast {
+  baseCurrency: string
+  year: number
+  /** Base period, yyyy-MM: the year before once over, else the last twelve complete months */
+  baseFrom: string
+  baseTo: string
+  months: { month: number; base: CashflowTotals; forecast: CashflowTotals }[]
+  baseTotals: CashflowTotals
+  totals: CashflowTotals
+  /** What the percentages and the extra items add over the base */
+  fromGrowth: CashflowTotals
+  fromItems: CashflowTotals
+  categories: { categoryId: number; name: string; color: string; kind: CategoryKind; base: number; forecast: number }[]
+  /** Each item's total in the year, in the scenario's order */
+  itemTotals: number[]
+  unconvertedCurrencies: string[]
+}
+
 export interface CashflowYears {
   baseCurrency: string
   years: { year: number; totals: CashflowTotals }[]

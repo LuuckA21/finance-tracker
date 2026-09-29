@@ -13,6 +13,7 @@ import {
   Repeat,
   Settings,
   Target,
+  TrendingUp,
   Users,
   Wallet,
   X,
@@ -35,6 +36,7 @@ const NAV_GROUPS = [
     { to: '/ricorrenti', label: 'nav.recurring', icon: Repeat },
     { to: '/budget', label: 'nav.budget', icon: Target },
     { to: '/flussi', label: 'nav.cashflow', icon: BarChart3 },
+    { to: '/previsione', label: 'nav.forecast', icon: TrendingUp },
   ],
   [
     { to: '/posizioni', label: 'nav.positions', icon: Wallet },
