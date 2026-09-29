@@ -373,3 +373,47 @@ export interface Tags {
   tags: TagSummary[]
   unconvertedCurrencies: string[]
 }
+
+// ---------------------------------------------------------------- annual report
+
+export interface AnnualReport {
+  baseCurrency: string
+  year: number
+  /** 31 December, or today for the current year */
+  periodEnd: string
+  /** Months in the period, for monthly averages */
+  months: number
+  availableYears: number[]
+  totals: CashflowTotals
+  /** 1 January to the same day one year earlier */
+  previousTotals: CashflowTotals
+  /** Income first, then expenses; largest first */
+  categories: { categoryId: number; name: string; color: string; kind: EntryKind; amount: number; previousAmount: number }[]
+  /** Value of every position on 31 December of the previous year */
+  netWorthStart: number
+  netWorthEnd: number
+  classes: { assetClass: AssetClass; start: number; end: number }[]
+  /** start/end null before the first value of the position or without an exchange rate */
+  positions: {
+    positionId: number
+    name: string
+    assetClass: AssetClass
+    currency: string
+    archived: boolean
+    start: number | null
+    end: number | null
+    transfersIn: number
+    transfersOut: number
+  }[]
+  tags: { tagId: number; name: string; entryCount: number; income: number; expense: number; transferred: number }[]
+  largestExpenses: {
+    entryId: number
+    date: string
+    categoryId: number | null
+    description: string | null
+    amount: number
+    currency: string
+    amountBase: number
+  }[]
+  unconvertedCurrencies: string[]
+}

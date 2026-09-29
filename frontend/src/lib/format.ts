@@ -36,9 +36,9 @@ export function compact(value: number): string {
 }
 
 /** Money with an explicit sign in front, whatever the locale puts the symbol: +CHF 1'234.50, −CHF 80.00. */
-export function signedMoney(value: number, currency: string): string {
+export function signedMoney(value: number, currency: string, digits = 2): string {
   const sign = value > 0 ? '+' : value < 0 ? '−' : ''
-  return sign + money(Math.abs(value), currency)
+  return sign + money(Math.abs(value), currency, digits)
 }
 
 /** Percentage with an explicit sign: +2.4 %, −0.8 %. */

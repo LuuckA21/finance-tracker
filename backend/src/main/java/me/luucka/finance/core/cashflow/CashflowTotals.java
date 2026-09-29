@@ -20,7 +20,7 @@ public record CashflowTotals(BigDecimal income, BigDecimal expense, BigDecimal n
 
     public static final CashflowTotals ZERO = of(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
 
-    static CashflowTotals of(BigDecimal income, BigDecimal expense, BigDecimal transferred) {
+    public static CashflowTotals of(BigDecimal income, BigDecimal expense, BigDecimal transferred) {
         BigDecimal net = income.subtract(expense);
         BigDecimal rate = income.signum() > 0
                 ? net.multiply(BigDecimal.valueOf(100)).divide(income, 1, RoundingMode.HALF_EVEN)

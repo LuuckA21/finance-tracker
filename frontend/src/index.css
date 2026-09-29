@@ -125,3 +125,26 @@ body {
     border-radius: 0.875rem;
   }
 }
+
+/* Printing (the annual report's "Print / PDF"): always the light palette on white paper */
+@media print {
+  :root,
+  :root[data-theme],
+  :root:not([data-theme="light"]) {
+    color-scheme: light;
+    --page: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #f0efec;
+    --border: rgba(11, 11, 11, 0.15);
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #6f6d68;
+    --accent: #2a78d6;
+    --accent-soft: #e6f0fc;
+    --good: #006300;
+    --bad: #b42323;
+    --bad-soft: #fdecec;
+    --warn-soft: #fff6e0;
+    --warn-ink: #7a5200;
+  }
+}

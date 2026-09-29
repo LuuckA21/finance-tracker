@@ -10,6 +10,7 @@ const EntriesPage = lazy(() => import('./pages/EntriesPage').then((m) => ({ defa
 const RecurringPage = lazy(() => import('./pages/RecurringPage').then((m) => ({ default: m.RecurringPage })))
 const GoalsPage = lazy(() => import('./pages/GoalsPage').then((m) => ({ default: m.GoalsPage })))
 const BudgetPage = lazy(() => import('./pages/BudgetPage').then((m) => ({ default: m.BudgetPage })))
+const AnnualReportPage = lazy(() => import('./pages/AnnualReportPage').then((m) => ({ default: m.AnnualReportPage })))
 const CashflowPage = lazy(() => import('./pages/CashflowPage').then((m) => ({ default: m.CashflowPage })))
 const NetWorthPage = lazy(() => import('./pages/NetWorthPage').then((m) => ({ default: m.NetWorthPage })))
 const PositionsPage = lazy(() => import('./pages/PositionsPage').then((m) => ({ default: m.PositionsPage })))
@@ -34,6 +35,7 @@ export function App() {
           <Route path="movimenti" element={<EntriesPage />} />
           <Route path="ricorrenti" element={<RecurringPage />} />
           <Route path="flussi" element={<CashflowPage />} />
+          <Route path="riepilogo" element={<AnnualReportPage />} />
           <Route path="budget" element={<BudgetPage />} />
           <Route path="obiettivi" element={<GoalsPage />} />
           <Route path="patrimonio" element={<NetWorthPage />} />
