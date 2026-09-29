@@ -15,6 +15,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param login          brute-force protection settings
  * @param session        login session settings
  * @param fx             exchange rate settings
+ * @param mail           outgoing email (notifications); disabled without a host
  */
 @ConfigurationProperties("app")
 public record AppProperties(
@@ -23,7 +24,8 @@ public record AppProperties(
         BootstrapAdmin bootstrapAdmin,
         Login login,
         Session session,
-        Fx fx) {
+        Fx fx,
+        Mail mail) {
 
     public record BootstrapAdmin(String username, String password, Language language) {
     }
@@ -57,5 +59,23 @@ public record AppProperties(
      * @param baseUrl directory of the ECB feeds
      */
     public record Ecb(boolean enabled, URI baseUrl) {
+    }
+
+    /**
+     * SMTP server for the notifications. Everything mail related is off while {@code host} is empty.
+     *
+     * @param from     sender address, e.g. {@code Finanze <finanze@example.com>}
+     * @param security {@code STARTTLS} (usually port 587), {@code SSL} (465) or {@code NONE} (local relay)
+     * @param appUrl   public address of the app, linked from the emails (optional)
+     * @param cron     when the alerts are checked
+     */
+    public record Mail(String host, int port, String username, String password, String from, Security security,
+                       String appUrl, String cron) {
+
+        public enum Security { STARTTLS, SSL, NONE }
+
+        public boolean enabled() {
+            return host != null && !host.isBlank();
+        }
     }
 }

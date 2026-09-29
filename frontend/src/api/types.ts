@@ -417,3 +417,17 @@ export interface AnnualReport {
   }[]
   unconvertedCurrencies: string[]
 }
+
+// ---------------------------------------------------------------- notifications
+
+export interface NotificationSettings {
+  /** False when the server has no SMTP settings: nothing can be sent */
+  mailEnabled: boolean
+  /** Confirmed address, the only one notifications go to */
+  email: string | null
+  /** Address waiting for the code sent to it */
+  pendingEmail: string | null
+  budgetAlerts: boolean
+  goalAlerts: boolean
+  monthlySummary: boolean
+}

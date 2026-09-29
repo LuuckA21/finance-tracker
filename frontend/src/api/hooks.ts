@@ -23,6 +23,7 @@ import type {
   Me,
   NetWorthDetail,
   NetWorthSeries,
+  NotificationSettings,
   Page,
   Position,
   RecurringEntry,
@@ -54,6 +55,32 @@ export function useChangePassword() {
     onSuccess: (me) => qc.setQueryData(['me'], me),
   })
 }
+
+// ---------------------------------------------------------------- notifications
+
+export const useNotificationSettings = () =>
+  useQuery({ queryKey: ['notifications'], queryFn: () => get<NotificationSettings>('/api/account/notifications') })
+
+/** Every notification call answers with the new settings: store them as they come. */
+function useNotificationMutation<T>(call: (arg: T) => Promise<NotificationSettings>) {
+  const qc = useQueryClient()
+  return useMutation({ mutationFn: call, onSuccess: (data) => qc.setQueryData(['notifications'], data) })
+}
+
+export const useUpdateNotifications = () => useNotificationMutation(
+  (body: Partial<Pick<NotificationSettings, 'budgetAlerts' | 'goalAlerts' | 'monthlySummary'>>) =>
+    put<NotificationSettings>('/api/account/notifications', body))
+
+export const useRequestEmailCode = () => useNotificationMutation(
+  (email: string) => post<NotificationSettings>('/api/account/notifications/email', { email }))
+
+export const useConfirmEmail = () => useNotificationMutation(
+  (code: string) => post<NotificationSettings>('/api/account/notifications/email/confirm', { code }))
+
+export const useRemoveEmail = () => useNotificationMutation(
+  () => del<NotificationSettings>('/api/account/notifications/email'))
+
+export const useSendTestEmail = () => useMutation({ mutationFn: () => post<void>('/api/account/notifications/test', {}) })
 
 export function useUpdateSettings() {
   const qc = useQueryClient()

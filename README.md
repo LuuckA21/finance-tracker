@@ -21,6 +21,12 @@ Self-hosted personal finance app for a small group of users (you and your family
   filter the list, with the totals of each tag (spent, received, transferred, period) and their
   split by category. Recurring rules can carry tags too: every entry they create gets them. Tags
   can be renamed or deleted in the settings, and travel through the CSV export and import.
+- **Email notifications** (optional, needs an SMTP server): budgets at 80 % and over their limit,
+  savings goals reached and a summary of the previous month on the 1st, in the user's language, as
+  HTML (key figures, bars for budgets and expenses, dark mode; no images or remote content, so
+  nothing tracks the reader) with a plain-text alternative for clients without HTML.
+  Mail goes only to an address confirmed with a 6-digit code sent to it; each user chooses which
+  alerts to get in Settings › Notifications, and only what happens after switching one on is sent.
 - **Annual report** – one calendar year on one page, printable or saved as PDF from the browser:
   income, expenses, savings and savings rate with monthly averages, each category against the year
   before (for the current year: against the same period of the year before), net worth on
@@ -69,7 +75,7 @@ backend/
     auth/        security config, login + 2FA flow, rate limiting, session revocation
     account/     self-service: password, preferences (base currency, language, theme), 2FA, login history
     admin/       user management (no public sign-up) + bootstrap admin
-    category/ cashflow/ recurring/ position/ fx/ dashboard/ budget/ goal/ tag/ report/
+    category/ cashflow/ recurring/ position/ fx/ dashboard/ budget/ goal/ tag/ report/ notification/
   src/main/resources/db/migration/   Flyway migrations
   src/test/java/…/core/              unit tests (no Spring)
   src/test/java/…/*IT.java           integration tests (Testcontainers + MockMvc)
@@ -164,6 +170,8 @@ npm run typecheck && npm run build
 # already listens on :8080; start the database first (see "Run locally").
 npx playwright install chromium        # once
 SPRING_PROFILES_ACTIVE=dev APP_ECB_ENABLED=false npm run e2e
+# The backend started by Playwright sends its email to a small SMTP sink (e2e/smtp-sink.mjs, port
+# 2525) whose messages the tests read.
 ```
 
 Each end-to-end test creates its own user through the admin API and deletes it at the end, so the
@@ -221,6 +229,27 @@ running on another host:
 - Container memory limits need the `memory` cgroup delegated to your user (default with systemd
   and cgroup v2): `docker info` must not warn "No memory limit support". A container that goes over
   its limit is restarted instead of taking memory from the other services on the server.
+
+### Email notifications (optional)
+
+Set the SMTP server in `.env` (without `MAIL_HOST` email stays off and the Notifications tab says
+so):
+
+```bash
+MAIL_HOST=smtp.example.com
+MAIL_PORT=587
+MAIL_SECURITY=STARTTLS        # STARTTLS (587), SSL (465) or NONE (a relay on the local network only)
+MAIL_USERNAME=finanze@example.com
+MAIL_PASSWORD=app-password
+MAIL_FROM="Finanze <finanze@example.com>"
+APP_PUBLIC_URL=https://finanze.example.com   # linked from the emails
+```
+
+With STARTTLS the connection is refused if the server does not offer it (never plain text), and the
+server certificate must match the host name. The backend needs outbound access to `MAIL_HOST` on
+`MAIL_PORT`. Alerts are checked every hour; the monthly summary goes out on the 1st. Each user then
+confirms an address in Settings › Notifications (a 6-digit code, valid 15 minutes, 5 attempts) and
+can send a test email from there.
 
 ### Updates with `deploy.sh`
 
@@ -360,6 +389,7 @@ encrypted with it).
 | Tags | `GET /api/tags` (with totals in the base currency, also per category), `PUT/DELETE /api/tags/{id}` (`{name}`; deleting keeps the entries) |
 | Goals | `GET/POST /api/goals` (list with progress), `PUT/DELETE /api/goals/{id}` (`{name,kind:BALANCE\|YEARLY,targetAmount,currency,targetDate?,positionIds}`) |
 | Reports | `GET /api/reports/annual?year` (totals and categories against the year before, net worth and positions at the start and end, tags, largest expenses) |
+| Notifications | `GET/PUT /api/account/notifications` (`mailEnabled`, `email`, `pendingEmail`, `budgetAlerts`, `goalAlerts`, `monthlySummary`), `POST /email` (`{email}`: sends a code), `POST /email/confirm` (`{code}`), `DELETE /email`, `POST /test` |
 | Dashboards | `GET /api/dashboard/cashflow?year`, `/cashflow/years`, `/net-worth?granularity=MONTH\|YEAR&from=yyyy-MM&to=yyyy-MM`, `/net-worth/detail?date` |
 | Admin | `GET/POST /api/admin/users`, `PATCH/DELETE /{id}`, `POST /{id}/{reset-password,unlock,reset-mfa}`, `GET /api/admin/fx`, `POST /api/admin/fx/refresh`, `POST /api/admin/fx/history` (202, runs in background) |
 

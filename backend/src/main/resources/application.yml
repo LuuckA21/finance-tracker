@@ -91,6 +91,20 @@ app:
       base-url: https://www.ecb.europa.eu/stats/eurofxref/
       # Hourly check; a download happens only when a new publication is due (~16:00 CET)
       cron: "0 7 * * * *"
+  mail:
+    # SMTP server for the email notifications; leave the host empty to turn email off
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    # Sender, e.g. "Finanze <finanze@example.com>"
+    from: ${MAIL_FROM:}
+    # STARTTLS (port 587), SSL (port 465) or NONE (local relay only)
+    security: ${MAIL_SECURITY:STARTTLS}
+    # Public address of the app, linked from the emails (e.g. https://finanze.example.com)
+    app-url: ${APP_PUBLIC_URL:}
+    # Budget and goal alerts are checked every hour; the monthly summary goes out on the 1st
+    cron: "0 20 * * * *"
 
 logging:
   level:
