@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -48,6 +49,13 @@ class TagsIT {
     private static long tagId(ApiClient client, String name) throws Exception {
         List<Integer> ids = json(client.get("/api/tags"), "$.tags[?(@.name == '" + name + "')].id");
         return ids.getFirst();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Double> doubles(Object map) {
+        Map<String, Double> result = new HashMap<>();
+        ((Map<String, Object>) map).forEach((k, v) -> result.put(k, ((Number) v).doubleValue()));
+        return result;
     }
 
     @Test
@@ -140,6 +148,20 @@ class TagsIT {
         assertEquals(2, rows.get(1).get("entryCount"));
         assertEquals(80.0, ((Number) rows.get(2).get("share")).doubleValue());
         assertEquals((int) tagId(client, "Vacanze"), rows.get(1).get("tagId"));
+
+        // Categories × tags: every expense category, the ferry in both columns, the pizza untagged
+        long holidays = tagId(client, "Vacanze");
+        long family = tagId(client, "Famiglia");
+        assertEquals(List.of("EXPENSE", "INCOME"), json(year, "$.tagMatrices[*].kind"));
+        assertEquals(List.of((int) holidays, (int) family), json(year, "$.tagMatrices[0].tagIds"));
+        List<Map<String, Object>> matrix = json(year, "$.tagMatrices[0].rows");
+        assertEquals(List.of((int) travel, (int) restaurants), matrix.stream().map(r -> r.get("categoryId")).toList());
+        assertEquals(Map.of(String.valueOf(holidays), 800.0, String.valueOf(family), 800.0),
+                doubles(matrix.get(0).get("tags")));
+        assertEquals(Map.of(String.valueOf(holidays), 120.0), doubles(matrix.get(1).get("tags")));
+        assertEquals(80.0, ((Number) matrix.get(1).get("untagged")).doubleValue());
+        assertEquals(200.0, ((Number) matrix.get(1).get("total")).doubleValue());
+        assertEquals(80.0, ((Number) json(year, "$.tagMatrices[0].untagged")).doubleValue());
 
         assertEquals(List.of(), json(client.get("/api/dashboard/cashflow?year=2024"), "$.tags"));
     }

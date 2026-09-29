@@ -3,7 +3,8 @@
 Self-hosted personal finance app for a small group of users (you and your family):
 
 - **Cash flow** – record income and expenses (date, category, amount, currency, note) and see
-  monthly and yearly dashboards: totals, savings rate, breakdown by category and by tag.
+  monthly and yearly dashboards: totals, savings rate, breakdown by category and by tag, and a
+  table of categories × tags.
 - **Recurring entries** – salary, rent, subscriptions: daily, weekly, monthly, quarterly, every 4
   or 6 months, yearly, with optional end date. The entries are created automatically when due
   (just after midnight and at startup, catching up days the server was down) and are ordinary
@@ -19,7 +20,8 @@ Self-hosted personal finance app for a small group of users (you and your family
 - **Tags** – free labels on entries across categories ("Holidays 2026", "Wedding"): typed on
   the entry (existing ones suggested, case does not matter, up to 10 per entry), clickable to
   filter the list, with the totals of each tag (spent, received, transferred, period) and their
-  split by category; the Income & expenses page shows each tag's spending and income of the year.
+  split by category; the Income & expenses page shows each tag's spending and income of the year
+  and a table of every category against the 8 largest tags, the other tags together and no tag.
   Recurring rules can carry tags too: every entry they create gets them. Tags can be renamed or
   deleted in the settings, and travel through the CSV export and import.
 - **Email notifications** (optional, needs an SMTP server): budgets at 80 % and over their limit,
@@ -401,7 +403,7 @@ encrypted with it).
 | Goals | `GET/POST /api/goals` (list with progress), `PUT/DELETE /api/goals/{id}` (`{name,kind:BALANCE\|YEARLY,targetAmount,currency,targetDate?,positionIds}`) |
 | Reports | `GET /api/reports/annual?year` (totals and categories against the year before, net worth and positions at the start and end, tags, largest expenses) |
 | Notifications | `GET/PUT /api/account/notifications` (`mailEnabled`, `email`, `pendingEmail`, `budgetAlerts`, `goalAlerts`, `monthlySummary`), `POST /email` (`{email}`: sends a code), `POST /email/confirm` (`{code}`), `DELETE /email`, `POST /test` |
-| Dashboards | `GET /api/dashboard/cashflow?year` (with `tags`: income and expenses of each tag in the year), `/cashflow/years`, `/net-worth?granularity=MONTH\|YEAR&from=yyyy-MM&to=yyyy-MM`, `/net-worth/detail?date` |
+| Dashboards | `GET /api/dashboard/cashflow?year` (with `tags`: income and expenses of each tag in the year, and `tagMatrices`: categories × tags), `/cashflow/years`, `/net-worth?granularity=MONTH\|YEAR&from=yyyy-MM&to=yyyy-MM`, `/net-worth/detail?date` |
 | Admin | `GET/POST /api/admin/users`, `PATCH/DELETE /{id}`, `POST /{id}/{reset-password,unlock,reset-mfa}`, `GET /api/admin/fx`, `POST /api/admin/fx/refresh`, `POST /api/admin/fx/history` (202, runs in background) |
 
 Errors are RFC 9457 problem details with a stable `code` (e.g. `invalid_credentials`,

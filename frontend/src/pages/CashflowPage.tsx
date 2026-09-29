@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useCashflowYear, useCashflowYears, useMe } from '../api/hooks'
 import { Card, MissingRatesNotice, PageHeader, Segmented, Spinner, StatTile } from '../components/ui'
+import { TagMatrixCard } from '../components/TagMatrix'
 import { CashflowChart } from '../charts/CashflowChart'
 import { RankedBars } from '../charts/ChartParts'
 import { useI18n } from '../i18n'
@@ -83,6 +84,7 @@ export function CashflowPage() {
                 <p className="text-xs text-muted lg:col-span-2">{t('cashflow.tagsHelp')}</p>
               </div>
             )}
+            {data.data.tagMatrices.length > 0 && <TagMatrixCard data={data.data} currency={currency} />}
 
             {data.data.transfers.length > 0 && (
               <Card title={t('cashflow.transfersByDestination')} className="mb-4">
