@@ -1,5 +1,8 @@
 # ---- build ----
-FROM node:26-alpine AS build
+# The exact Node version is the one for the whole frontend: CI reads it from this line, so tests,
+# the end-to-end suite and the production build all run on it. Dependabot proposes patch and minor
+# updates here; a new major is chosen by hand.
+FROM node:26.10.0-alpine AS build
 WORKDIR /src
 COPY package.json package-lock.json ./
 RUN npm ci

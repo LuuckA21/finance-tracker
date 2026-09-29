@@ -25,10 +25,18 @@ updates:
     schedule:
       interval: weekly
     ignore:
-      # Build stage only. Its tags mix Maven and JDK versions (3.9-eclipse-temurin-25) and
-      # Dependabot reads 3-eclipse-temurin-24 as newer: a JDK downgrade. The floating 3.9 tag
-      # already picks up Maven patches; move to a new JDK together with eclipse-temurin by hand.
+      # Build stage only. Its tags mix Maven and JDK versions (3.9.16-eclipse-temurin-25) and
+      # Dependabot reads 3-eclipse-temurin-24 as newer: a JDK downgrade. Maven is updated by hand,
+      # and moves to a new JDK together with eclipse-temurin.
       - dependency-name: maven
+      # The JDK of the backend (CI runs on the same one): updates within Java 25 come as PRs, the
+      # next LTS is chosen by hand together with java.version in pom.xml
+      - dependency-name: eclipse-temurin
+        update-types: [version-update:semver-major]
+      # The Node version of the frontend (CI runs on the same one): patches and minors come as PRs,
+      # a new major (every six months; odd ones never become LTS) is chosen by hand
+      - dependency-name: node
+        update-types: [version-update:semver-major]
 
   # postgres image in docker-compose.yml. A major version needs a dump/restore, so only minors
   - package-ecosystem: docker-compose

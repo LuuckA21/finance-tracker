@@ -49,7 +49,8 @@ test('income, expenses and transfers: add, filter, edit, delete', async ({ signe
   await page.getByRole('link', { name: 'Entrate e uscite' }).click()
   await expect(page.getByRole('heading', { name: 'Entrate e uscite' })).toBeVisible()
   const tiles = page.locator('main')
-  await expect(tiles.getByText(/Entrate \d{4}/).locator('..')).toContainText(/6.000/)
+  // Separator optional: CLDR 48 groups Italian amounts only from five digits (6000, 12'345)
+  await expect(tiles.getByText(/Entrate \d{4}/).locator('..')).toContainText(/6.?000/)
   await expect(tiles.getByText(/Uscite \d{4}/).locator('..')).toContainText('50')
   await expect(tiles.getByText(/Trasferito \d{4}/).locator('..')).toContainText('500')
 
