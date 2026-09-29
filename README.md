@@ -16,6 +16,11 @@ Self-hosted personal finance app for a small group of users (you and your family
   currency). The Budget page shows, for any month, what was spent, what is left, the categories
   close to (80 %) or over their limit, an end-of-month projection for the current month and the
   spending in categories without a budget, with a suggestion from the last 3 months' average.
+- **Savings goals** – either a balance to reach on some positions (an emergency fund, a home
+  deposit), optionally by a date, or a yearly amount to put into them (e.g. the pillar 3a
+  maximum). Each goal shows its progress, the pace of the last 6 months and the month the target
+  is reached at that pace, and what is needed each month to make it in time; the first goals
+  also appear on the overview.
   The overview warns when a budget of the current month is over or close to its limit.
 - **Transfers** – money moved between your own accounts or investments (to savings, a broker, a
   pension account): a third kind of entry, without category, optionally from and to one of your
@@ -53,7 +58,7 @@ backend/
     auth/        security config, login + 2FA flow, rate limiting, session revocation
     account/     self-service: password, preferences (base currency, language, theme), 2FA, login history
     admin/       user management (no public sign-up) + bootstrap admin
-    category/ cashflow/ recurring/ position/ fx/ dashboard/
+    category/ cashflow/ recurring/ position/ fx/ dashboard/ budget/ goal/
   src/main/resources/db/migration/   Flyway migrations
   src/test/java/…/core/              unit tests (no Spring)
   src/test/java/…/*IT.java           integration tests (Testcontainers + MockMvc)
@@ -306,6 +311,12 @@ encrypted with it).
 - **Budgets**: only expenses count (income and transfers never do); a budget in another currency
   is converted at the end of the month (today for the current month). The projection counts
   expenses created by recurring rules as booked and extrapolates the rest over the month's days.
+- **Savings goals**, in the base currency: a balance goal compares the value of its positions
+  today with the target, converted at today's rate; its pace is their average monthly change
+  since 6 months ago (deposits and market moves alike, from at least 4 weeks of records). A
+  yearly goal counts the transfers into its positions since 1 January. Months are counted whole,
+  the current one included: "by December" in September means 4 months, and the target is expected
+  at the end of the month the pace covers it.
 - **Exchange rates**, `1 <currency> = rate <base>`, looked up for each date in this order:
   1. the user's latest manual rate on or before the date (manual rates are tied to the base
      currency they were entered for, and always win);
@@ -328,13 +339,14 @@ encrypted with it).
 | Area | Endpoints |
 |------|-----------|
 | Auth | `GET /api/auth/csrf`, `POST /api/auth/login`, `POST /api/auth/login/mfa`, `POST /api/auth/logout`, `GET /api/auth/me` |
-| Account | `PUT /api/account/password`, `PUT /api/account/settings` (partial: `baseCurrency`, `language` `IT\|EN`, `theme` `SYSTEM\|LIGHT\|DARK`), `GET /api/account/logins`, `POST /api/account/mfa/{setup,enable,disable,recovery-codes}` |
+| Account | `PUT /api/account/password`, `PUT /api/account/settings` (partial: `baseCurrency`, `language` `IT\|EN\|DE\|FR`, `theme` `SYSTEM\|LIGHT\|DARK`), `GET /api/account/logins`, `POST /api/account/mfa/{setup,enable,disable,recovery-codes}` |
 | Categories | `GET/POST /api/categories`, `PUT/DELETE /api/categories/{id}` |
 | Entries | `GET /api/cash-entries?from&to&kind&categoryId&q&page&size` (kind `INCOME\|EXPENSE\|TRANSFER`; transfers take `fromPositionId`/`toPositionId` instead of `categoryId`), `POST`, `PUT/DELETE /{id}`, `GET /export?filters` (CSV), `POST /import/preview` (multipart `file`), `POST /import` (`{entries:[…]}`) |
 | Recurring | `GET/POST /api/recurring-entries`, `PUT/DELETE /{id}` (frequency `DAILY\|WEEKLY\|MONTHLY\|QUARTERLY\|FOUR_MONTHLY\|SEMIANNUAL\|YEARLY`) |
 | Positions | `GET/POST /api/positions`, `GET/PUT/DELETE /{id}`, `GET/POST /{id}/snapshots`, `PUT/DELETE /{id}/snapshots/{sid}`, `POST /api/positions/snapshots/bulk` |
 | FX | `GET/POST /api/fx-rates`, `DELETE /{id}` (manual rates), `GET /api/fx-rates/central?date` (ECB rates in the base currency on a day, default today) |
 | Budgets | `GET /api/budgets`, `PUT/DELETE /api/budgets/{categoryId}` (`{amount,currency}`), `GET /api/budgets/status?month=yyyy-MM` |
+| Goals | `GET/POST /api/goals` (list with progress), `PUT/DELETE /api/goals/{id}` (`{name,kind:BALANCE\|YEARLY,targetAmount,currency,targetDate?,positionIds}`) |
 | Dashboards | `GET /api/dashboard/cashflow?year`, `/cashflow/years`, `/net-worth?granularity=MONTH\|YEAR&from=yyyy-MM&to=yyyy-MM`, `/net-worth/detail?date` |
 | Admin | `GET/POST /api/admin/users`, `PATCH/DELETE /{id}`, `POST /{id}/{reset-password,unlock,reset-mfa}`, `GET /api/admin/fx`, `POST /api/admin/fx/refresh`, `POST /api/admin/fx/history` (202, runs in background) |
 

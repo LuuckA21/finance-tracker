@@ -306,3 +306,38 @@ export interface UserWithPassword {
   user: AdminUser
   temporaryPassword: string | null
 }
+
+export type GoalKind = 'BALANCE' | 'YEARLY'
+export type GoalState = 'REACHED' | 'ON_TRACK' | 'BEHIND' | 'IN_PROGRESS' | 'NO_RATE'
+
+/** A savings goal with its progress in the base currency. */
+export interface Goal {
+  id: number
+  name: string
+  kind: GoalKind
+  /** As entered, in the goal's own currency */
+  targetAmount: number
+  currency: string
+  /** BALANCE only, optional (yyyy-MM-dd) */
+  targetDate: string | null
+  positionIds: number[]
+  baseCurrency: string
+  /** Target in the base currency; null when its currency cannot be converted (NO_RATE) */
+  target: number | null
+  /** BALANCE: value of the positions today; YEARLY: transferred into them this year */
+  current: number
+  remaining: number | null
+  percent: number | null
+  state: GoalState
+  /** BALANCE: average monthly change over the last 6 months; YEARLY: per month so far this year */
+  monthlyPace: number | null
+  /** BALANCE: end of the month the target is reached at that pace */
+  projectedDate: string | null
+  /** Needed each month to make it in time (deadline or end of year) */
+  requiredMonthly: number | null
+  /** Months available, the current one included */
+  monthsLeft: number | null
+  /** YEARLY: the calendar year measured */
+  year: number | null
+  unconvertedCurrencies: string[]
+}

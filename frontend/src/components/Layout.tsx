@@ -3,6 +3,7 @@ import { NavLink, Outlet } from 'react-router'
 import {
   ArrowLeftRight,
   BarChart3,
+  Flag,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -26,6 +27,7 @@ const NAV = [
   { to: '/ricorrenti', label: 'nav.recurring', icon: Repeat },
   { to: '/flussi', label: 'nav.cashflow', icon: BarChart3 },
   { to: '/budget', label: 'nav.budget', icon: Target },
+  { to: '/obiettivi', label: 'nav.goals', icon: Flag },
   { to: '/patrimonio', label: 'nav.netWorth', icon: PiggyBank },
   { to: '/posizioni', label: 'nav.positions', icon: Wallet },
   { to: '/aggiorna', label: 'nav.bulkUpdate', icon: RefreshCw },

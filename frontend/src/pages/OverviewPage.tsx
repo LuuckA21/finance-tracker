@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { AlertTriangle, ArrowRight } from 'lucide-react'
-import { useBudgetStatus, useCashflowYear, useMe, useNetWorthDetail, useNetWorthSeries } from '../api/hooks'
+import { useBudgetStatus, useCashflowYear, useGoals, useMe, useNetWorthDetail, useNetWorthSeries } from '../api/hooks'
+import { GoalProgress } from '../components/GoalProgress'
 import { Card, MissingRatesNotice, PageHeader, Spinner, StatTile } from '../components/ui'
 import { CashflowChart } from '../charts/CashflowChart'
 import { NetWorthLine } from '../charts/NetWorthCharts'
@@ -73,6 +74,8 @@ export function OverviewPage() {
         />
       </div>
 
+      <GoalsCard />
+
       <Card title={t('overview.cashflowYear', { year })} actions={<Link to="/flussi" className="text-sm text-accent hover:underline">{t('overview.details')}</Link>}>
         {cashflow.isPending ? <Spinner /> : (
           <CashflowChart
@@ -86,6 +89,20 @@ export function OverviewPage() {
         )}
       </Card>
     </>
+  )
+}
+
+/** The first savings goals, compact; hidden while the user has none. */
+function GoalsCard() {
+  const { t } = useI18n()
+  const goals = useGoals().data ?? []
+  if (goals.length === 0) return null
+  return (
+    <Card title={t('nav.goals')} className="mb-4" actions={<Link to="/obiettivi" className="text-sm text-accent hover:underline">{t('overview.details')}</Link>}>
+      <ul className="flex flex-col gap-4">
+        {goals.slice(0, 4).map((goal) => <li key={goal.id}><GoalProgress goal={goal} compact /></li>)}
+      </ul>
+    </Card>
   )
 }
 

@@ -46,6 +46,11 @@ public final class PositionHistory {
         return currency;
     }
 
+    /** Date of the first snapshot, empty for a position without any. */
+    public Optional<LocalDate> firstDate() {
+        return snapshots.isEmpty() ? Optional.empty() : Optional.of(snapshots.firstKey());
+    }
+
     /**
      * @return the snapshot in effect on {@code date}, or empty if the position did not exist yet
      */
