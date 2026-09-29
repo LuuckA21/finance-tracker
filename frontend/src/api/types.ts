@@ -238,6 +238,17 @@ export interface CashflowYear {
   transfers: { destination: AssetClass | null; amount: number; share: number | null }[]
   /** Income or expenses of each tag, largest first; an entry with several tags counts for each */
   tags: { tagId: number; name: string; kind: CategoryKind; amount: number; share: number | null; entryCount: number }[]
+  /**
+   * Categories × tags, one per kind with tagged entries: a row per category (largest first), a column
+   * per tag of `tagIds` (the largest; `tags` keyed by id), then the other tags and no tag
+   */
+  tagMatrices: {
+    kind: CategoryKind
+    tagIds: number[]
+    rows: { categoryId: number; tags: Record<string, number>; otherTags: number; untagged: number; total: number }[]
+    otherTags: number
+    untagged: number
+  }[]
   availableYears: number[]
   unconvertedCurrencies: string[]
 }

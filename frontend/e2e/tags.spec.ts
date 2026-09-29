@@ -50,6 +50,16 @@ test('tags: add them to entries, filter by one, see its totals, rename and delet
   await expect(byTag.first()).toContainText(/Vacanze Sardegna\s*CHF\s?920/)
   await expect(byTag.last()).toContainText(/Famiglia\s*CHF\s?800/)
   await expect(page.getByRole('region', { name: 'Entrate per etichetta' })).toContainText('Nessuna entrata con etichette')
+
+  // Categories × tags: every expense category, the ferry under both of its tags
+  const matrix = page.getByRole('region', { name: 'Categorie × etichette' })
+  await expect(matrix.getByRole('columnheader')).toHaveText(['Categoria', 'Vacanze Sardegna', 'Famiglia', 'Senza etichetta', 'Totale'])
+  await expect(matrix.getByRole('row').filter({ hasText: 'Viaggi' }).getByRole('cell')).toHaveText([/800/, /800/, '—', /800/])
+  await expect(matrix.getByRole('row').filter({ hasText: 'Ristoranti' }).getByRole('cell')).toHaveText([/120/, '—', '—', /120/])
+  await expect(matrix.getByRole('row').filter({ hasText: 'Spesa alimentare' }).getByRole('cell')).toHaveText(['—', '—', /60/, /60/])
+  await expect(matrix.locator('tfoot').getByRole('cell')).toHaveText([/920/, /800/, /60/, /980/])
+  await matrix.getByRole('radio', { name: 'Entrate' }).click()
+  await expect(matrix).toContainText('Nessuna entrata con etichette')
   await page.goto('/movimenti')
 
   // Editing an entry: remove a tag with its chip button

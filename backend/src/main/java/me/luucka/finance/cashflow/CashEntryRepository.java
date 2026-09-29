@@ -33,11 +33,11 @@ public interface CashEntryRepository extends JpaRepository<CashEntry, Long>, Jpa
             from CashEntry e join e.tagIds t where e.userId = :userId""")
     List<TaggedAmount> findTaggedAmounts(Long userId);
 
-    /** Like {@link #findTaggedAmounts}, for the entries between two dates (both included). */
+    /** The tags of the user's entries between two dates (both included), one row per entry and tag. */
     @Query("""
-            select new me.luucka.finance.cashflow.TaggedAmount(t, e.date, e.kind, e.categoryId, e.amount, e.currency)
+            select new me.luucka.finance.cashflow.EntryTag(e.id, t)
             from CashEntry e join e.tagIds t where e.userId = :userId and e.date between :from and :to""")
-    List<TaggedAmount> findTaggedAmountsBetween(Long userId, LocalDate from, LocalDate to);
+    List<EntryTag> findEntryTagsBetween(Long userId, LocalDate from, LocalDate to);
 
     @Query("select distinct year(e.date) from CashEntry e where e.userId = :userId order by year(e.date)")
     List<Integer> findYearsWithEntries(Long userId);
