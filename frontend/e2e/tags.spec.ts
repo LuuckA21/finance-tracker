@@ -43,6 +43,15 @@ test('tags: add them to entries, filter by one, see its totals, rename and delet
   await page.getByLabel('Etichette', { exact: true }).selectOption({ label: 'Tutte le etichette' })
   await expect(rows).toHaveCount(3)
 
+  // Income and expenses of the year, by tag: the ferry counts for both of its tags
+  await page.goto('/flussi')
+  const byTag = page.getByRole('region', { name: 'Uscite per etichetta' }).getByRole('listitem')
+  await expect(byTag).toHaveCount(2)
+  await expect(byTag.first()).toContainText(/Vacanze Sardegna\s*CHF\s?920/)
+  await expect(byTag.last()).toContainText(/Famiglia\s*CHF\s?800/)
+  await expect(page.getByRole('region', { name: 'Entrate per etichetta' })).toContainText('Nessuna entrata con etichette')
+  await page.goto('/movimenti')
+
   // Editing an entry: remove a tag with its chip button
   await rows.filter({ hasText: 'Traghetto' }).getByRole('button', { name: 'Modifica' }).click()
   const dialog = page.locator('dialog[open]')
