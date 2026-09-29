@@ -16,25 +16,37 @@ import {
   Users,
   Wallet,
   X,
+  type LucideIcon,
 } from 'lucide-react'
 import { useMe } from '../api/hooks'
 import { useLogout } from '../auth/useLogout'
-import { useI18n } from '../i18n'
+import { useI18n, type MessageKey } from '../i18n'
 import { Spinner } from './ui'
 
-const NAV = [
-  { to: '/', label: 'nav.overview', icon: LayoutDashboard, end: true },
-  { to: '/movimenti', label: 'nav.entries', icon: ArrowLeftRight },
-  { to: '/ricorrenti', label: 'nav.recurring', icon: Repeat },
-  { to: '/flussi', label: 'nav.cashflow', icon: BarChart3 },
-  { to: '/riepilogo', label: 'nav.report', icon: FileText },
-  { to: '/budget', label: 'nav.budget', icon: Target },
-  { to: '/obiettivi', label: 'nav.goals', icon: Flag },
-  { to: '/patrimonio', label: 'nav.netWorth', icon: PiggyBank },
-  { to: '/posizioni', label: 'nav.positions', icon: Wallet },
-  { to: '/aggiorna', label: 'nav.bulkUpdate', icon: RefreshCw },
-  { to: '/impostazioni', label: 'nav.settings', icon: Settings },
+/**
+ * The menu in groups, each from recording to analysing: the overview; cash flow (entries,
+ * recurring ones, budgets, income & expenses); net worth (positions, updating their values, goals,
+ * net worth over time); the annual report across both; settings.
+ */
+const NAV_GROUPS = [
+  [{ to: '/', label: 'nav.overview', icon: LayoutDashboard, end: true }],
+  [
+    { to: '/movimenti', label: 'nav.entries', icon: ArrowLeftRight },
+    { to: '/ricorrenti', label: 'nav.recurring', icon: Repeat },
+    { to: '/budget', label: 'nav.budget', icon: Target },
+    { to: '/flussi', label: 'nav.cashflow', icon: BarChart3 },
+  ],
+  [
+    { to: '/posizioni', label: 'nav.positions', icon: Wallet },
+    { to: '/aggiorna', label: 'nav.bulkUpdate', icon: RefreshCw },
+    { to: '/obiettivi', label: 'nav.goals', icon: Flag },
+    { to: '/patrimonio', label: 'nav.netWorth', icon: PiggyBank },
+  ],
+  [{ to: '/riepilogo', label: 'nav.report', icon: FileText }],
+  [{ to: '/impostazioni', label: 'nav.settings', icon: Settings }],
 ] as const
+
+type NavItem = { to: string; label: MessageKey; icon: LucideIcon; end?: boolean }
 
 export function Layout() {
   const me = useMe().data
@@ -42,28 +54,32 @@ export function Layout() {
   const [open, setOpen] = useState(false)
   const { t } = useI18n()
 
-  const items = me?.role === 'ADMIN'
-    ? [...NAV, { to: '/admin/utenti', label: 'nav.users', icon: Users } as const]
-    : NAV
+  // Administrators also manage the users, next to the settings
+  const groups: readonly (readonly NavItem[])[] = me?.role === 'ADMIN'
+    ? [...NAV_GROUPS.slice(0, -1), [...NAV_GROUPS[NAV_GROUPS.length - 1], { to: '/admin/utenti', label: 'nav.users', icon: Users }]]
+    : NAV_GROUPS
 
   const nav = (
     <nav className="flex flex-col gap-0.5" aria-label={t('nav.main')}>
-      {items.map(({ to, label, icon: Icon, ...rest }) => (
-        <NavLink
-          key={to}
-          to={to}
-          end={'end' in rest}
-          onClick={() => setOpen(false)}
-          className={({ isActive }) =>
-            `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
-              isActive ? 'bg-accent-soft font-medium text-accent' : 'text-ink-2 hover:bg-surface-2 hover:text-ink'
-            }`
-          }
-        >
-          <Icon className="size-4" aria-hidden />
-          {t(label)}
-        </NavLink>
-      ))}
+      {groups.flatMap((group, index) => [
+        ...(index > 0 ? [<hr key={`separator-${index}`} className="mx-3 my-1.5 border-line" aria-hidden />] : []),
+        ...group.map(({ to, label, icon: Icon, end }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={end}
+            onClick={() => setOpen(false)}
+            className={({ isActive }) =>
+              `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
+                isActive ? 'bg-accent-soft font-medium text-accent' : 'text-ink-2 hover:bg-surface-2 hover:text-ink'
+              }`
+            }
+          >
+            <Icon className="size-4" aria-hidden />
+            {t(label)}
+          </NavLink>
+        )),
+      ])}
     </nav>
   )
 
@@ -85,7 +101,7 @@ export function Layout() {
     <div className="min-h-dvh lg:grid lg:grid-cols-[15rem_1fr] print:block">
       {/* Desktop sidebar */}
       <div className="hidden border-r border-line bg-surface lg:block print:hidden">
-        <aside className="sticky top-0 flex h-dvh flex-col justify-between p-3">
+        <aside className="sticky top-0 flex h-dvh flex-col justify-between gap-3 overflow-y-auto p-3">
           <div>
             <Brand />
             {nav}
