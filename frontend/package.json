@@ -23,7 +23,7 @@
     "recharts": "^3.10.1"
   },
   "devDependencies": {
-    "@playwright/test": "1.56.1",
+    "@playwright/test": "1.63.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "22.20.4",
     "@types/qrcode": "^1.5.6",
