@@ -24,11 +24,20 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: JDK version of the production image
+        id: java
+        run: ../scripts/java-version.sh Dockerfile >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: '25'
+          java-version: ${{ steps.java.outputs.version }}
           cache: maven
+
+      - name: Check the JDK installed
+        env:
+          RUNTIME: ${{ steps.java.outputs.runtime }}
+        run: java -version 2>&1 | grep -F "(build $RUNTIME"
 
       # Integration tests start PostgreSQL with Testcontainers on the runner's Docker
       - name: Test
@@ -110,11 +119,20 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: JDK version of the production image
+        id: java
+        run: scripts/java-version.sh backend/Dockerfile >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: '25'
+          java-version: ${{ steps.java.outputs.version }}
           cache: maven
+
+      - name: Check the JDK installed
+        env:
+          RUNTIME: ${{ steps.java.outputs.runtime }}
+        run: java -version 2>&1 | grep -F "(build $RUNTIME"
 
       - name: Node version of the production build
         id: node
