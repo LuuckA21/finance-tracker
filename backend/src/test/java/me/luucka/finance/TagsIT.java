@@ -111,6 +111,40 @@ class TagsIT {
     }
 
     @Test
+    void theYearsCashFlowSplitsByTag() throws Exception {
+        ApiClient client = login(testUsers.create("tags-cashflow", Role.USER));
+        long restaurants = category(client, "Ristoranti");
+        long travel = category(client, "Viaggi");
+        long salary = category(client, "Stipendio");
+        entry(client, "2026-07-10", "EXPENSE", travel, 800, "Traghetto", "[\"Vacanze\",\"Famiglia\"]");
+        entry(client, "2026-07-12", "EXPENSE", restaurants, 120, "Cena", "[\"Vacanze\"]");
+        entry(client, "2026-07-15", "EXPENSE", restaurants, 80, "Pizza", "[]");
+        entry(client, "2026-07-25", "INCOME", salary, 6000, "Stipendio", "[\"Famiglia\"]");
+        // Another year and transfers stay out
+        entry(client, "2025-12-30", "EXPENSE", restaurants, 500, "Capodanno", "[\"Vacanze\"]");
+        String account = json(client.post("/api/positions", """
+                {"name":"Conto","assetClass":"CASH","currency":"CHF"}"""), "$.id").toString();
+        client.post("/api/cash-entries", """
+                {"date":"2026-07-26","kind":"TRANSFER","amount":1000,"currency":"CHF","fromPositionId":%s,
+                 "tags":["Vacanze"]}""".formatted(account));
+
+        MvcResult year = client.get("/api/dashboard/cashflow?year=2026");
+        List<Map<String, Object>> rows = json(year, "$.tags");
+        // Largest first; an entry with two tags counts for both, so shares go past 100% together
+        assertEquals(List.of("Famiglia/INCOME", "Vacanze/EXPENSE", "Famiglia/EXPENSE"),
+                rows.stream().map(r -> r.get("name") + "/" + r.get("kind")).toList());
+        assertEquals(6000.0, ((Number) rows.get(0).get("amount")).doubleValue());
+        assertEquals(100.0, ((Number) rows.get(0).get("share")).doubleValue());
+        assertEquals(920.0, ((Number) rows.get(1).get("amount")).doubleValue());
+        assertEquals(92.0, ((Number) rows.get(1).get("share")).doubleValue());
+        assertEquals(2, rows.get(1).get("entryCount"));
+        assertEquals(80.0, ((Number) rows.get(2).get("share")).doubleValue());
+        assertEquals((int) tagId(client, "Vacanze"), rows.get(1).get("tagId"));
+
+        assertEquals(List.of(), json(client.get("/api/dashboard/cashflow?year=2024"), "$.tags"));
+    }
+
+    @Test
     void badTagsAreRefused() throws Exception {
         ApiClient client = login(testUsers.create("tags-bad", Role.USER));
         long food = category(client, "Spesa alimentare");

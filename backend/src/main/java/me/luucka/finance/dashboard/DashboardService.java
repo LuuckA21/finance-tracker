@@ -6,8 +6,11 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.function.Function;
@@ -15,10 +18,13 @@ import java.util.stream.Collectors;
 
 import me.luucka.finance.cashflow.CashEntry;
 import me.luucka.finance.cashflow.CashEntryRepository;
+import me.luucka.finance.cashflow.TaggedAmount;
 import me.luucka.finance.category.Category;
 import me.luucka.finance.category.CategoryRepository;
 import me.luucka.finance.core.AssetClass;
 import me.luucka.finance.core.EntryKind;
+import me.luucka.finance.core.Money;
+import me.luucka.finance.core.TagNames;
 import me.luucka.finance.core.cashflow.CashflowCalculator;
 import me.luucka.finance.core.cashflow.CashflowEntry;
 import me.luucka.finance.core.cashflow.CashflowTotals;
@@ -32,6 +38,7 @@ import me.luucka.finance.position.AssetPosition;
 import me.luucka.finance.position.AssetPositionRepository;
 import me.luucka.finance.position.PositionSnapshot;
 import me.luucka.finance.position.PositionSnapshotRepository;
+import me.luucka.finance.tag.TagService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,8 +66,16 @@ public class DashboardService {
     public record TransferRow(AssetClass destination, BigDecimal amount, BigDecimal share) {
     }
 
+    /**
+     * The income or the expenses of one tag in the year. An entry with several tags counts for each,
+     * so the shares (of the year's income or expenses) can add up to more than 100%.
+     */
+    public record TagRow(long tagId, String name, EntryKind kind, BigDecimal amount, BigDecimal share,
+                         int entryCount) {
+    }
+
     public record CashflowYearResponse(String baseCurrency, int year, List<MonthRow> months, CashflowTotals totals,
-                                       List<CategoryRow> categories, List<TransferRow> transfers,
+                                       List<CategoryRow> categories, List<TransferRow> transfers, List<TagRow> tags,
                                        List<Integer> availableYears, SortedSet<String> unconvertedCurrencies) {
     }
 
@@ -95,16 +110,18 @@ public class DashboardService {
     private final CategoryRepository categories;
     private final AssetPositionRepository positions;
     private final PositionSnapshotRepository snapshots;
+    private final TagService tags;
     private final FxService fxService;
     private final Clock clock;
 
     public DashboardService(CashEntryRepository entries, CategoryRepository categories,
                             AssetPositionRepository positions, PositionSnapshotRepository snapshots,
-                            FxService fxService, Clock clock) {
+                            TagService tags, FxService fxService, Clock clock) {
         this.entries = entries;
         this.categories = categories;
         this.positions = positions;
         this.snapshots = snapshots;
+        this.tags = tags;
         this.fxService = fxService;
         this.clock = clock;
     }
@@ -146,8 +163,44 @@ public class DashboardService {
             years.add(currentYear);
         }
         years.sort(null);
-        return new CashflowYearResponse(fx.baseCurrency(), year, months, result.totals(), rows, transfers, years,
-                result.unconvertedCurrencies());
+        return new CashflowYearResponse(fx.baseCurrency(), year, months, result.totals(), rows, transfers,
+                tagRows(userId, year, fx, result.totals()), years, result.unconvertedCurrencies());
+    }
+
+    /** Income and expenses of each tag in the year, largest first; transfers stay out, as in the totals. */
+    private List<TagRow> tagRows(long userId, int year, FxTable fx, CashflowTotals totals) {
+        record Key(long tagId, EntryKind kind) {
+        }
+        final class Sum {
+            BigDecimal amount = BigDecimal.ZERO;
+            int count;
+        }
+        Map<Key, Sum> sums = new HashMap<>();
+        for (TaggedAmount row : entries.findTaggedAmountsBetween(userId, LocalDate.of(year, 1, 1),
+                LocalDate.of(year, 12, 31))) {
+            if (row.kind() == EntryKind.TRANSFER) {
+                continue;
+            }
+            // Without a rate the entry is left out of the totals too (its currency is reported there)
+            Optional<BigDecimal> value = fx.toBase(row.amount(), row.currency(), row.date());
+            if (value.isPresent()) {
+                Sum sum = sums.computeIfAbsent(new Key(row.tagId(), row.kind()), k -> new Sum());
+                sum.amount = sum.amount.add(value.get(), Money.CONTEXT);
+                sum.count++;
+            }
+        }
+        Map<Long, String> names = tags.names(userId);
+        return sums.entrySet().stream()
+                .filter(e -> names.containsKey(e.getKey().tagId()))
+                .map(e -> {
+                    BigDecimal amount = Money.round(e.getValue().amount);
+                    BigDecimal total = e.getKey().kind() == EntryKind.INCOME ? totals.income() : totals.expense();
+                    return new TagRow(e.getKey().tagId(), names.get(e.getKey().tagId()), e.getKey().kind(), amount,
+                            percentage(amount, total), e.getValue().count);
+                })
+                .sorted(Comparator.comparing(TagRow::amount).reversed()
+                        .thenComparing(r -> TagNames.key(r.name())))
+                .toList();
     }
 
     public CashflowYearsResponse cashflowYears(long userId) {

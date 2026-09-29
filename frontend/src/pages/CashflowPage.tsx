@@ -6,7 +6,7 @@ import { RankedBars } from '../charts/ChartParts'
 import { useI18n } from '../i18n'
 import { assetClassLabel, money, monthName, monthShort, percent } from '../lib/format'
 import { assetClassColor, useChartTheme } from '../charts/theme'
-import type { CashflowTotals } from '../api/types'
+import type { CashflowTotals, CashflowYear } from '../api/types'
 
 export function CashflowPage() {
   const [year, setYear] = useState(() => new Date().getFullYear())
@@ -72,6 +72,18 @@ export function CashflowPage() {
               </Card>
             </div>
 
+            {data.data.tags.length > 0 && (
+              <div className="mb-4 grid gap-4 lg:grid-cols-2">
+                <Card title={t('cashflow.expenseByTag')}>
+                  <TagBars rows={data.data.tags} kind="EXPENSE" currency={currency} emptyText={t('cashflow.noTaggedExpenses')} />
+                </Card>
+                <Card title={t('cashflow.incomeByTag')}>
+                  <TagBars rows={data.data.tags} kind="INCOME" currency={currency} emptyText={t('cashflow.noTaggedIncome')} />
+                </Card>
+                <p className="text-xs text-muted lg:col-span-2">{t('cashflow.tagsHelp')}</p>
+              </div>
+            )}
+
             {data.data.transfers.length > 0 && (
               <Card title={t('cashflow.transfersByDestination')} className="mb-4">
                 <p className="mb-3 text-xs text-muted">{t('cashflow.transfersHelp')}</p>
@@ -105,6 +117,18 @@ export function CashflowPage() {
         </>
       )}
     </>
+  )
+}
+
+function TagBars({ rows, kind, currency, emptyText }: {
+  rows: CashflowYear['tags']
+  kind: CashflowYear['tags'][number]['kind']
+  currency: string
+  emptyText: string
+}) {
+  return (
+    <RankedBars currency={currency} emptyText={emptyText}
+      rows={rows.filter((r) => r.kind === kind).map((r) => ({ key: String(r.tagId), label: r.name, value: r.amount, share: r.share }))} />
   )
 }
 

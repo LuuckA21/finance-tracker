@@ -236,6 +236,8 @@ export interface CashflowYear {
   }[]
   /** Transfers by asset class of the destination; null when no destination was given */
   transfers: { destination: AssetClass | null; amount: number; share: number | null }[]
+  /** Income or expenses of each tag, largest first; an entry with several tags counts for each */
+  tags: { tagId: number; name: string; kind: CategoryKind; amount: number; share: number | null; entryCount: number }[]
   availableYears: number[]
   unconvertedCurrencies: string[]
 }
