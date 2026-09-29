@@ -34,6 +34,11 @@ test('tags: add them to entries, filter by one, see its totals, rename and delet
   const summary = page.getByRole('status').filter({ hasText: 'Vacanze Sardegna' })
   await expect(summary).toContainText('Movimenti: 2')
   await expect(summary).toContainText(/Uscite: CHF\s?920/)
+  // ...split by category, largest first
+  const byCategory = summary.getByRole('list', { name: 'Per categoria' }).getByRole('listitem')
+  await expect(byCategory).toHaveCount(2)
+  await expect(byCategory.first()).toContainText(/Viaggi\s*− CHF\s?800/)
+  await expect(byCategory.last()).toContainText(/Ristoranti\s*− CHF\s?120/)
   await expect(page.getByLabel('Etichette', { exact: true })).toHaveValue(/\d+/)
   await page.getByLabel('Etichette', { exact: true }).selectOption({ label: 'Tutte le etichette' })
   await expect(rows).toHaveCount(3)
@@ -61,4 +66,24 @@ test('tags: add them to entries, filter by one, see its totals, rename and delet
   // The entries show the new name
   await page.goto('/movimenti')
   await expect(page.locator('tbody tr').filter({ hasText: 'Cena al porto' }).getByRole('button', { name: 'Sardegna 2026' })).toBeVisible()
+})
+
+test('tags: a recurring rule passes its tags to the entries it creates', async ({ signedIn: page }) => {
+  await page.goto('/ricorrenti')
+  await page.getByRole('button', { name: 'Nuova ricorrenza' }).click()
+  const dialog = page.locator('dialog[open]')
+  await dialog.getByLabel('Descrizione (facoltativa)').fill('Abbonamento palestra')
+  await dialog.getByLabel('Categoria').selectOption({ label: 'Svago' })
+  await dialog.getByLabel('Importo').fill('70')
+  const input = dialog.getByLabel('Etichette')
+  await input.fill('Salute')
+  await input.press('Enter')
+  await dialog.getByRole('button', { name: 'Salva', exact: true }).click()
+  await expect(dialog).toBeHidden()
+  // Starting today: the first entry is created straight away
+  await expect(page.locator('tbody tr').filter({ hasText: 'Abbonamento palestra' })).toContainText('Salute')
+
+  await page.goto('/movimenti')
+  const entry = page.locator('tbody tr').filter({ hasText: 'Abbonamento palestra' })
+  await expect(entry.getByRole('button', { name: 'Salute' })).toBeVisible()
 })

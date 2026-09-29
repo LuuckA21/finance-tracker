@@ -47,11 +47,14 @@ public class RecurringEntryController {
             Boolean active,
             // Transfers only, both optional
             Long fromPositionId,
-            Long toPositionId) {
+            Long toPositionId,
+            // Names; unknown ones become new tags of the user (rules checked by the service)
+            @Size(max = 50) List<@NotNull @Size(max = 100) String> tags) {
 
         RecurringEntryService.RuleData toData() {
             return new RecurringEntryService.RuleData(kind, categoryId, amount, currency, description, frequency,
-                    startDate, endDate, !Boolean.FALSE.equals(active), fromPositionId, toPositionId);
+                    startDate, endDate, !Boolean.FALSE.equals(active), fromPositionId, toPositionId,
+                    tags == null ? List.of() : tags);
         }
     }
 

@@ -51,6 +51,7 @@ class TagsIT {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void entriesCarryTagsThatFilterAndAddUp() throws Exception {
         ApiClient client = login(testUsers.create("tags", Role.USER));
         long restaurants = category(client, "Ristoranti");
@@ -76,6 +77,11 @@ class TagsIT {
         assertEquals(0.0, ((Number) holidays.get("income")).doubleValue());
         assertEquals("2026-07-10", holidays.get("firstDate"));
         assertEquals("2026-07-12", holidays.get("lastDate"));
+        // Split by category, largest first
+        List<Map<String, Object>> byCategory = (List<Map<String, Object>>) holidays.get("categories");
+        assertEquals(List.of((int) travel, (int) restaurants), byCategory.stream().map(c -> c.get("categoryId")).toList());
+        assertEquals(800.0, ((Number) byCategory.get(0).get("amount")).doubleValue());
+        assertEquals("EXPENSE", byCategory.get(1).get("kind"));
 
         long holidaysId = tagId(client, "Vacanze Sardegna");
         List<String> filtered = json(client.get("/api/cash-entries?tagId=" + holidaysId), "$.content[*].description");

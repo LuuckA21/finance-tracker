@@ -2,6 +2,7 @@ package me.luucka.finance;
 
 import static me.luucka.finance.support.ApiClient.json;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.time.LocalDate;
@@ -68,6 +69,35 @@ class RecurringEntriesIT {
         // Running the scheduler again creates nothing new
         scheduler.generateAll();
         assertEquals(5, entryDates(client).size());
+    }
+
+    @Test
+    void entriesGetTheRuleTagsAndKeepThemWhenTheRuleChanges() throws Exception {
+        ApiClient client = loggedIn();
+        int category = categoryId(client, "EXPENSE");
+        MvcResult rule = client.post("/api/recurring-entries", """
+                {"kind":"EXPENSE","categoryId":%d,"amount":100,"currency":"CHF","description":"Palestra",
+                 "frequency":"DAILY","startDate":"%s","tags":["Salute"," casa "]}""".formatted(category, today.minusDays(2)));
+        assertEquals(201, rule.getResponse().getStatus());
+        assertEquals(List.of("casa", "Salute"), json(rule, "$.tags"));
+        List<List<String>> tags = json(client.get("/api/cash-entries?size=200"), "$.content[?(@.recurringEntryId != null)].tags");
+        assertEquals(3, tags.size());
+        assertTrue(tags.stream().allMatch(t -> t.equals(List.of("casa", "Salute"))), tags.toString());
+
+        // New tags on the rule apply to the next entries only
+        long id = ((Number) json(rule, "$.id")).longValue();
+        MvcResult edited = client.put("/api/recurring-entries/" + id, """
+                {"kind":"EXPENSE","categoryId":%d,"amount":100,"currency":"CHF","description":"Palestra",
+                 "frequency":"DAILY","startDate":"%s","tags":["Sport"]}""".formatted(category, today.minusDays(2)));
+        assertEquals(List.of("Sport"), json(edited, "$.tags"));
+        assertEquals(List.of("Sport"), json(client.get("/api/recurring-entries"), "$[0].tags"));
+        tags = json(client.get("/api/cash-entries?size=200"), "$.content[?(@.recurringEntryId != null)].tags");
+        assertTrue(tags.stream().allMatch(t -> t.equals(List.of("casa", "Salute"))), tags.toString());
+
+        // Deleting a tag removes it from the rule too
+        List<Integer> sport = json(client.get("/api/tags"), "$.tags[?(@.name == 'Sport')].id");
+        assertEquals(204, client.delete("/api/tags/" + sport.getFirst()).getResponse().getStatus());
+        assertEquals(List.of(), json(client.get("/api/recurring-entries"), "$[0].tags"));
     }
 
     @Test

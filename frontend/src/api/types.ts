@@ -75,6 +75,8 @@ export interface RecurringEntry {
   lastGenerated: string | null
   /** Null when paused or past the end date */
   nextDate: string | null
+  /** Copied to every entry the rule creates */
+  tags: string[]
 }
 
 export interface Budget {
@@ -356,6 +358,14 @@ export interface TagSummary {
   /** Null for a tag without entries */
   firstDate: string | null
   lastDate: string | null
+  /** Amounts per category in the base currency, largest first (transfers have none) */
+  categories: TagCategoryAmount[]
+}
+
+export interface TagCategoryAmount {
+  categoryId: number
+  kind: EntryKind
+  amount: number
 }
 
 export interface Tags {
