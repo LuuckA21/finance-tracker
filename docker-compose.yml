@@ -40,6 +40,14 @@ services:
       SESSION_MAX_LIFETIME: ${SESSION_MAX_LIFETIME:-7d}
       # Daily ECB exchange rates (outbound HTTPS to www.ecb.europa.eu)
       APP_ECB_ENABLED: ${APP_ECB_ENABLED:-true}
+      # Email notifications: off while MAIL_HOST is empty (outbound SMTP to MAIL_HOST:MAIL_PORT)
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_SECURITY: ${MAIL_SECURITY:-STARTTLS}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
     networks: [internal]
     read_only: true
     tmpfs: [/tmp]

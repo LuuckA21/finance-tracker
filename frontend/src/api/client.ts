@@ -140,7 +140,7 @@ export const get = <T>(url: string) => api<T>('GET', url)
 export const post = <T>(url: string, body?: unknown) => api<T>('POST', url, body ?? {})
 export const put = <T>(url: string, body: unknown) => api<T>('PUT', url, body)
 export const patch = <T>(url: string, body: unknown) => api<T>('PATCH', url, body)
-export const del = (url: string) => api<void>('DELETE', url)
+export const del = <T = void>(url: string) => api<T>('DELETE', url)
 export const upload = <T>(url: string, form: FormData) => api<T>('POST', url, form)
 
 /**

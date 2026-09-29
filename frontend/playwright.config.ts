@@ -5,8 +5,9 @@ import { defineConfig, devices } from '@playwright/test'
  * against a real backend and PostgreSQL. Every test creates its own user through the admin API,
  * so the suite also runs against a database that already has data.
  *
- * Needs the backend on :8080 (started here from backend/target when nothing listens there) and the
- * bootstrap administrator's credentials in E2E_ADMIN_USERNAME / E2E_ADMIN_PASSWORD.
+ * Needs the backend on :8080 (started here from backend/target when nothing listens there, sending its
+ * email to the SMTP sink on :2525) and the bootstrap administrator's credentials in
+ * E2E_ADMIN_USERNAME / E2E_ADMIN_PASSWORD.
  */
 const CI = !!process.env.CI
 
@@ -30,7 +31,15 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
     {
+      // Receives the notification emails (e2e/mail.ts reads them)
+      command: 'node e2e/smtp-sink.mjs',
+      port: 2525,
+      reuseExistingServer: !CI,
+      timeout: 10_000,
+    },
+    {
       command: 'sh -c "java -jar ../backend/target/finance-tracker-*.jar"',
+      env: { MAIL_HOST: '127.0.0.1', MAIL_PORT: '2525', MAIL_SECURITY: 'NONE', MAIL_FROM: 'Finanze <e2e@example.test>' },
       url: 'http://localhost:8080/actuator/health',
       reuseExistingServer: true,
       timeout: 120_000,

@@ -16,6 +16,7 @@ const PAGES = [
   { path: '/impostazioni', heading: 'Impostazioni' },
   { path: '/impostazioni/categorie', heading: 'Impostazioni' },
   { path: '/impostazioni/cambi', heading: 'Impostazioni' },
+  { path: '/impostazioni/notifiche', heading: 'Impostazioni' },
 ]
 
 test('every page fits a 360 px phone screen', async ({ signedIn: page }) => {
