@@ -9,6 +9,8 @@ import type {
   CashflowYears,
   Category,
   BudgetStatus,
+  Goal,
+  GoalKind,
   CategoryKind,
   EntryKind,
   CentralRates,
@@ -30,7 +32,7 @@ import type { Language } from '../i18n'
 import type { Theme } from '../preferences/theme'
 
 // Every mutation that changes financial data invalidates the dashboards too.
-const FINANCE_KEYS = [['entries'], ['dashboard'], ['positions'], ['fx'], ['budgets']] as const
+const FINANCE_KEYS = [['entries'], ['dashboard'], ['positions'], ['fx'], ['budgets'], ['goals']] as const
 
 function useInvalidate() {
   const qc = useQueryClient()
@@ -365,6 +367,36 @@ export function useDeleteBudget() {
   return useMutation({
     mutationFn: (categoryId: number) => del(`/api/budgets/${categoryId}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['budgets'] }),
+  })
+}
+
+// ---------------------------------------------------------------- goals
+
+export const useGoals = () => useQuery({ queryKey: ['goals'], queryFn: () => get<Goal[]>('/api/goals') })
+
+export interface GoalInput {
+  id?: number
+  name: string
+  kind: GoalKind
+  targetAmount: number
+  currency: string
+  targetDate: string | null
+  positionIds: number[]
+}
+
+export function useSaveGoal() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...body }: GoalInput) => (id ? put<Goal>(`/api/goals/${id}`, body) : post<Goal>('/api/goals', body)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['goals'] }),
+  })
+}
+
+export function useDeleteGoal() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => del(`/api/goals/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['goals'] }),
   })
 }
 

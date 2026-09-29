@@ -8,6 +8,7 @@ const PAGES = [
   { path: '/ricorrenti', heading: 'Movimenti ricorrenti' },
   { path: '/flussi', heading: 'Entrate e uscite' },
   { path: '/budget', heading: 'Budget' },
+  { path: '/obiettivi', heading: 'Obiettivi di risparmio' },
   { path: '/patrimonio', heading: 'Patrimonio' },
   { path: '/posizioni', heading: 'Posizioni' },
   { path: '/aggiorna', heading: 'Aggiorna valori' },
@@ -36,6 +37,10 @@ test('every page fits a 360 px phone screen', async ({ signedIn: page }) => {
     description: 'Affitto', frequency: 'MONTHLY', startDate: today(), endDate: null, active: true,
   })
   await apiOk(request, 'PUT', `/api/budgets/${id('Spesa alimentare')}`, { amount: 600, currency: 'CHF' })
+  await apiOk(request, 'POST', '/api/goals', {
+    name: 'Fondo emergenza con un nome piuttosto lungo', kind: 'BALANCE', targetAmount: 30000, currency: 'CHF',
+    targetDate: null, positionIds: [position.id],
+  })
 
   for (const { path, heading } of PAGES) {
     await page.goto(path)

@@ -13,6 +13,8 @@ import me.luucka.finance.common.ApiException;
 import me.luucka.finance.core.AssetClass;
 import me.luucka.finance.core.Currencies;
 import me.luucka.finance.core.Money;
+import me.luucka.finance.core.valuation.PositionHistory;
+import me.luucka.finance.core.valuation.ValuationSnapshot;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,6 +62,30 @@ public class PositionService {
         return positions.findByUserIdOrderByArchivedAscNameAsc(userId).stream()
                 .map(p -> PositionResponse.of(p, latest.get(p.getId())))
                 .toList();
+    }
+
+    /** Snapshot history of every position of the user, for valuations at any date. */
+    @Transactional(readOnly = true)
+    public List<PositionHistory> histories(long userId) {
+        Map<Long, List<ValuationSnapshot>> grouped = snapshots.findByUserId(userId).stream()
+                .collect(Collectors.groupingBy(PositionSnapshot::getPositionId,
+                        Collectors.mapping(PositionSnapshot::toValuation, Collectors.toList())));
+        return positions.findByUserIdOrderByArchivedAscNameAsc(userId).stream()
+                .map(p -> new PositionHistory(p.getId(), p.getAssetClass(), p.getCurrency(),
+                        grouped.getOrDefault(p.getId(), List.of())))
+                .toList();
+    }
+
+    /** Ids of the user's own positions among {@code ids}; throws 404 when one is not theirs. */
+    @Transactional(readOnly = true)
+    public Set<Long> requireOwned(long userId, Set<Long> ids) {
+        Set<Long> owned = positions.findByUserIdOrderByArchivedAscNameAsc(userId).stream()
+                .map(AssetPosition::getId)
+                .collect(Collectors.toSet());
+        if (!owned.containsAll(ids)) {
+            throw ApiException.notFound("Position");
+        }
+        return Set.copyOf(ids);
     }
 
     @Transactional(readOnly = true)

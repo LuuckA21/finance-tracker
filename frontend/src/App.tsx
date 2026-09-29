@@ -8,6 +8,7 @@ import { Layout } from './components/Layout'
 const OverviewPage = lazy(() => import('./pages/OverviewPage').then((m) => ({ default: m.OverviewPage })))
 const EntriesPage = lazy(() => import('./pages/EntriesPage').then((m) => ({ default: m.EntriesPage })))
 const RecurringPage = lazy(() => import('./pages/RecurringPage').then((m) => ({ default: m.RecurringPage })))
+const GoalsPage = lazy(() => import('./pages/GoalsPage').then((m) => ({ default: m.GoalsPage })))
 const BudgetPage = lazy(() => import('./pages/BudgetPage').then((m) => ({ default: m.BudgetPage })))
 const CashflowPage = lazy(() => import('./pages/CashflowPage').then((m) => ({ default: m.CashflowPage })))
 const NetWorthPage = lazy(() => import('./pages/NetWorthPage').then((m) => ({ default: m.NetWorthPage })))
@@ -34,6 +35,7 @@ export function App() {
           <Route path="ricorrenti" element={<RecurringPage />} />
           <Route path="flussi" element={<CashflowPage />} />
           <Route path="budget" element={<BudgetPage />} />
+          <Route path="obiettivi" element={<GoalsPage />} />
           <Route path="patrimonio" element={<NetWorthPage />} />
           <Route path="posizioni" element={<PositionsPage />} />
           <Route path="posizioni/:id" element={<PositionDetailPage />} />
