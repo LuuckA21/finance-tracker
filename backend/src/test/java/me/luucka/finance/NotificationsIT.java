@@ -193,6 +193,37 @@ class NotificationsIT {
     }
 
     @Test
+    void wrongCodesSentAllAtOnceStillCountOneByOne() throws Exception {
+        ApiClient client = login(testUsers.create("mail-race", Role.USER));
+        client.post("/api/account/notifications/email", "{\"email\":\"race@example.test\"}");
+        Matcher code = CODE.matcher(text(received()[0]));
+        assertTrue(code.find());
+        String right = code.group(1);
+        String wrong = right.equals("000000") ? "111111" : "000000";
+        // Many guesses in parallel: without locking they would all read "0 attempts so far"
+        int guesses = 24;
+        java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+        try (var pool = java.util.concurrent.Executors.newFixedThreadPool(guesses)) {
+            List<java.util.concurrent.Future<Integer>> results = new java.util.ArrayList<>();
+            for (int i = 0; i < guesses; i++) {
+                results.add(pool.submit(() -> {
+                    start.await();
+                    return client.post("/api/account/notifications/email/confirm", "{\"code\":\"" + wrong + "\"}")
+                            .getResponse().getStatus();
+                }));
+            }
+            start.countDown();
+            for (var result : results) {
+                assertEquals(400, result.get());
+            }
+        }
+        // Five wrong codes end the confirmation: the right one no longer works
+        MvcResult late = client.post("/api/account/notifications/email/confirm", "{\"code\":\"" + right + "\"}");
+        assertEquals(400, late.getResponse().getStatus());
+        assertNull(json(client.get("/api/account/notifications"), "$.email"));
+    }
+
+    @Test
     void alertsGoOutOnceAndOnlyForWhatHappensAfterSwitchingOn() throws Exception {
         AppUser user = testUsers.create("mail-alerts", Role.USER);
         ApiClient client = login(user);

@@ -205,7 +205,7 @@ public class CashEntryCsvService {
     }
 
     public static ApiException tooLarge() {
-        return new ApiException(HttpStatus.PAYLOAD_TOO_LARGE, "csv_too_large",
+        return new ApiException(HttpStatus.CONTENT_TOO_LARGE, "csv_too_large",
                 "The file is larger than " + MAX_BYTES / 1024 / 1024 + " MB");
     }
 

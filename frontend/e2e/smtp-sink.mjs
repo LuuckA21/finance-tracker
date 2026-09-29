@@ -13,7 +13,9 @@ let count = 0
 
 function save(recipients, message) {
   for (const to of recipients) {
-    fs.writeFileSync(path.join(dir, `${to.toLowerCase()}-${Date.now()}-${count++}.eml`), message)
+    // The address becomes a file name: keep it to harmless characters so it cannot leave the directory
+    const name = to.toLowerCase().replace(/[^a-z0-9@._+-]/g, '_').replace(/^\.+/, '_')
+    fs.writeFileSync(path.join(dir, `${name}-${Date.now()}-${count++}.eml`), message)
   }
 }
 

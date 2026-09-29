@@ -128,10 +128,10 @@ public final class CashflowCalculator {
     /**
      * Computes yearly totals for every year that has at least one entry, oldest first.
      */
-    public static MultiYearResult years(Collection<CashflowEntry> entries, FxTable fx) {
+    public static MultiYearResult years(Collection<DatedAmount> entries, FxTable fx) {
         TreeMap<Integer, BigDecimal[]> perYear = new TreeMap<>();
         SortedSet<String> unconverted = new TreeSet<>();
-        for (CashflowEntry entry : entries) {
+        for (DatedAmount entry : entries) {
             LocalDate date = entry.date();
             BigDecimal[] sums = perYear.computeIfAbsent(date.getYear(), y -> zeros(3));
             Optional<BigDecimal> converted = fx.toBase(entry.amount(), entry.currency(), date);

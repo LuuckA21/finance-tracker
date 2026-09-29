@@ -53,7 +53,7 @@ public class GlobalExceptionHandler {
     /** Upload over spring.servlet.multipart limits (CSV import). */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     ProblemDetail handleUploadSize(MaxUploadSizeExceededException ex) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.PAYLOAD_TOO_LARGE, "The file is too large");
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONTENT_TOO_LARGE, "The file is too large");
         problem.setProperty("code", "csv_too_large");
         return problem;
     }
