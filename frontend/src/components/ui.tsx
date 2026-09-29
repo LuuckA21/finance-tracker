@@ -63,11 +63,12 @@ export function Card({ title, actions, children, className = '' }: {
   children: ReactNode
   className?: string
 }) {
+  const titleId = useId()
   return (
-    <section className={`card p-4 sm:p-5 ${className}`}>
+    <section className={`card p-4 sm:p-5 ${className}`} aria-labelledby={title ? titleId : undefined}>
       {(title || actions) && (
         <header className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          {title && <h2 className="text-sm font-semibold text-ink">{title}</h2>}
+          {title && <h2 id={titleId} className="text-sm font-semibold text-ink">{title}</h2>}
           {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
         </header>
       )}

@@ -7,6 +7,7 @@ const PAGES = [
   { path: '/movimenti', heading: 'Movimenti' },
   { path: '/ricorrenti', heading: 'Movimenti ricorrenti' },
   { path: '/flussi', heading: 'Entrate e uscite' },
+  { path: '/riepilogo', heading: `Riepilogo ${new Date().getFullYear()}` },
   { path: '/budget', heading: 'Budget' },
   { path: '/obiettivi', heading: 'Obiettivi di risparmio' },
   { path: '/patrimonio', heading: 'Patrimonio' },
@@ -26,7 +27,7 @@ test('every page fits a 360 px phone screen', async ({ signedIn: page }) => {
     { name: 'Conto risparmio con un nome piuttosto lungo', symbol: '', assetClass: 'CASH', currency: 'CHF', notes: '', archived: false })
   await apiOk(request, 'POST', `/api/positions/${position.id}/snapshots`, { date: today(), quantity: 1, unitPrice: 12500, note: '' })
   for (const entry of [
-    { kind: 'EXPENSE', categoryId: id('Spesa alimentare'), amount: 84.35, description: 'Spesa settimanale al supermercato' },
+    { kind: 'EXPENSE', categoryId: id('Spesa alimentare'), amount: 84.35, description: 'Spesa settimanale al supermercato', tags: ['Vacanze in montagna'] },
     { kind: 'INCOME', categoryId: id('Stipendio'), amount: 6400, description: 'Stipendio' },
     { kind: 'TRANSFER', categoryId: null, toPositionId: position.id, amount: 500, description: 'Risparmio' },
   ]) {

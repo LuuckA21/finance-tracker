@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tansta
 import { del, get, patch, post, put, upload } from './client'
 import type {
   AdminUser,
+  AnnualReport,
   AssetClass,
   CashEntry,
   CashflowYear,
@@ -429,6 +430,13 @@ export const useCashflowYear = (year: number) =>
   useQuery({
     queryKey: ['dashboard', 'cashflow', year],
     queryFn: () => get<CashflowYear>(`/api/dashboard/cashflow?year=${year}`),
+    placeholderData: keepPreviousData,
+  })
+
+export const useAnnualReport = (year: number) =>
+  useQuery({
+    queryKey: ['dashboard', 'annual', year],
+    queryFn: () => get<AnnualReport>(`/api/reports/annual?year=${year}`),
     placeholderData: keepPreviousData,
   })
 

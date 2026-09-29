@@ -3,6 +3,7 @@ import { NavLink, Outlet } from 'react-router'
 import {
   ArrowLeftRight,
   BarChart3,
+  FileText,
   Flag,
   LayoutDashboard,
   LogOut,
@@ -26,6 +27,7 @@ const NAV = [
   { to: '/movimenti', label: 'nav.entries', icon: ArrowLeftRight },
   { to: '/ricorrenti', label: 'nav.recurring', icon: Repeat },
   { to: '/flussi', label: 'nav.cashflow', icon: BarChart3 },
+  { to: '/riepilogo', label: 'nav.report', icon: FileText },
   { to: '/budget', label: 'nav.budget', icon: Target },
   { to: '/obiettivi', label: 'nav.goals', icon: Flag },
   { to: '/patrimonio', label: 'nav.netWorth', icon: PiggyBank },
@@ -80,9 +82,9 @@ export function Layout() {
   )
 
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-[15rem_1fr]">
+    <div className="min-h-dvh lg:grid lg:grid-cols-[15rem_1fr] print:block">
       {/* Desktop sidebar */}
-      <div className="hidden border-r border-line bg-surface lg:block">
+      <div className="hidden border-r border-line bg-surface lg:block print:hidden">
         <aside className="sticky top-0 flex h-dvh flex-col justify-between p-3">
           <div>
             <Brand />
@@ -93,7 +95,7 @@ export function Layout() {
       </div>
 
       {/* Mobile top bar */}
-      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-line bg-surface px-4 py-2 lg:hidden">
+      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-line bg-surface px-4 py-2 lg:hidden print:hidden">
         <Brand />
         <button type="button" className="rounded-md p-2 text-ink-2" onClick={() => setOpen((v) => !v)}
           aria-label={open ? t('nav.closeMenu') : t('nav.openMenu')} aria-expanded={open}>
@@ -101,13 +103,13 @@ export function Layout() {
         </button>
       </header>
       {open && (
-        <div className="fixed inset-x-0 top-[3.25rem] bottom-0 z-10 flex flex-col justify-between overflow-y-auto bg-surface p-3 lg:hidden">
+        <div className="fixed inset-x-0 top-[3.25rem] bottom-0 z-10 flex flex-col justify-between overflow-y-auto bg-surface p-3 lg:hidden print:hidden">
           {nav}
           {account}
         </div>
       )}
 
-      <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:py-8">
+      <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:py-8 print:max-w-none print:p-0">
         <Suspense fallback={<Spinner />}>
           <Outlet />
         </Suspense>

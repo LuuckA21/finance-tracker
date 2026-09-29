@@ -21,6 +21,11 @@ Self-hosted personal finance app for a small group of users (you and your family
   filter the list, with the totals of each tag (spent, received, transferred, period) and their
   split by category. Recurring rules can carry tags too: every entry they create gets them. Tags
   can be renamed or deleted in the settings, and travel through the CSV export and import.
+- **Annual report** – one calendar year on one page, printable or saved as PDF from the browser:
+  income, expenses, savings and savings rate with monthly averages, each category against the year
+  before (for the current year: against the same period of the year before), net worth on
+  31 December of the year before and at the end of the period by asset class, each position with
+  its net transfers (e.g. pillar 3a contributions), the year's tags and its ten largest expenses.
 - **Savings goals** – either a balance to reach on some positions (an emergency fund, a home
   deposit), optionally by a date, or a yearly amount to put into them (e.g. the pillar 3a
   maximum). Each goal shows its progress, the pace of the last 6 months and the month the target
@@ -52,7 +57,7 @@ Self-hosted personal finance app for a small group of users (you and your family
 | Layer    | Tech |
 |----------|------|
 | Backend  | Java 25, Spring Boot 4.1 (Web MVC, Security 7, Data JPA, Session JDBC), Flyway, PostgreSQL 18 |
-| Frontend | React 19, TypeScript, Vite, TanStack Query, Recharts, Tailwind CSS 4 (UI in Italian and English) |
+| Frontend | React 19, TypeScript, Vite, TanStack Query, Recharts, Tailwind CSS 4 (UI in Italian, English, German and French) |
 | Deploy   | Docker Compose: `db` (Postgres) + `backend` + `web` (Nginx serving the SPA and proxying `/api`) |
 
 ## Project layout
@@ -64,7 +69,7 @@ backend/
     auth/        security config, login + 2FA flow, rate limiting, session revocation
     account/     self-service: password, preferences (base currency, language, theme), 2FA, login history
     admin/       user management (no public sign-up) + bootstrap admin
-    category/ cashflow/ recurring/ position/ fx/ dashboard/ budget/ goal/ tag/
+    category/ cashflow/ recurring/ position/ fx/ dashboard/ budget/ goal/ tag/ report/
   src/main/resources/db/migration/   Flyway migrations
   src/test/java/…/core/              unit tests (no Spring)
   src/test/java/…/*IT.java           integration tests (Testcontainers + MockMvc)
@@ -354,6 +359,7 @@ encrypted with it).
 | Budgets | `GET /api/budgets`, `PUT/DELETE /api/budgets/{categoryId}` (`{amount,currency}`), `GET /api/budgets/status?month=yyyy-MM` |
 | Tags | `GET /api/tags` (with totals in the base currency, also per category), `PUT/DELETE /api/tags/{id}` (`{name}`; deleting keeps the entries) |
 | Goals | `GET/POST /api/goals` (list with progress), `PUT/DELETE /api/goals/{id}` (`{name,kind:BALANCE\|YEARLY,targetAmount,currency,targetDate?,positionIds}`) |
+| Reports | `GET /api/reports/annual?year` (totals and categories against the year before, net worth and positions at the start and end, tags, largest expenses) |
 | Dashboards | `GET /api/dashboard/cashflow?year`, `/cashflow/years`, `/net-worth?granularity=MONTH\|YEAR&from=yyyy-MM&to=yyyy-MM`, `/net-worth/detail?date` |
 | Admin | `GET/POST /api/admin/users`, `PATCH/DELETE /{id}`, `POST /{id}/{reset-password,unlock,reset-mfa}`, `GET /api/admin/fx`, `POST /api/admin/fx/refresh`, `POST /api/admin/fx/history` (202, runs in background) |
 
