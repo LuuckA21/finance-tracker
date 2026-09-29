@@ -12,8 +12,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.icegreen.greenmail.junit5.GreenMailExtension;
-import com.icegreen.greenmail.util.GreenMailUtil;
 import com.icegreen.greenmail.util.ServerSetup;
+import jakarta.mail.BodyPart;
+import jakarta.mail.Multipart;
+import jakarta.mail.Part;
 import jakarta.mail.internet.MimeMessage;
 import me.luucka.finance.notification.NotificationService;
 import me.luucka.finance.support.ApiClient;
@@ -86,6 +88,31 @@ class NotificationsIT {
                 .formatted(date, category, amount)).getResponse().getStatus());
     }
 
+    /** The plain-text version of a message. */
+    private static String text(MimeMessage mail) throws Exception {
+        return part(mail, "text/plain");
+    }
+
+    private static String html(MimeMessage mail) throws Exception {
+        return part(mail, "text/html");
+    }
+
+    private static String part(Part part, String type) throws Exception {
+        if (part.isMimeType(type)) {
+            return (String) part.getContent();
+        }
+        if (part.getContent() instanceof Multipart multipart) {
+            for (int i = 0; i < multipart.getCount(); i++) {
+                BodyPart child = multipart.getBodyPart(i);
+                String found = part(child, type);
+                if (found != null) {
+                    return found;
+                }
+            }
+        }
+        return null;
+    }
+
     private static MimeMessage[] received() {
         return SMTP.getReceivedMessages();
     }
@@ -95,7 +122,7 @@ class NotificationsIT {
         assertEquals(200, client.post("/api/account/notifications/email", "{\"email\":\"" + address + "\"}")
                 .getResponse().getStatus());
         MimeMessage[] mails = received();
-        Matcher m = CODE.matcher(GreenMailUtil.getBody(mails[mails.length - 1]));
+        Matcher m = CODE.matcher(text(mails[mails.length - 1]));
         assertTrue(m.find());
         assertEquals(200, client.post("/api/account/notifications/email/confirm", "{\"code\":\"" + m.group(1) + "\"}")
                 .getResponse().getStatus());
@@ -119,10 +146,12 @@ class NotificationsIT {
         assertEquals("Luca@example.test", mail.getAllRecipients()[0].toString());
         assertEquals("Finanze: codice di conferma", mail.getSubject());
         assertTrue(mail.getFrom()[0].toString().contains("finanze@example.test"));
-        // UTF-8 end to end: accented letters survive the SMTP round trip
-        assertTrue(((String) mail.getContent()).contains("questo indirizzo email è:"), (String) mail.getContent());
-        Matcher code = CODE.matcher(GreenMailUtil.getBody(mail));
+        // Both versions, UTF-8 end to end: accented letters survive the SMTP round trip
+        assertTrue(text(mail).contains("questo indirizzo email è:"), text(mail));
+        assertTrue(html(mail).contains("questo indirizzo email è:"), html(mail));
+        Matcher code = CODE.matcher(text(mail));
         assertTrue(code.find());
+        assertTrue(html(mail).contains(">" + code.group(1) + "</div>"), html(mail));
 
         // Asking again at once is refused; wrong codes count
         assertEquals(429, client.post("/api/account/notifications/email", "{\"email\":\"luca@example.test\"}")
@@ -149,7 +178,7 @@ class NotificationsIT {
     void tooManyWrongCodesEndTheConfirmation() throws Exception {
         ApiClient client = login(testUsers.create("mail-attempts", Role.USER));
         client.post("/api/account/notifications/email", "{\"email\":\"someone@example.test\"}");
-        Matcher code = CODE.matcher(GreenMailUtil.getBody(received()[0]));
+        Matcher code = CODE.matcher(text(received()[0]));
         assertTrue(code.find());
         String right = code.group(1);
         String wrong = right.equals("000000") ? "111111" : "000000";
@@ -186,10 +215,15 @@ class NotificationsIT {
         assertEquals(1, received().length);
         MimeMessage alert = received()[0];
         assertEquals("Finanze: nuovi avvisi", alert.getSubject());
-        String body = GreenMailUtil.getBody(alert);
+        String body = text(alert);
         assertTrue(body.contains("Ristoranti: 85"), body);
         assertTrue(!body.contains("Spesa alimentare"), body);
         assertTrue(body.contains("https://finanze.example.test"), body);
+        // The HTML version: the category escaped in a row with its bar, and the button to the app
+        String page = html(alert);
+        assertTrue(page.contains(">Ristoranti<br>"), page);
+        assertTrue(page.contains("<td width=\"85%\""), page);
+        assertTrue(page.contains("href=\"https://finanze.example.test\""), page);
         notifications.run(user.getId());
         assertEquals(1, received().length);
 
@@ -197,7 +231,7 @@ class NotificationsIT {
         expense(client, today, restaurants, 40);
         notifications.run(user.getId());
         assertEquals(2, received().length);
-        assertTrue(GreenMailUtil.getBody(received()[1]).contains("Ristoranti: superato"));
+        assertTrue(text(received()[1]).contains("Ristoranti: superato"));
 
         // A goal reached
         int bank = json(client.post("/api/positions", """
@@ -209,7 +243,7 @@ class NotificationsIT {
                 .formatted(bank));
         notifications.run(user.getId());
         assertEquals(3, received().length);
-        assertTrue(GreenMailUtil.getBody(received()[2]).contains("Fondo emergenza: raggiunto"));
+        assertTrue(text(received()[2]).contains("Fondo emergenza: raggiunto"));
 
         // Goal alerts switched off: nothing for a second goal
         client.put("/api/account/notifications", "{\"goalAlerts\":false}");
@@ -242,7 +276,7 @@ class NotificationsIT {
         MimeMessage[] mails = received();
         MimeMessage summary = mails[mails.length - 1];
         assertTrue(summary.getSubject().startsWith("Finanze: riepilogo di "), summary.getSubject());
-        String body = GreenMailUtil.getBody(summary);
+        String body = text(summary);
         assertTrue(body.contains("Entrate: CHF"), body);
         assertTrue(body.contains("Casa: CHF"), body);
         assertTrue(body.contains("Budget superati"), body);

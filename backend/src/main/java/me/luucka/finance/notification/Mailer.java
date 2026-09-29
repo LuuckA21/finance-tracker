@@ -14,7 +14,7 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 
 /**
- * Sends plain-text email through the configured SMTP server ({@code app.mail.*}). Without a host
+ * Sends email (HTML with a plain-text alternative) through the configured SMTP server ({@code app.mail.*}). Without a host
  * it is disabled and every mail feature of the app says so instead of failing.
  */
 @Component
@@ -42,21 +42,24 @@ public class Mailer {
     }
 
     /**
+     * Sends the message as multipart/alternative: the HTML version and the plain-text one, which
+     * clients without HTML (or with it turned off) show instead.
+     *
      * @throws IllegalStateException when mail is not configured
      * @throws MailException         when the server refuses or cannot be reached
      */
-    public void send(String to, String subject, String text) {
+    public void send(String to, MailContent content) {
         if (sender == null) {
             throw new IllegalStateException("Mail is not configured");
         }
         MimeMessage message = sender.createMimeMessage();
         try {
-            MimeMessageHelper helper = new MimeMessageHelper(message, false, StandardCharsets.UTF_8.name());
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
             helper.setFrom(from());
             helper.setTo(new InternetAddress(to, true));
             // Subjects never carry user text, but keep them on one line whatever happens
-            helper.setSubject(subject.replaceAll("[\\r\\n]+", " "));
-            helper.setText(text, false);
+            helper.setSubject(content.subject().replaceAll("[\\r\\n]+", " "));
+            helper.setText(MailRenderer.text(content, appUrl()), MailRenderer.html(content, appUrl()));
         } catch (MessagingException e) {
             throw new MailPreparationException("Invalid message", e);
         }

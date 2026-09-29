@@ -28,6 +28,9 @@ test('email notifications: confirm an address with its code, send a test, choose
   const mails = await mailsTo(address, 2)
   expect(mails[1].subject).toBe('Finanze: email di prova')
   expect(mails[1].text).toContain('questa è un\'email di prova')
+  // The same message in HTML, for clients that show it
+  expect(mails[1].html).toContain('<html lang="it">')
+  expect(mails[1].html).toContain('questa è un&#39;email di prova')
 
   // Alerts: all on by default; a change is kept
   const alerts = page.getByRole('region', { name: 'Cosa ricevere' })

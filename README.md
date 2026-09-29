@@ -22,7 +22,9 @@ Self-hosted personal finance app for a small group of users (you and your family
   split by category. Recurring rules can carry tags too: every entry they create gets them. Tags
   can be renamed or deleted in the settings, and travel through the CSV export and import.
 - **Email notifications** (optional, needs an SMTP server): budgets at 80 % and over their limit,
-  savings goals reached and a summary of the previous month on the 1st, in the user's language.
+  savings goals reached and a summary of the previous month on the 1st, in the user's language, as
+  HTML (key figures, bars for budgets and expenses, dark mode; no images or remote content, so
+  nothing tracks the reader) with a plain-text alternative for clients without HTML.
   Mail goes only to an address confirmed with a 6-digit code sent to it; each user chooses which
   alerts to get in Settings › Notifications, and only what happens after switching one on is sent.
 - **Annual report** – one calendar year on one page, printable or saved as PDF from the browser:

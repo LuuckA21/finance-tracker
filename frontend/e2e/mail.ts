@@ -8,7 +8,10 @@ export const MAIL_DIR = process.env.E2E_MAIL_DIR ?? path.join(os.tmpdir(), 'fina
 
 export interface Mail {
   subject: string
+  /** Plain-text version */
   text: string
+  /** HTML version */
+  html: string
 }
 
 /** The messages received for `to`, oldest first, waiting until there are at least `count`. */
@@ -31,17 +34,42 @@ function byTime(a: string, b: string) {
   return ta - tb || na - nb
 }
 
-/** Subject and decoded plain-text body of a single-part message. */
+/** Subject and decoded plain-text and HTML versions of a message (single part or multipart). */
 function parse(raw: string): Mail {
-  const split = raw.indexOf('\r\n\r\n')
-  const headers = raw.slice(0, split).replace(/\r\n[ \t]+/g, ' ')
-  const body = raw.slice(split + 4)
-  const header = (name: string) => new RegExp(`^${name}:\\s*(.*)$`, 'im').exec(headers)?.[1] ?? ''
-  const encoding = header('Content-Transfer-Encoding').toLowerCase()
+  const { headers } = split(raw)
+  const subject = decodeWords(header(headers, 'Subject'))
+  return { subject, text: find(raw, 'text/plain') ?? '', html: find(raw, 'text/html') ?? '' }
+}
+
+function split(raw: string) {
+  const at = raw.indexOf('\r\n\r\n')
+  return { headers: raw.slice(0, at).replace(/\r\n[ \t]+/g, ' '), body: raw.slice(at + 4) }
+}
+
+function header(headers: string, name: string) {
+  return new RegExp(`^${name}:\\s*(.*)$`, 'im').exec(headers)?.[1] ?? ''
+}
+
+/** The decoded body of the first part of `type`, looking inside multipart containers. */
+function find(raw: string, type: string): string | undefined {
+  const { headers, body } = split(raw)
+  const contentType = header(headers, 'Content-Type').toLowerCase()
+  if (contentType.startsWith('multipart/')) {
+    const boundary = /boundary="?([^";]+)"?/i.exec(header(headers, 'Content-Type'))?.[1]
+    if (!boundary) return undefined
+    for (const part of body.split(`--${boundary}`).slice(1)) {
+      if (part.startsWith('--')) break
+      const found = find(part.replace(/^\r\n/, ''), type)
+      if (found !== undefined) return found
+    }
+    return undefined
+  }
+  if (!contentType.startsWith(type) && !(type === 'text/plain' && contentType === '')) return undefined
+  const encoding = header(headers, 'Content-Transfer-Encoding').toLowerCase()
   const bytes = encoding === 'base64' ? Buffer.from(body.replace(/\s+/g, ''), 'base64')
     : encoding === 'quoted-printable' ? quotedPrintable(body)
       : Buffer.from(body, 'latin1')
-  return { subject: decodeWords(header('Subject')), text: bytes.toString('utf8').replace(/\r\n/g, '\n') }
+  return bytes.toString('utf8').replace(/\r\n/g, '\n')
 }
 
 function quotedPrintable(body: string): Buffer {

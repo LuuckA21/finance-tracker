@@ -43,8 +43,8 @@ class MailTextsTest {
     void placeholdersAreFilledAndTheAppNameIsKnown() {
         assertEquals("Finanze: riepilogo di agosto 2026", MailTexts.text(Language.IT, "subject.monthly",
                 Map.of("month", MailTexts.month(YearMonth.of(2026, 8), Language.IT))));
-        String body = MailTexts.text(Language.IT, "code.body", Map.of("code", "123456"));
-        assertTrue(body.contains("\n\n    123456\n\n"), body);
+        assertEquals("CHF 700.00 su CHF 600.00", MailTexts.text(Language.IT, "amountOf",
+                Map.of("amount", "CHF 700.00", "total", "CHF 600.00")));
     }
 
     @Test

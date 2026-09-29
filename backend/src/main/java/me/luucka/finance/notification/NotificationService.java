@@ -44,7 +44,7 @@ public class NotificationService {
     private static final int TOP_EXPENSES = 3;
 
     /** One line of an alert email; sending it also settles every key in {@code keys}. */
-    private record Alert(Kind kind, String key, List<String> keys, String line) {
+    private record Alert(Kind kind, String key, List<String> keys, MailContent.Row row) {
     }
 
     private final NotificationSettingsRepository settings;
@@ -101,8 +101,7 @@ public class NotificationService {
         Set<String> handled = sent.handled(userId, alerts.stream().map(Alert::key).toList());
         List<Alert> fresh = alerts.stream().filter(a -> !handled.contains(a.key())).toList();
         if (!fresh.isEmpty()) {
-            mailer.send(s.getEmail(), MailTexts.text(language, "subject.alerts"),
-                    alertsEmail(user, fresh, YearMonth.from(today)));
+            mailer.send(s.getEmail(), alertsEmail(user, fresh, YearMonth.from(today)));
             sent.markHandled(userId, fresh.stream().flatMap(a -> a.keys().stream()).toList());
         }
 
@@ -110,10 +109,9 @@ public class NotificationService {
             YearMonth month = YearMonth.from(today).minusMonths(1);
             String key = monthlyKey(month);
             if (sent.handled(userId, List.of(key)).isEmpty()) {
-                String body = monthlyEmail(user, month);
-                if (body != null) {
-                    mailer.send(s.getEmail(), MailTexts.text(language, "subject.monthly",
-                            Map.of("month", MailTexts.month(month, language))), body);
+                MailContent summary = monthlyEmail(user, month);
+                if (summary != null) {
+                    mailer.send(s.getEmail(), summary);
                 }
                 sent.markHandled(userId, List.of(key));
             }
@@ -160,17 +158,16 @@ public class NotificationService {
                     continue;
                 }
                 String prefix = "budget:" + c.categoryId() + ":" + status.month() + ":";
-                Map<String, String> values = Map.of("category", c.name(),
-                        "spent", MailTexts.money(c.spent(), currency, language),
-                        "budget", MailTexts.money(c.budget(), currency, language),
-                        "percent", MailTexts.percent(c.percent(), language));
-                if (c.state() == BudgetCalculator.State.OVER) {
-                    alerts.add(new Alert(Kind.BUDGET, prefix + "100", List.of(prefix + "100", prefix + "80"),
-                            MailTexts.text(language, "alerts.budgetOver", values)));
-                } else {
-                    alerts.add(new Alert(Kind.BUDGET, prefix + "80", List.of(prefix + "80"),
-                            MailTexts.text(language, "alerts.budgetWarning", values)));
-                }
+                boolean over = c.state() == BudgetCalculator.State.OVER;
+                String percent = MailTexts.percent(c.percent(), language);
+                MailContent.Row row = new MailContent.Row(c.name(), amountOf(c.spent(), c.budget(), currency, language),
+                        MailTexts.text(language, over ? "alerts.budgetOver" : "alerts.budgetWarning",
+                                Map.of("percent", percent)),
+                        over ? MailContent.Tone.BAD : MailContent.Tone.WARN,
+                        new MailContent.Bar(c.percent().doubleValue(), null));
+                alerts.add(over
+                        ? new Alert(Kind.BUDGET, prefix + "100", List.of(prefix + "100", prefix + "80"), row)
+                        : new Alert(Kind.BUDGET, prefix + "80", List.of(prefix + "80"), row));
             }
         }
         if (kinds.contains(Kind.GOAL)) {
@@ -181,29 +178,35 @@ public class NotificationService {
                 String key = g.kind() == GoalCalculator.Kind.YEARLY
                         ? "goal:" + g.id() + ":" + (g.year() == null ? today.getYear() : g.year())
                         : "goal:" + g.id();
-                alerts.add(new Alert(Kind.GOAL, key, List.of(key), MailTexts.text(language, "alerts.goalReached",
-                        Map.of("goal", g.name(),
-                                "current", MailTexts.money(g.current(), g.baseCurrency(), language),
-                                "target", MailTexts.money(g.target(), g.baseCurrency(), language)))));
+                alerts.add(new Alert(Kind.GOAL, key, List.of(key), new MailContent.Row(g.name(),
+                        amountOf(g.current(), g.target(), g.baseCurrency(), language),
+                        MailTexts.text(language, "alerts.goalReached"), MailContent.Tone.GOOD,
+                        new MailContent.Bar(100, null))));
             }
         }
         return alerts;
     }
 
-    private String alertsEmail(AppUser user, List<Alert> alerts, YearMonth month) {
+    private MailContent alertsEmail(AppUser user, List<Alert> alerts, YearMonth month) {
         Language language = user.getLanguage();
-        StringBuilder body = new StringBuilder();
-        body.append(MailTexts.text(language, "greeting", Map.of("user", user.getUsername()))).append("\n\n")
-                .append(MailTexts.text(language, "alerts.intro")).append("\n");
-        section(body, MailTexts.text(language, "alerts.budgetHeading", Map.of("month", MailTexts.month(month, language))),
-                alerts.stream().filter(a -> a.kind() == Kind.BUDGET).map(Alert::line).toList());
-        section(body, MailTexts.text(language, "alerts.goalsHeading"),
-                alerts.stream().filter(a -> a.kind() == Kind.GOAL).map(Alert::line).toList());
-        return footer(body, language);
+        List<MailContent.Block> blocks = new ArrayList<>();
+        blocks.add(new MailContent.Paragraph(MailTexts.text(language, "alerts.intro")));
+        List<MailContent.Row> budgetRows = alerts.stream().filter(a -> a.kind() == Kind.BUDGET).map(Alert::row).toList();
+        if (!budgetRows.isEmpty()) {
+            blocks.add(new MailContent.Section(MailTexts.text(language, "alerts.budgetHeading",
+                    Map.of("month", MailTexts.month(month, language))), budgetRows));
+        }
+        List<MailContent.Row> goalRows = alerts.stream().filter(a -> a.kind() == Kind.GOAL).map(Alert::row).toList();
+        if (!goalRows.isEmpty()) {
+            blocks.add(new MailContent.Section(MailTexts.text(language, "alerts.goalsHeading"), goalRows));
+        }
+        String preheader = alerts.stream().map(a -> a.row().label() + ": " + a.row().detail())
+                .collect(Collectors.joining(" · "));
+        return new MailContent(language, MailTexts.text(language, "subject.alerts"), preheader, greeting(user), blocks);
     }
 
     /** Last month in numbers; null when there is nothing to tell (no entries, no positions). */
-    private String monthlyEmail(AppUser user, YearMonth month) {
+    private MailContent monthlyEmail(AppUser user, YearMonth month) {
         long userId = user.getId();
         Language language = user.getLanguage();
         DashboardService.CashflowYearResponse year = dashboards.cashflowYear(userId, month.getYear());
@@ -216,69 +219,75 @@ public class NotificationService {
             return null;
         }
         String currency = year.baseCurrency();
-        StringBuilder body = new StringBuilder();
-        body.append(MailTexts.text(language, "greeting", Map.of("user", user.getUsername()))).append("\n\n")
-                .append(MailTexts.text(language, "monthly.intro", Map.of("month", MailTexts.month(month, language))))
-                .append("\n\n");
-        body.append(MailTexts.text(language, "monthly.income",
-                Map.of("amount", MailTexts.money(totals.income(), currency, language)))).append('\n');
-        body.append(MailTexts.text(language, "monthly.expense",
-                Map.of("amount", MailTexts.money(totals.expense(), currency, language)))).append('\n');
-        body.append(totals.savingsRate() == null
-                ? MailTexts.text(language, "monthly.net", Map.of("amount", MailTexts.money(totals.net(), currency, language)))
-                : MailTexts.text(language, "monthly.netRate", Map.of(
-                        "amount", MailTexts.money(totals.net(), currency, language),
-                        "percent", MailTexts.percent(totals.savingsRate(), language)))).append('\n');
+        String monthName = MailTexts.month(month, language);
+        List<MailContent.Block> blocks = new ArrayList<>();
+        blocks.add(new MailContent.Paragraph(MailTexts.text(language, "monthly.intro", Map.of("month", monthName))));
 
-        record Spent(String name, BigDecimal amount) {
+        List<MailContent.Stat> stats = new ArrayList<>();
+        stats.add(new MailContent.Stat(MailTexts.text(language, "monthly.income"),
+                MailTexts.money(totals.income(), currency, language), null, MailContent.Tone.NEUTRAL));
+        stats.add(new MailContent.Stat(MailTexts.text(language, "monthly.expense"),
+                MailTexts.money(totals.expense(), currency, language), null, MailContent.Tone.NEUTRAL));
+        stats.add(new MailContent.Stat(MailTexts.text(language, "monthly.net"),
+                MailTexts.money(totals.net(), currency, language),
+                totals.savingsRate() == null ? null : MailTexts.text(language, "monthly.rate",
+                        Map.of("percent", MailTexts.percent(totals.savingsRate(), language))),
+                totals.net().signum() < 0 ? MailContent.Tone.BAD : MailContent.Tone.GOOD));
+        if (!end.positions().isEmpty()) {
+            BigDecimal change = end.total().subtract(start.total());
+            stats.add(new MailContent.Stat(MailTexts.text(language, "monthly.netWorth"),
+                    MailTexts.money(end.total(), currency, language),
+                    MailTexts.text(language, "monthly.netWorthChange",
+                            Map.of("change", MailTexts.signedMoney(change, currency, language))),
+                    change.signum() < 0 ? MailContent.Tone.BAD : MailContent.Tone.NEUTRAL));
+        }
+        blocks.add(new MailContent.Stats(stats));
+
+        record Spent(String name, String color, BigDecimal amount) {
         }
         List<Spent> spent = new ArrayList<>();
-        status.categories().forEach(c -> spent.add(new Spent(c.name(), c.spent())));
-        status.others().forEach(o -> spent.add(new Spent(o.name(), o.spent())));
-        section(body, MailTexts.text(language, "monthly.topHeading"), spent.stream()
+        status.categories().forEach(c -> spent.add(new Spent(c.name(), c.color(), c.spent())));
+        status.others().forEach(o -> spent.add(new Spent(o.name(), o.color(), o.spent())));
+        List<Spent> top = spent.stream()
                 .filter(x -> x.amount().signum() > 0)
                 .sorted(Comparator.comparing(Spent::amount).reversed())
                 .limit(TOP_EXPENSES)
-                .map(x -> x.name() + ": " + MailTexts.money(x.amount(), currency, language))
-                .toList());
-        section(body, MailTexts.text(language, "monthly.overHeading"), status.categories().stream()
-                .filter(c -> c.state() == BudgetCalculator.State.OVER && c.budget() != null)
-                .map(c -> MailTexts.text(language, "monthly.overLine", Map.of("category", c.name(),
-                        "spent", MailTexts.money(c.spent(), currency, language),
-                        "budget", MailTexts.money(c.budget(), currency, language))))
-                .toList());
-
-        if (!end.positions().isEmpty()) {
-            body.append('\n').append(MailTexts.text(language, "monthly.netWorth", Map.of(
-                    "amount", MailTexts.money(end.total(), currency, language),
-                    "change", MailTexts.signedMoney(end.total().subtract(start.total()), currency, language))))
-                    .append('\n');
+                .toList();
+        if (!top.isEmpty()) {
+            double largest = top.getFirst().amount().doubleValue();
+            blocks.add(new MailContent.Section(MailTexts.text(language, "monthly.topHeading"), top.stream()
+                    .map(x -> new MailContent.Row(x.name(), MailTexts.money(x.amount(), currency, language), null,
+                            MailContent.Tone.NEUTRAL, new MailContent.Bar(x.amount().doubleValue() * 100 / largest, x.color())))
+                    .toList()));
         }
+        List<MailContent.Row> over = status.categories().stream()
+                .filter(c -> c.state() == BudgetCalculator.State.OVER && c.budget() != null)
+                .map(c -> new MailContent.Row(c.name(), amountOf(c.spent(), c.budget(), currency, language), null,
+                        MailContent.Tone.BAD, new MailContent.Bar(100, null)))
+                .toList();
+        if (!over.isEmpty()) {
+            blocks.add(new MailContent.Section(MailTexts.text(language, "monthly.overHeading"), over));
+        }
+
         SortedSet<String> unconverted = new TreeSet<>(year.unconvertedCurrencies());
         unconverted.addAll(status.unconvertedCurrencies());
         unconverted.addAll(end.unconvertedCurrencies());
         if (!unconverted.isEmpty()) {
-            body.append('\n').append(MailTexts.text(language, "monthly.unconverted",
-                    Map.of("currencies", String.join(", ", unconverted)))).append('\n');
+            blocks.add(new MailContent.Note(MailTexts.text(language, "monthly.unconverted",
+                    Map.of("currencies", String.join(", ", unconverted)))));
         }
-        return footer(body, language);
+        String preheader = MailTexts.text(language, "monthly.net") + ": " + MailTexts.money(totals.net(), currency, language);
+        return new MailContent(language, MailTexts.text(language, "subject.monthly", Map.of("month", monthName)),
+                preheader, greeting(user), blocks);
     }
 
-    private static void section(StringBuilder body, String heading, List<String> lines) {
-        if (lines.isEmpty()) {
-            return;
-        }
-        body.append('\n').append(heading).append('\n');
-        lines.forEach(line -> body.append("- ").append(line).append('\n'));
+    static String greeting(AppUser user) {
+        return MailTexts.text(user.getLanguage(), "greeting", Map.of("user", user.getUsername()));
     }
 
-    private String footer(StringBuilder body, Language language) {
-        body.append("\n--\n");
-        if (!mailer.appUrl().isEmpty()) {
-            body.append(MailTexts.text(language, "footer.link", Map.of("url", mailer.appUrl()))).append('\n');
-        }
-        body.append(MailTexts.text(language, "footer.settings")).append('\n');
-        return body.toString();
+    private static String amountOf(BigDecimal amount, BigDecimal total, String currency, Language language) {
+        return MailTexts.text(language, "amountOf", Map.of("amount", MailTexts.money(amount, currency, language),
+                "total", MailTexts.money(total, currency, language)));
     }
 
     private static String monthlyKey(YearMonth month) {

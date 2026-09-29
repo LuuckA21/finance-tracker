@@ -8,8 +8,8 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 
 import jakarta.mail.internet.AddressException;
@@ -104,8 +104,12 @@ public class NotificationSettingsService {
         s.startConfirmation(normalized, hash(userId, code), now.plus(CODE_VALIDITY), now);
         settings.save(s);
         AppUser user = user(userId);
-        send(normalized, MailTexts.text(user.getLanguage(), "subject.code"),
-                greeting(user) + MailTexts.text(user.getLanguage(), "code.body", Map.of("code", code)) + "\n");
+        Language language = user.getLanguage();
+        send(normalized, new MailContent(language, MailTexts.text(language, "subject.code"), code,
+                NotificationService.greeting(user), List.of(
+                        new MailContent.Paragraph(MailTexts.text(language, "code.intro")),
+                        new MailContent.Code(code),
+                        new MailContent.Paragraph(MailTexts.text(language, "code.validity")))));
         return response(s);
     }
 
@@ -161,13 +165,15 @@ public class NotificationSettingsService {
         s.setTestSentAt(now);
         settings.save(s);
         AppUser user = user(userId);
-        send(s.getEmail(), MailTexts.text(user.getLanguage(), "subject.test"),
-                greeting(user) + MailTexts.text(user.getLanguage(), "test.body") + "\n");
+        Language language = user.getLanguage();
+        send(s.getEmail(), new MailContent(language, MailTexts.text(language, "subject.test"),
+                MailTexts.text(language, "test.body"), NotificationService.greeting(user),
+                List.of(new MailContent.Paragraph(MailTexts.text(language, "test.body")))));
     }
 
-    private void send(String to, String subject, String body) {
+    private void send(String to, MailContent content) {
         try {
-            mailer.send(to, subject, body);
+            mailer.send(to, content);
         } catch (MailException e) {
             log.warn("Email to the notification address failed: {}", e.getMessage());
             throw new ApiException(HttpStatus.BAD_GATEWAY, "mail_failed", "The mail server did not accept the email");
@@ -191,11 +197,6 @@ public class NotificationSettingsService {
 
     private AppUser user(long userId) {
         return users.findById(userId).orElseThrow(() -> ApiException.notFound("User"));
-    }
-
-    private static String greeting(AppUser user) {
-        Language language = user.getLanguage();
-        return MailTexts.text(language, "greeting", Map.of("user", user.getUsername())) + "\n\n";
     }
 
     /** A bare address (no display name), trimmed; the domain lower-cased. */
