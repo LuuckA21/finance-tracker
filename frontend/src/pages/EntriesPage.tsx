@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Download, FileUp, Pencil, Plus, Repeat, Trash2 } from 'lucide-react'
 import { download, errorMessage } from '../api/client'
-import { entryFilterParams, useCategories, useDeleteEntry, useEntries, usePositions, type EntryFilter } from '../api/hooks'
+import { entryFilterParams, useCategories, useDeleteEntry, useEntries, usePositions, useTags, type EntryFilter } from '../api/hooks'
 import type { CashEntry, Category, EntryKind } from '../api/types'
+import { TagChip } from '../components/TagInput'
 import { amountStyle, EntryTarget } from '../components/TransferFields'
 import { Button, Card, EmptyState, ErrorAlert, PageHeader, Spinner } from '../components/ui'
 import { useI18n } from '../i18n'
@@ -16,12 +17,13 @@ const NO_CATEGORIES: Category[] = []
 const PAGE_SIZE = 50
 
 export function EntriesPage() {
-  const [filter, setFilter] = useState<EntryFilter>({ page: 0, size: PAGE_SIZE, kind: '', categoryId: '', q: '' })
+  const [filter, setFilter] = useState<EntryFilter>({ page: 0, size: PAGE_SIZE, kind: '', categoryId: '', q: '', tagId: '' })
   const [editing, setEditing] = useState<CashEntry | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const entries = useEntries(filter)
   const categories = useCategories().data ?? NO_CATEGORIES
   const positions = usePositions().data ?? []
+  const tags = useTags().data
   const remove = useDeleteEntry()
   const [error, setError] = useState<string | null>(null)
   const [importOpen, setImportOpen] = useState(false)
@@ -55,6 +57,8 @@ export function EntriesPage() {
   }
 
   const page = entries.data
+  const selectedTag = tags?.tags.find((tag) => tag.id === filter.tagId)
+  const tagId = (name: string) => tags?.tags.find((tag) => tag.name === name)?.id
 
   return (
     <>
@@ -77,7 +81,7 @@ export function EntriesPage() {
       />
 
       <Card>
-        <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-5">
+        <div className={`mb-4 grid grid-cols-2 gap-2 ${tags && tags.tags.length > 0 ? 'md:grid-cols-6' : 'md:grid-cols-5'}`}>
           <input type="date" className="input" aria-label={t('entries.from')} value={filter.from ?? ''} onChange={(e) => update({ from: e.target.value || undefined })} />
           <input type="date" className="input" aria-label={t('entries.to')} value={filter.to ?? ''} onChange={(e) => update({ to: e.target.value || undefined })} />
           <select className="input" aria-label={t('entries.kind')} value={filter.kind} onChange={(e) => update({ kind: e.target.value as EntryKind | '', categoryId: '' })}>
@@ -93,9 +97,29 @@ export function EntriesPage() {
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
-          <input type="search" className="input col-span-2 md:col-span-1" placeholder={t('entries.searchPlaceholder')} aria-label={t('entries.search')}
+          {tags && tags.tags.length > 0 && (
+            <select className="input" aria-label={t('tags.label')} value={filter.tagId}
+              onChange={(e) => update({ tagId: e.target.value ? Number(e.target.value) : '' })}>
+              <option value="">{t('tags.all')}</option>
+              {tags.tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
+            </select>
+          )}
+          <input type="search" className={`input ${tags && tags.tags.length > 0 ? '' : 'col-span-2'} md:col-span-1`} placeholder={t('entries.searchPlaceholder')} aria-label={t('entries.search')}
             value={filter.q} onChange={(e) => update({ q: e.target.value })} />
         </div>
+
+        {selectedTag && tags && (
+          <p className="mb-4 flex flex-wrap gap-x-4 gap-y-1 rounded-lg bg-surface-2 px-3 py-2 text-sm" role="status">
+            <strong>{selectedTag.name}</strong>
+            <span>{t('tags.entries', { count: selectedTag.entryCount })}</span>
+            {selectedTag.expense > 0 && <span>{t('tags.expense', { amount: money(selectedTag.expense, tags.baseCurrency) })}</span>}
+            {selectedTag.income > 0 && <span>{t('tags.income', { amount: money(selectedTag.income, tags.baseCurrency) })}</span>}
+            {selectedTag.transferred > 0 && <span>{t('tags.transferred', { amount: money(selectedTag.transferred, tags.baseCurrency) })}</span>}
+            {selectedTag.firstDate && (
+              <span className="text-muted">{selectedTag.firstDate === selectedTag.lastDate ? date(selectedTag.firstDate) : `${date(selectedTag.firstDate)} – ${date(selectedTag.lastDate)}`}</span>
+            )}
+          </p>
+        )}
 
         <ErrorAlert message={error} />
 
@@ -123,13 +147,23 @@ export function EntriesPage() {
                         <EntryTarget kind={e.kind} categoryId={e.categoryId} from={e.fromPositionId} to={e.toPositionId}
                           categories={byId} positions={positions} />
                       </td>
-                      <td className="max-w-64 truncate px-2 py-2 text-ink-2">
-                        {e.recurringEntryId !== null && (
-                          <Repeat className="mr-1.5 inline size-3.5 align-[-2px] text-muted" aria-label={t('recurring.generated')}>
-                            <title>{t('recurring.generated')}</title>
-                          </Repeat>
+                      <td className="max-w-64 px-2 py-2 text-ink-2">
+                        <div className="truncate">
+                          {e.recurringEntryId !== null && (
+                            <Repeat className="mr-1.5 inline size-3.5 align-[-2px] text-muted" aria-label={t('recurring.generated')}>
+                              <title>{t('recurring.generated')}</title>
+                            </Repeat>
+                          )}
+                          {e.description}
+                        </div>
+                        {e.tags.length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {e.tags.map((name) => {
+                              const id = tagId(name)
+                              return <TagChip key={name} name={name} onClick={id === undefined ? undefined : () => update({ tagId: id })} />
+                            })}
+                          </div>
                         )}
-                        {e.description}
                       </td>
                       <td className={`tabular px-2 py-2 text-right font-medium ${style.className}`}>
                         {style.sign}{money(e.amount, e.currency)}

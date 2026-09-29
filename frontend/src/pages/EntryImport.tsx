@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Download, FileUp } from 'lucide-react'
 import { ApiError, errorMessage, saveBlob } from '../api/client'
 import { useCategories, useImportEntries, useImportPreview, useMe, usePositions } from '../api/hooks'
 import type { Category, EntryKind, ImportPreview, ImportPreviewRow, ImportRowError, Position } from '../api/types'
+import { TagChip } from '../components/TagInput'
 import { transferOptions } from '../components/TransferFields'
 import { Badge, Button, ErrorAlert, Field, Modal, Segmented } from '../components/ui'
 import { useI18n, type Language, type MessageKey } from '../i18n'
@@ -15,11 +16,11 @@ const FIXABLE: ImportRowError[] = ['invalid_kind', 'missing_category', 'unknown_
   'unknown_position', 'transfer_same_position']
 const REVIEW_PAGE = 100
 /** Downloadable example file, with the headers and kind words of each interface language. */
-const TEMPLATES: Record<Language, { file: string; header: string; expense: string; income: string; transfer: string; shop: string; savings: string }> = {
-  IT: { file: 'modello.csv', header: 'data;tipo;categoria;importo;valuta;descrizione;da;verso', expense: 'Uscita', income: 'Entrata', transfer: 'Trasferimento', shop: 'Supermercato', savings: 'Risparmio' },
-  EN: { file: 'template.csv', header: 'date;type;category;amount;currency;description;from;to', expense: 'Expense', income: 'Income', transfer: 'Transfer', shop: 'Supermarket', savings: 'Savings' },
-  DE: { file: 'vorlage.csv', header: 'datum;art;kategorie;betrag;währung;beschreibung;von;nach', expense: 'Ausgabe', income: 'Einnahme', transfer: 'Umbuchung', shop: 'Supermarkt', savings: 'Sparen' },
-  FR: { file: 'modele.csv', header: 'date;type;catégorie;montant;monnaie;description;de;vers', expense: 'Dépense', income: 'Revenu', transfer: 'Virement', shop: 'Supermarché', savings: 'Épargne' },
+const TEMPLATES: Record<Language, { file: string; header: string; expense: string; income: string; transfer: string; shop: string; savings: string; tag: string }> = {
+  IT: { file: 'modello.csv', header: 'data;tipo;categoria;importo;valuta;descrizione;da;verso;etichette', expense: 'Uscita', income: 'Entrata', transfer: 'Trasferimento', shop: 'Supermercato', savings: 'Risparmio', tag: 'Casa' },
+  EN: { file: 'template.csv', header: 'date;type;category;amount;currency;description;from;to;tags', expense: 'Expense', income: 'Income', transfer: 'Transfer', shop: 'Supermarket', savings: 'Savings', tag: 'Home' },
+  DE: { file: 'vorlage.csv', header: 'datum;art;kategorie;betrag;währung;beschreibung;von;nach;tags', expense: 'Ausgabe', income: 'Einnahme', transfer: 'Umbuchung', shop: 'Supermarkt', savings: 'Sparen', tag: 'Haushalt' },
+  FR: { file: 'modele.csv', header: 'date;type;catégorie;montant;monnaie;description;de;vers;étiquettes', expense: 'Dépense', income: 'Revenu', transfer: 'Virement', shop: 'Supermarché', savings: 'Épargne', tag: 'Maison' },
 }
 const MAX_FILE_BYTES = 2 * 1024 * 1024
 
@@ -116,8 +117,8 @@ function SelectStep({ onStep }: { onStep: (step: Step) => void }) {
     const expense = categories.find((c) => c.kind === 'EXPENSE')?.name ?? ''
     const income = categories.find((c) => c.kind === 'INCOME')?.name ?? ''
     const tpl = TEMPLATES[language]
-    const csv = `${tpl.header}\r\n2026-08-01;${tpl.expense};${expense};45.20;CHF;${tpl.shop};;\r\n`
-      + `2026-08-25;${tpl.income};${income};6000;CHF;;;\r\n2026-08-28;${tpl.transfer};;500;CHF;${tpl.savings};;\r\n`
+    const csv = `${tpl.header}\r\n2026-08-01;${tpl.expense};${expense};45.20;CHF;${tpl.shop};;;${tpl.tag}\r\n`
+      + `2026-08-25;${tpl.income};${income};6000;CHF;;;;\r\n2026-08-28;${tpl.transfer};;500;CHF;${tpl.savings};;;\r\n`
     saveBlob(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }), tpl.file)
   }
 
@@ -130,6 +131,7 @@ function SelectStep({ onStep }: { onStep: (step: Step) => void }) {
           <li>{t('import.helpFormats')}</li>
           <li>{t('import.helpKind')}</li>
           <li>{t('import.helpTransfer')}</li>
+          <li>{t('import.helpTags')}</li>
         </ul>
         <button type="button" onClick={downloadTemplate} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline">
           <Download className="size-3.5" /> {t('import.template')}
@@ -317,7 +319,12 @@ function ReviewStep({ preview, onStep }: { preview: ImportPreview; onStep: (step
                       ? money(row.source.amount, row.source.currency ?? baseCurrency)
                       : <span className="text-bad">{row.source.raw.amount || '—'}</span>}
                   </td>
-                  <td className="max-w-[16rem] truncate px-2 py-1.5 text-ink-2" title={row.source.description ?? ''}>{row.source.description ?? ''}</td>
+                  <td className="max-w-[16rem] px-2 py-1.5 text-ink-2" title={row.source.description ?? ''}>
+                    <div className="truncate">{row.source.description ?? ''}</div>
+                    {row.source.tags.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">{row.source.tags.map((name) => <TagChip key={name} name={name} />)}</div>
+                    )}
+                  </td>
                   <td className="px-2 py-1.5">
                     <div className="flex flex-wrap gap-1">
                       {row.source.duplicate && <Badge tone="accent">{t('import.duplicate')}</Badge>}
@@ -366,7 +373,7 @@ function showError(error: ImportRowError, row: ReviewRow, ready: boolean) {
 }
 
 function toInput(row: Pick<ImportPreviewRow, 'date' | 'kind' | 'categoryId' | 'amount' | 'currency' | 'description'
-  | 'fromPositionId' | 'toPositionId'>) {
+  | 'fromPositionId' | 'toPositionId' | 'tags'>) {
   return {
     date: row.date!,
     kind: row.kind!,
@@ -376,6 +383,7 @@ function toInput(row: Pick<ImportPreviewRow, 'date' | 'kind' | 'categoryId' | 'a
     description: row.description,
     fromPositionId: row.fromPositionId,
     toPositionId: row.toPositionId,
+    tags: row.tags,
   }
 }
 

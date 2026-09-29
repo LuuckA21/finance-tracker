@@ -89,10 +89,10 @@ class CsvImportExportIT {
         assertEquals("no-store", export.getResponse().getHeader("Cache-Control"));
         byte[] bytes = export.getResponse().getContentAsByteArray();
         String csv = new String(bytes, StandardCharsets.UTF_8);
-        assertTrue(csv.startsWith("\uFEFFdata;tipo;categoria;importo;valuta;descrizione;da;verso\r\n"), csv);
+        assertTrue(csv.startsWith("\uFEFFdata;tipo;categoria;importo;valuta;descrizione;da;verso;etichette\r\n"), csv);
         assertTrue(csv.contains("2026-08-01;Uscita;Spesa alimentare;12.5;CHF;\"'=HYPERLINK(\"\"http://evil\"\",\"\"clic\"\")\""), csv);
         assertTrue(csv.contains("2026-08-02;Uscita;Spesa alimentare;3.2;EUR;\"Caffè; bar \"\"centrale\"\"\""), csv);
-        assertTrue(csv.contains("2026-08-25;Entrata;Stipendio;6000;CHF;;;\r\n"), csv);
+        assertTrue(csv.contains("2026-08-25;Entrata;Stipendio;6000;CHF;;;;\r\n"), csv);
         // Filters apply to the export too
         String income = alice.get("/api/cash-entries/export?kind=INCOME").getResponse()
                 .getContentAsString(StandardCharsets.UTF_8);
@@ -138,8 +138,8 @@ class CsvImportExportIT {
         assertTrue(export.getResponse().getHeader("Content-Disposition").matches(
                 "attachment; filename=\"operations-\\d{4}-\\d{2}-\\d{2}\\.csv\""));
         String csv = export.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        assertTrue(csv.startsWith("\uFEFFdate;type;catégorie;montant;monnaie;description;de;vers\r\n"), csv);
-        assertTrue(csv.contains("2026-08-01;Dépense;Spesa alimentare;12.5;CHF;Migros;;\r\n"), csv);
+        assertTrue(csv.startsWith("\uFEFFdate;type;catégorie;montant;monnaie;description;de;vers;étiquettes\r\n"), csv);
+        assertTrue(csv.contains("2026-08-01;Dépense;Spesa alimentare;12.5;CHF;Migros;;;\r\n"), csv);
         assertEquals(Integer.valueOf(1), json(upload(client, csv), "$.duplicates"));
 
         MvcResult preview = upload(client, """

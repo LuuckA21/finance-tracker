@@ -20,12 +20,14 @@ import me.luucka.finance.category.CategoryService;
 import me.luucka.finance.common.ApiException;
 import me.luucka.finance.core.Currencies;
 import me.luucka.finance.core.EntryKind;
+import me.luucka.finance.core.TagNames;
 import me.luucka.finance.core.csv.CsvReader;
 import me.luucka.finance.core.csv.CsvWriter;
 import me.luucka.finance.core.csv.EntryCsvFormat;
 import me.luucka.finance.core.csv.EntryCsvFormat.Column;
 import me.luucka.finance.position.AssetPosition;
 import me.luucka.finance.position.AssetPositionRepository;
+import me.luucka.finance.tag.TagService;
 import me.luucka.finance.user.AppUser;
 import me.luucka.finance.user.AppUserRepository;
 import org.springframework.http.HttpStatus;
@@ -52,7 +54,7 @@ public class CashEntryCsvService {
     /** One data row: the text as written in the file and, where it could be read, the values. */
     public record PreviewRow(int line, Map<String, String> raw, LocalDate date, EntryKind kind, Long categoryId,
                              BigDecimal amount, String currency, String description, Long fromPositionId,
-                             Long toPositionId, boolean duplicate, List<String> errors) {
+                             Long toPositionId, List<String> tags, boolean duplicate, List<String> errors) {
     }
 
     public record Preview(String delimiter, List<String> ignoredColumns, int total, int valid, int duplicates,
@@ -64,15 +66,17 @@ public class CashEntryCsvService {
     private final CategoryService categories;
     private final AssetPositionRepository positions;
     private final AppUserRepository users;
+    private final TagService tags;
 
     public CashEntryCsvService(CashEntryService entries, CashEntryRepository repository,
                                CategoryService categories, AssetPositionRepository positions,
-                               AppUserRepository users) {
+                               AppUserRepository users, TagService tags) {
         this.entries = entries;
         this.repository = repository;
         this.categories = categories;
         this.positions = positions;
         this.users = users;
+        this.tags = tags;
     }
 
     // ------------------------------------------------------------------ export
@@ -85,8 +89,9 @@ public class CashEntryCsvService {
                 .collect(Collectors.toMap(Category::getId, Category::getName));
         Map<Long, String> positionNames = positions.findByUserIdOrderByArchivedAscNameAsc(userId).stream()
                 .collect(Collectors.toMap(AssetPosition::getId, AssetPosition::getName));
-        // Category, description and position names are user text; the rest is produced here
-        boolean[] text = {false, false, true, false, false, true, true, true};
+        Map<Long, String> tagNames = tags.names(userId);
+        // Category, description, position and tag names are user text; the rest is produced here
+        boolean[] text = {false, false, true, false, false, true, true, true, true};
         CsvWriter csv = new CsvWriter(EXPORT_DELIMITER);
         csv.textRow(EntryCsvFormat.headers(language));
         for (CashEntry entry : entries.all(userId, filter)) {
@@ -98,7 +103,8 @@ public class CashEntryCsvService {
                     entry.getCurrency(),
                     entry.getDescription(),
                     entry.getFromPositionId() == null ? "" : positionNames.getOrDefault(entry.getFromPositionId(), ""),
-                    entry.getToPositionId() == null ? "" : positionNames.getOrDefault(entry.getToPositionId(), "")),
+                    entry.getToPositionId() == null ? "" : positionNames.getOrDefault(entry.getToPositionId(), ""),
+                    String.join(", ", CashEntryService.tagNames(entry, tagNames))),
                     text);
         }
         return (BOM + csv).getBytes(StandardCharsets.UTF_8);
@@ -286,8 +292,14 @@ public class CashEntryCsvService {
             errors.add("unknown_category");
         }
 
+        List<String> tags = TagNames.parseCell(raw.getOrDefault("tags", "")).orElse(null);
+        if (tags == null) {
+            errors.add("invalid_tags");
+        }
+
         return new PreviewRow(record.line(), raw, date, kind, categoryId, amount, currency,
-                description.isEmpty() ? null : description, fromPositionId, toPositionId, false, errors);
+                description.isEmpty() ? null : description, fromPositionId, toPositionId,
+                tags == null ? List.of() : tags, false, errors);
     }
 
     private static Long position(String name, Map<String, List<AssetPosition>> positionsByName,
@@ -323,7 +335,7 @@ public class CashEntryCsvService {
                     key(row.date(), row.kind(), row.amount(), row.currency(), row.description()));
             return duplicate ? new PreviewRow(row.line(), row.raw(), row.date(), row.kind(), row.categoryId(),
                     row.amount(), row.currency(), row.description(), row.fromPositionId(), row.toPositionId(),
-                    true, row.errors()) : row;
+                    row.tags(), true, row.errors()) : row;
         }).toList();
     }
 

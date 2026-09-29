@@ -24,15 +24,22 @@ import me.luucka.finance.core.EntryKind;
  */
 public final class EntryCsvFormat {
 
-    /** {@code FROM}/{@code TO}: position names of a transfer, both optional. */
-    public enum Column { DATE, KIND, CATEGORY, AMOUNT, CURRENCY, DESCRIPTION, FROM, TO }
+    /**
+     * {@code FROM}/{@code TO}: position names of a transfer, both optional. {@code TAGS}: tag names
+     * separated by commas, optional.
+     */
+    public enum Column { DATE, KIND, CATEGORY, AMOUNT, CURRENCY, DESCRIPTION, FROM, TO, TAGS }
 
     /** Export headers per interface language. */
     public static final Map<Locale, List<String>> HEADERS = Map.of(
-            Locale.ITALIAN, List.of("data", "tipo", "categoria", "importo", "valuta", "descrizione", "da", "verso"),
-            Locale.ENGLISH, List.of("date", "type", "category", "amount", "currency", "description", "from", "to"),
-            Locale.GERMAN, List.of("datum", "art", "kategorie", "betrag", "währung", "beschreibung", "von", "nach"),
-            Locale.FRENCH, List.of("date", "type", "catégorie", "montant", "monnaie", "description", "de", "vers"));
+            Locale.ITALIAN, List.of("data", "tipo", "categoria", "importo", "valuta", "descrizione", "da", "verso",
+                    "etichette"),
+            Locale.ENGLISH, List.of("date", "type", "category", "amount", "currency", "description", "from", "to",
+                    "tags"),
+            Locale.GERMAN, List.of("datum", "art", "kategorie", "betrag", "währung", "beschreibung", "von", "nach",
+                    "tags"),
+            Locale.FRENCH, List.of("date", "type", "catégorie", "montant", "monnaie", "description", "de", "vers",
+                    "étiquettes"));
 
     private static final Map<Column, List<String>> ALIASES = new EnumMap<>(Map.of(
             Column.DATE, List.of("data", "date", "datum", "giorno", "day"),
@@ -43,7 +50,9 @@ public final class EntryCsvFormat {
             Column.DESCRIPTION, List.of("descrizione", "description", "beschreibung", "note", "nota", "notes",
                     "causale", "memo", "buchungstext", "libelle"),
             Column.FROM, List.of("da", "from", "von", "de", "origine", "source"),
-            Column.TO, List.of("verso", "a", "to", "nach", "vers", "destinazione", "destination")));
+            Column.TO, List.of("verso", "a", "to", "nach", "vers", "destinazione", "destination"),
+            Column.TAGS, List.of("etichette", "etichetta", "tag", "tags", "label", "labels", "etiquettes",
+                    "etiquette", "schlagworter", "stichworter")));
 
     private static final Map<String, EntryKind> KINDS = Map.ofEntries(
             Map.entry("entrata", EntryKind.INCOME), Map.entry("entrate", EntryKind.INCOME),
