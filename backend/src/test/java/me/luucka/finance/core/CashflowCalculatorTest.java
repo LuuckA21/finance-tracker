@@ -63,7 +63,7 @@ class CashflowCalculatorTest {
 
     @Test
     void yearlySummaryCoversEveryYear() {
-        CashflowCalculator.MultiYearResult result = CashflowCalculator.years(entries, fx);
+        CashflowCalculator.MultiYearResult result = CashflowCalculator.years(entries.stream().map(CashflowEntry::dated).toList(), fx);
 
         assertEquals(2, result.years().size());
         assertEquals(2025, result.years().get(0).year());
@@ -96,7 +96,7 @@ class CashflowCalculatorTest {
         // No category rows for transfers
         assertEquals(2, result.byCategory().size());
 
-        var years = CashflowCalculator.years(withTransfers, fx);
+        var years = CashflowCalculator.years(withTransfers.stream().map(CashflowEntry::dated).toList(), fx);
         assertEquals(new BigDecimal("1595.00"), years.years().getFirst().totals().transferred());
         assertEquals(new BigDecimal("6000.00"), years.years().getFirst().totals().income());
     }

@@ -18,10 +18,20 @@ public interface CashEntryRepository extends JpaRepository<CashEntry, Long>, Jpa
 
     List<CashEntry> findByUserIdAndDateBetween(Long userId, LocalDate from, LocalDate to);
 
-    List<CashEntry> findByUserId(Long userId);
+    /**
+     * Sums per day, kind and currency: everything a view over all years needs, a few thousand small
+     * rows instead of every entry.
+     */
+    @Query("""
+            select new me.luucka.finance.cashflow.DailySum(e.date, e.kind, e.currency, sum(e.amount))
+            from CashEntry e where e.userId = :userId group by e.date, e.kind, e.currency""")
+    List<DailySum> sumByDay(Long userId);
 
-    @Query("select e from CashEntry e where e.userId = :userId and e.tagIds is not empty")
-    List<CashEntry> findTaggedByUserId(Long userId);
+    /** One row per tag of each of the user's tagged entries. */
+    @Query("""
+            select new me.luucka.finance.cashflow.TaggedAmount(t, e.date, e.kind, e.categoryId, e.amount, e.currency)
+            from CashEntry e join e.tagIds t where e.userId = :userId""")
+    List<TaggedAmount> findTaggedAmounts(Long userId);
 
     @Query("select distinct year(e.date) from CashEntry e where e.userId = :userId order by year(e.date)")
     List<Integer> findYearsWithEntries(Long userId);

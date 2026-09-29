@@ -191,8 +191,10 @@ public class NotificationSettingsService {
                 s.isGoalAlerts(), s.isMonthlySummary());
     }
 
+    /** The user's settings, created if missing and locked for the rest of the transaction. */
     private NotificationSettings load(long userId) {
-        return settings.findById(userId).orElseGet(() -> settings.save(new NotificationSettings(userId)));
+        settings.createIfMissing(userId);
+        return settings.findForUpdate(userId).orElseThrow();
     }
 
     private AppUser user(long userId) {

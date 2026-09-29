@@ -14,8 +14,8 @@ import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import me.luucka.finance.cashflow.CashEntry;
 import me.luucka.finance.cashflow.CashEntryRepository;
+import me.luucka.finance.cashflow.TaggedAmount;
 import me.luucka.finance.common.ApiException;
 import me.luucka.finance.core.EntryKind;
 import me.luucka.finance.core.Money;
@@ -75,14 +75,12 @@ public class TagService {
         FxTable table = fx.table(userId);
         Map<Long, Totals> totals = new HashMap<>();
         SortedSet<String> unconverted = new TreeSet<>();
-        for (CashEntry entry : entries.findTaggedByUserId(userId)) {
-            Optional<BigDecimal> value = table.toBase(entry.getAmount(), entry.getCurrency(), entry.getDate());
+        for (TaggedAmount row : entries.findTaggedAmounts(userId)) {
+            Optional<BigDecimal> value = table.toBase(row.amount(), row.currency(), row.date());
             if (value.isEmpty()) {
-                unconverted.add(entry.getCurrency());
+                unconverted.add(row.currency());
             }
-            for (Long tagId : entry.getTagIds()) {
-                totals.computeIfAbsent(tagId, id -> new Totals()).add(entry, value.orElse(null));
-            }
+            totals.computeIfAbsent(row.tagId(), id -> new Totals()).add(row, value.orElse(null));
         }
         List<TagSummary> rows = tags.findByUserIdOrderByNameAsc(userId).stream()
                 .sorted(Comparator.comparing(t -> TagNames.key(t.getName())))
@@ -171,21 +169,21 @@ public class TagService {
         private final Map<Long, BigDecimal> byCategory = new HashMap<>();
         private final Map<Long, EntryKind> categoryKinds = new HashMap<>();
 
-        void add(CashEntry entry, BigDecimal value) {
+        void add(TaggedAmount entry, BigDecimal value) {
             count++;
-            first = first == null || entry.getDate().isBefore(first) ? entry.getDate() : first;
-            last = last == null || entry.getDate().isAfter(last) ? entry.getDate() : last;
+            first = first == null || entry.date().isBefore(first) ? entry.date() : first;
+            last = last == null || entry.date().isAfter(last) ? entry.date() : last;
             if (value == null) {
                 return;
             }
-            switch (entry.getKind()) {
+            switch (entry.kind()) {
                 case INCOME -> income = income.add(value, Money.CONTEXT);
                 case EXPENSE -> expense = expense.add(value, Money.CONTEXT);
                 case TRANSFER -> transferred = transferred.add(value, Money.CONTEXT);
             }
-            if (entry.getCategoryId() != null) {
-                byCategory.merge(entry.getCategoryId(), value, (a, b) -> a.add(b, Money.CONTEXT));
-                categoryKinds.put(entry.getCategoryId(), entry.getKind());
+            if (entry.categoryId() != null) {
+                byCategory.merge(entry.categoryId(), value, (a, b) -> a.add(b, Money.CONTEXT));
+                categoryKinds.put(entry.categoryId(), entry.kind());
             }
         }
 

@@ -22,6 +22,7 @@ import me.luucka.finance.core.EntryKind;
 import me.luucka.finance.core.cashflow.CashflowCalculator;
 import me.luucka.finance.core.cashflow.CashflowEntry;
 import me.luucka.finance.core.cashflow.CashflowTotals;
+import me.luucka.finance.core.cashflow.DatedAmount;
 import me.luucka.finance.core.fx.FxTable;
 import me.luucka.finance.core.valuation.NetWorthCalculator;
 import me.luucka.finance.core.valuation.PositionHistory;
@@ -151,8 +152,10 @@ public class DashboardService {
 
     public CashflowYearsResponse cashflowYears(long userId) {
         FxTable fx = fxService.table(userId);
-        Map<Long, AssetClass> classes = assetClasses(userId);
-        List<CashflowEntry> data = entries.findByUserId(userId).stream().map(e -> toCashflow(e, classes)).toList();
+        // A day's sum converts like its entries: the rate is the same for one currency on one day
+        List<DatedAmount> data = entries.sumByDay(userId).stream()
+                .map(s -> new DatedAmount(s.date(), s.kind(), s.amount(), s.currency()))
+                .toList();
         CashflowCalculator.MultiYearResult result = CashflowCalculator.years(data, fx);
         List<YearRow> rows = result.years().stream().map(y -> new YearRow(y.year(), y.totals())).toList();
         return new CashflowYearsResponse(fx.baseCurrency(), rows, result.unconvertedCurrencies());

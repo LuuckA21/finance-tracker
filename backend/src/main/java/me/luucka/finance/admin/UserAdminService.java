@@ -72,10 +72,10 @@ public class UserAdminService {
 
     /**
      * Creates a user with default categories. When {@code password} is null a random one is
-     * generated. The user must change it at first login either way.
+     * generated. The user must change it at first login either way. The language is the new user's
+     * interface language and names their starting categories.
      */
     @Transactional
-    /** The language is the new user's interface language and names their starting categories. */
     public UserWithPassword create(String rawUsername, Role role, String password, Language language) {
         String username = rawUsername.trim().toLowerCase(Locale.ROOT);
         if (!USERNAME.matcher(username).matches()) {

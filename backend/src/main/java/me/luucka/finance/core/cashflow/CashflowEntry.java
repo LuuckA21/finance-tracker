@@ -30,6 +30,11 @@ public record CashflowEntry(LocalDate date, EntryKind kind, BigDecimal amount, S
         }
     }
 
+    /** Date, kind, amount and currency only: what yearly totals need. */
+    public DatedAmount dated() {
+        return new DatedAmount(date, kind, amount, currency);
+    }
+
     /** An income or expense. */
     public CashflowEntry(LocalDate date, EntryKind kind, BigDecimal amount, String currency, long categoryId) {
         this(date, kind, amount, currency, categoryId, null);
