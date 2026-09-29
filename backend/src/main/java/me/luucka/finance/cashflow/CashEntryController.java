@@ -54,11 +54,13 @@ public class CashEntryController {
             @Size(max = 500) String description,
             // Transfers only, both optional: the user's positions the money moved from and to
             Long fromPositionId,
-            Long toPositionId) {
+            Long toPositionId,
+            // Names; unknown ones become new tags of the user (rules checked by the service)
+            @Size(max = 50) List<@NotNull @Size(max = 100) String> tags) {
 
         CashEntryService.EntryData toData() {
             return new CashEntryService.EntryData(date, kind, categoryId, amount, currency, description,
-                    fromPositionId, toPositionId);
+                    fromPositionId, toPositionId, tags == null ? List.of() : tags);
         }
     }
 
@@ -90,9 +92,10 @@ public class CashEntryController {
             @RequestParam(required = false) EntryKind kind,
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) Long tagId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        var filter = new CashEntryService.Filter(from, to, kind, categoryId, q);
+        var filter = new CashEntryService.Filter(from, to, kind, categoryId, q, tagId);
         return service.list(me.id(), filter, page, size);
     }
 
@@ -104,8 +107,9 @@ public class CashEntryController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) EntryKind kind,
             @RequestParam(required = false) Long categoryId,
-            @RequestParam(required = false) String q) {
-        byte[] body = csv.export(me.id(), new CashEntryService.Filter(from, to, kind, categoryId, q));
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) Long tagId) {
+        byte[] body = csv.export(me.id(), new CashEntryService.Filter(from, to, kind, categoryId, q, tagId));
         return ResponseEntity.ok()
                 .contentType(CSV)
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()

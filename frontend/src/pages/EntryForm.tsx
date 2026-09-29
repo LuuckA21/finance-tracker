@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { ApiError, errorMessage } from '../api/client'
-import { useCategories, useMe, useSaveEntry } from '../api/hooks'
+import { useCategories, useMe, useSaveEntry, useTags } from '../api/hooks'
 import type { CashEntry, EntryKind } from '../api/types'
+import { TagInput } from '../components/TagInput'
 import { TransferFields } from '../components/TransferFields'
 import { Button, ErrorAlert, Field, Modal, Segmented } from '../components/ui'
 import { useI18n } from '../i18n'
@@ -22,6 +23,7 @@ function EntryForm({ entry, onDone }: { entry: CashEntry | null; onDone: () => v
   const me = useMe().data
   const categories = useCategories().data ?? []
   const save = useSaveEntry()
+  const tagNames = (useTags().data?.tags ?? []).map((tag) => tag.name)
   const { t } = useI18n()
 
   const [kind, setKind] = useState<EntryKind>(entry?.kind ?? 'EXPENSE')
@@ -31,6 +33,7 @@ function EntryForm({ entry, onDone }: { entry: CashEntry | null; onDone: () => v
   const [currency, setCurrency] = useState(entry?.currency ?? lastCurrency ?? me?.baseCurrency ?? 'CHF')
   const [description, setDescription] = useState(entry?.description ?? '')
   const [route, setRoute] = useState({ from: entry?.fromPositionId ?? null, to: entry?.toPositionId ?? null })
+  const [tags, setTags] = useState<string[]>(entry?.tags ?? [])
   const isTransfer = kind === 'TRANSFER'
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
@@ -65,9 +68,11 @@ function EntryForm({ entry, onDone }: { entry: CashEntry | null; onDone: () => v
         description: description.trim() || null,
         fromPositionId: isTransfer ? route.from : null,
         toPositionId: isTransfer ? route.to : null,
+        tags,
       })
       lastCurrency = currency.toUpperCase()
       if (again) {
+        // Tags stay: the next entry is often part of the same trip or project
         setAmount('')
         setDescription('')
       } else {
@@ -135,6 +140,9 @@ function EntryForm({ entry, onDone }: { entry: CashEntry | null; onDone: () => v
       )}
       <Field label={t('entryForm.descriptionOptional')} error={fieldErrors.description}>
         {(id) => <input id={id} className="input" maxLength={500} value={description} onChange={(e) => setDescription(e.target.value)} />}
+      </Field>
+      <Field label={t('tags.label')} hint={t('tags.hint')} error={fieldErrors.tags}>
+        {(id) => <TagInput id={id} value={tags} onChange={setTags} suggestions={tagNames} />}
       </Field>
       <ErrorAlert message={error} />
       <div className="flex flex-wrap justify-end gap-2">

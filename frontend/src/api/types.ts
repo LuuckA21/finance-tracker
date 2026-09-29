@@ -53,6 +53,8 @@ export interface CashEntry {
   /** Transfers only, both optional */
   fromPositionId: number | null
   toPositionId: number | null
+  /** Tag names, sorted; unknown names become new tags when saving */
+  tags: string[]
 }
 
 export type Frequency = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'FOUR_MONTHLY' | 'SEMIANNUAL' | 'YEARLY'
@@ -153,12 +155,12 @@ export interface FxRate {
 export type ImportRowError =
   | 'invalid_date' | 'invalid_amount' | 'zero_amount' | 'invalid_currency' | 'description_too_long'
   | 'invalid_kind' | 'missing_category' | 'unknown_category' | 'category_kind_mismatch'
-  | 'unknown_position' | 'transfer_same_position'
+  | 'unknown_position' | 'transfer_same_position' | 'invalid_tags'
 
 /** One CSV data row: raw text as in the file plus the values that could be read. */
 export interface ImportPreviewRow {
   line: number
-  raw: Partial<Record<'date' | 'kind' | 'category' | 'amount' | 'currency' | 'description' | 'from' | 'to', string>>
+  raw: Partial<Record<'date' | 'kind' | 'category' | 'amount' | 'currency' | 'description' | 'from' | 'to' | 'tags', string>>
   date: string | null
   kind: EntryKind | null
   categoryId: number | null
@@ -167,6 +169,7 @@ export interface ImportPreviewRow {
   description: string | null
   fromPositionId: number | null
   toPositionId: number | null
+  tags: string[]
   duplicate: boolean
   errors: ImportRowError[]
 }
@@ -339,5 +342,24 @@ export interface Goal {
   monthsLeft: number | null
   /** YEARLY: the calendar year measured */
   year: number | null
+  unconvertedCurrencies: string[]
+}
+
+/** A tag with the totals of its entries in the base currency, all dates. */
+export interface TagSummary {
+  id: number
+  name: string
+  entryCount: number
+  income: number
+  expense: number
+  transferred: number
+  /** Null for a tag without entries */
+  firstDate: string | null
+  lastDate: string | null
+}
+
+export interface Tags {
+  baseCurrency: string
+  tags: TagSummary[]
   unconvertedCurrencies: string[]
 }

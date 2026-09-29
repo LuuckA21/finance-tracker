@@ -20,6 +20,9 @@ public interface CashEntryRepository extends JpaRepository<CashEntry, Long>, Jpa
 
     List<CashEntry> findByUserId(Long userId);
 
+    @Query("select e from CashEntry e where e.userId = :userId and e.tagIds is not empty")
+    List<CashEntry> findTaggedByUserId(Long userId);
+
     @Query("select distinct year(e.date) from CashEntry e where e.userId = :userId order by year(e.date)")
     List<Integer> findYearsWithEntries(Long userId);
 }

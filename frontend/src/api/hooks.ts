@@ -26,13 +26,14 @@ import type {
   Position,
   RecurringEntry,
   Snapshot,
+  Tags,
   UserWithPassword,
 } from './types'
 import type { Language } from '../i18n'
 import type { Theme } from '../preferences/theme'
 
 // Every mutation that changes financial data invalidates the dashboards too.
-const FINANCE_KEYS = [['entries'], ['dashboard'], ['positions'], ['fx'], ['budgets'], ['goals']] as const
+const FINANCE_KEYS = [['entries'], ['dashboard'], ['positions'], ['fx'], ['budgets'], ['goals'], ['tags']] as const
 
 function useInvalidate() {
   const qc = useQueryClient()
@@ -129,6 +130,7 @@ export interface EntryFilter {
   kind?: EntryKind | ''
   categoryId?: number | ''
   q?: string
+  tagId?: number | ''
   page: number
   size: number
 }
@@ -188,6 +190,27 @@ export function useSaveEntry() {
 export function useDeleteEntry() {
   const invalidate = useInvalidate()
   return useMutation({ mutationFn: (id: number) => del(`/api/cash-entries/${id}`), onSuccess: () => invalidate() })
+}
+
+// ---------------------------------------------------------------- tags
+
+export const useTags = () => useQuery({ queryKey: ['tags'], queryFn: () => get<Tags>('/api/tags') })
+
+export function useRenameTag() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: ({ id, name }: { id: number; name: string }) => put<unknown>(`/api/tags/${id}`, { name }),
+    // Entries show tag names: refresh them too
+    onSuccess: () => invalidate([['tags'], ['entries']]),
+  })
+}
+
+export function useDeleteTag() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: (id: number) => del(`/api/tags/${id}`),
+    onSuccess: () => invalidate([['tags'], ['entries']]),
+  })
 }
 
 // ---------------------------------------------------------------- recurring entries

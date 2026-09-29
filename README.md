@@ -16,6 +16,10 @@ Self-hosted personal finance app for a small group of users (you and your family
   currency). The Budget page shows, for any month, what was spent, what is left, the categories
   close to (80 %) or over their limit, an end-of-month projection for the current month and the
   spending in categories without a budget, with a suggestion from the last 3 months' average.
+- **Tags** – free labels on entries across categories ("Holidays 2026", "Wedding"): typed on
+  the entry (existing ones suggested, case does not matter, up to 10 per entry), clickable to
+  filter the list, with the totals of each tag (spent, received, transferred, period). They can be
+  renamed or deleted in the settings, and travel through the CSV export and import.
 - **Savings goals** – either a balance to reach on some positions (an emergency fund, a home
   deposit), optionally by a date, or a yearly amount to put into them (e.g. the pillar 3a
   maximum). Each goal shows its progress, the pace of the last 6 months and the month the target
@@ -33,7 +37,8 @@ Self-hosted personal finance app for a small group of users (you and your family
   see duplicates. Headers in Italian, English, German or French; dates `2026-08-01` or
   `01.08.2026`; amounts `1234.50`, `1234,50` or `1'234.50`. Transfers use the type
   "Trasferimento"/"Transfer"/"Umbuchung"/"Virement" and the optional columns `da`/`verso`
-  (`from`/`to`, `von`/`nach`, `de`/`vers`) with position names.
+  (`from`/`to`, `von`/`nach`, `de`/`vers`) with position names. Tags go in an optional column
+  (`etichette`/`tags`/`étiquettes`), separated by commas.
 - **Multi-currency** – each entry/position keeps its own currency; dashboards convert to the
   user's base currency with the ECB reference rates, downloaded automatically every working day
   and shared by all users. A user's own manual rates take priority over them.
@@ -58,7 +63,7 @@ backend/
     auth/        security config, login + 2FA flow, rate limiting, session revocation
     account/     self-service: password, preferences (base currency, language, theme), 2FA, login history
     admin/       user management (no public sign-up) + bootstrap admin
-    category/ cashflow/ recurring/ position/ fx/ dashboard/ budget/ goal/
+    category/ cashflow/ recurring/ position/ fx/ dashboard/ budget/ goal/ tag/
   src/main/resources/db/migration/   Flyway migrations
   src/test/java/…/core/              unit tests (no Spring)
   src/test/java/…/*IT.java           integration tests (Testcontainers + MockMvc)
@@ -341,11 +346,12 @@ encrypted with it).
 | Auth | `GET /api/auth/csrf`, `POST /api/auth/login`, `POST /api/auth/login/mfa`, `POST /api/auth/logout`, `GET /api/auth/me` |
 | Account | `PUT /api/account/password`, `PUT /api/account/settings` (partial: `baseCurrency`, `language` `IT\|EN\|DE\|FR`, `theme` `SYSTEM\|LIGHT\|DARK`), `GET /api/account/logins`, `POST /api/account/mfa/{setup,enable,disable,recovery-codes}` |
 | Categories | `GET/POST /api/categories`, `PUT/DELETE /api/categories/{id}` |
-| Entries | `GET /api/cash-entries?from&to&kind&categoryId&q&page&size` (kind `INCOME\|EXPENSE\|TRANSFER`; transfers take `fromPositionId`/`toPositionId` instead of `categoryId`), `POST`, `PUT/DELETE /{id}`, `GET /export?filters` (CSV), `POST /import/preview` (multipart `file`), `POST /import` (`{entries:[…]}`) |
+| Entries | `GET /api/cash-entries?from&to&kind&categoryId&q&tagId&page&size` (each entry has `tags`: names; unknown names sent on save become new tags) (kind `INCOME\|EXPENSE\|TRANSFER`; transfers take `fromPositionId`/`toPositionId` instead of `categoryId`), `POST`, `PUT/DELETE /{id}`, `GET /export?filters` (CSV), `POST /import/preview` (multipart `file`), `POST /import` (`{entries:[…]}`) |
 | Recurring | `GET/POST /api/recurring-entries`, `PUT/DELETE /{id}` (frequency `DAILY\|WEEKLY\|MONTHLY\|QUARTERLY\|FOUR_MONTHLY\|SEMIANNUAL\|YEARLY`) |
 | Positions | `GET/POST /api/positions`, `GET/PUT/DELETE /{id}`, `GET/POST /{id}/snapshots`, `PUT/DELETE /{id}/snapshots/{sid}`, `POST /api/positions/snapshots/bulk` |
 | FX | `GET/POST /api/fx-rates`, `DELETE /{id}` (manual rates), `GET /api/fx-rates/central?date` (ECB rates in the base currency on a day, default today) |
 | Budgets | `GET /api/budgets`, `PUT/DELETE /api/budgets/{categoryId}` (`{amount,currency}`), `GET /api/budgets/status?month=yyyy-MM` |
+| Tags | `GET /api/tags` (with totals in the base currency), `PUT/DELETE /api/tags/{id}` (`{name}`; deleting keeps the entries) |
 | Goals | `GET/POST /api/goals` (list with progress), `PUT/DELETE /api/goals/{id}` (`{name,kind:BALANCE\|YEARLY,targetAmount,currency,targetDate?,positionIds}`) |
 | Dashboards | `GET /api/dashboard/cashflow?year`, `/cashflow/years`, `/net-worth?granularity=MONTH\|YEAR&from=yyyy-MM&to=yyyy-MM`, `/net-worth/detail?date` |
 | Admin | `GET/POST /api/admin/users`, `PATCH/DELETE /{id}`, `POST /{id}/{reset-password,unlock,reset-mfa}`, `GET /api/admin/fx`, `POST /api/admin/fx/refresh`, `POST /api/admin/fx/history` (202, runs in background) |
