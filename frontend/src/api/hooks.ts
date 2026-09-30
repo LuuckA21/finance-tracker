@@ -16,6 +16,9 @@ import type {
   EntryKind,
   CentralRates,
   EcbStatus,
+  Forecast,
+  ForecastInput,
+  ForecastScenario,
   FxRate,
   ImportPreview,
   Granularity,
@@ -450,6 +453,43 @@ export function useDeleteGoal() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['goals'] }),
   })
 }
+
+// ---------------------------------------------------------------- forecasts
+
+export const useForecasts = () => useQuery({ queryKey: ['forecasts'], queryFn: () => get<ForecastScenario[]>('/api/forecasts') })
+
+export function useSaveForecast() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...body }: ForecastInput & { id?: number }) =>
+      id ? put<ForecastScenario>(`/api/forecasts/${id}`, body) : post<ForecastScenario>('/api/forecasts', body),
+    // In the list at once, so the page can select it before the refetch
+    onSuccess: (saved) => {
+      qc.setQueryData<ForecastScenario[]>(['forecasts'], (old) => old && [...old.filter((s) => s.id !== saved.id), saved])
+      return qc.invalidateQueries({ queryKey: ['forecasts'] })
+    },
+  })
+}
+
+export function useDeleteForecast() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => del(`/api/forecasts/${id}`),
+    onSuccess: (_, id) => {
+      qc.setQueryData<ForecastScenario[]>(['forecasts'], (old) => old?.filter((s) => s.id !== id))
+      return qc.invalidateQueries({ queryKey: ['forecasts'] })
+    },
+  })
+}
+
+/** The forecast of a scenario being edited (saved or not); under 'dashboard', so new entries refresh it. */
+export const useForecastPreview = (input: ForecastInput | null) =>
+  useQuery({
+    queryKey: ['dashboard', 'forecast', input],
+    queryFn: () => post<Forecast>('/api/forecasts/preview', input),
+    enabled: input !== null,
+    placeholderData: keepPreviousData,
+  })
 
 // ---------------------------------------------------------------- dashboards
 

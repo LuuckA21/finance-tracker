@@ -5,6 +5,13 @@ Self-hosted personal finance app for a small group of users (you and your family
 - **Cash flow** – record income and expenses (date, category, amount, currency, note) and see
   monthly and yearly dashboards: totals, savings rate, breakdown by category and by tag, and a
   table of categories × tags.
+- **Forecast** – income and expenses of a coming year, month by month, in saved scenarios. Each
+  month starts from the same month of the base (the year before once it is over, until then the
+  last 12 complete months), grows by a percentage for income and one for expenses, and adds extra
+  items in the base currency: every month from one month to another (a new rent) or once (a car),
+  negative to take something away (a subscription cancelled). Tags and categories can be left out
+  of the base (a one-off trip). The result: totals against the base and where the difference comes
+  from, a chart, a monthly table with the savings to date, and the categories base vs forecast.
 - **Recurring entries** – salary, rent, subscriptions: daily, weekly, monthly, quarterly, every 4
   or 6 months, yearly, with optional end date. The entries are created automatically when due
   (just after midnight and at startup, catching up days the server was down) and are ordinary
@@ -78,7 +85,7 @@ backend/
     auth/        security config, login + 2FA flow, rate limiting, session revocation
     account/     self-service: password, preferences (base currency, language, theme), 2FA, login history
     admin/       user management (no public sign-up) + bootstrap admin
-    category/ cashflow/ recurring/ position/ fx/ dashboard/ budget/ goal/ tag/ report/ notification/
+    category/ cashflow/ recurring/ position/ fx/ dashboard/ budget/ goal/ tag/ forecast/ report/ notification/
   src/main/resources/db/migration/   Flyway migrations
   src/test/java/…/core/              unit tests (no Spring)
   src/test/java/…/*IT.java           integration tests (Testcontainers + MockMvc)
@@ -401,6 +408,7 @@ encrypted with it).
 | Budgets | `GET /api/budgets`, `PUT/DELETE /api/budgets/{categoryId}` (`{amount,currency}`), `GET /api/budgets/status?month=yyyy-MM` |
 | Tags | `GET /api/tags` (with totals in the base currency, also per category), `PUT/DELETE /api/tags/{id}` (`{name}`; deleting keeps the entries) |
 | Goals | `GET/POST /api/goals` (list with progress), `PUT/DELETE /api/goals/{id}` (`{name,kind:BALANCE\|YEARLY,targetAmount,currency,targetDate?,positionIds}`) |
+| Forecasts | `GET/POST /api/forecasts`, `PUT/DELETE /api/forecasts/{id}` (`{name, year, incomeGrowth, expenseGrowth, excludedTagIds, excludedCategoryIds, items:[{description, kind, categoryId, amount, schedule: MONTHLY\|ONCE, startMonth, endMonth}]}`), `POST /api/forecasts/preview` (the same body, saved or not: the forecast month by month) |
 | Reports | `GET /api/reports/annual?year` (totals and categories against the year before, net worth and positions at the start and end, tags, largest expenses) |
 | Notifications | `GET/PUT /api/account/notifications` (`mailEnabled`, `email`, `pendingEmail`, `budgetAlerts`, `goalAlerts`, `monthlySummary`), `POST /email` (`{email}`: sends a code), `POST /email/confirm` (`{code}`), `DELETE /email`, `POST /test` |
 | Dashboards | `GET /api/dashboard/cashflow?year` (with `tags`: income and expenses of each tag in the year, and `tagMatrices`: categories × tags), `/cashflow/years`, `/net-worth?granularity=MONTH\|YEAR&from=yyyy-MM&to=yyyy-MM`, `/net-worth/detail?date` |
