@@ -73,8 +73,10 @@ Self-hosted personal finance app for a small group of users (you and your family
   categories ("Casa") and, under them, optional detail categories ("Affitto", "Energia"). An entry
   sits on a macro or on a detail; filters on a macro take in its details, and the Income & expenses
   page, the categories × tags table, the tag totals, the monthly email, the annual summary and the
-  forecast add details up to their macro (the cash flow and the summary open each macro on its details; entries on the macro itself
-  show as "Casa (senza dettaglio)"). Each user starts with macros and details named in the language
+  forecast add details up to their macro. On the Income & expenses page each macro's bar is split
+  into its details (shades of one colour, largest first, entries on the macro itself in grey) and
+  opens on their amounts; the annual summary lists them under the macro; entries on the macro itself
+  show as "Casa (senza dettaglio)". Each user starts with macros and details named in the language
   chosen when the account is created (`APP_ADMIN_LANGUAGE` for the first admin); from then on they
   are the user's own to rename, recolour, move between levels or delete (a macro once its details
   are gone). Users created before the two levels got the default details under their default

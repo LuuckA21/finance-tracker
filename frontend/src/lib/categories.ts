@@ -34,3 +34,49 @@ export function categoryPath(id: number | null | undefined, byId: Map<number, Ca
 export function macros(categories: Category[], kind?: CategoryKind): Category[] {
   return categories.filter((c) => c.parentId === null && (!kind || c.kind === kind)).toSorted(byName)
 }
+
+/** One part of a macro category's bar: a detail, the rest of the details together, or the macro's own entries. */
+export interface BarPart {
+  key: string
+  /** A detail's name; empty for the macro's own entries and for the rest */
+  name: string
+  amount: number
+  share: number | null
+  role: 'detail' | 'rest' | 'own'
+  /** Position among the parts that are details (the shade to paint them with), -1 for the macro's own entries */
+  step: number
+  /** Details folded into the rest */
+  count: number
+  /** For the rest, the details it holds, largest first */
+  members: { key: string; name: string; amount: number; share: number | null }[]
+}
+
+/**
+ * The parts of a macro category's bar, largest first: its details, those past the first
+ * {@code maxDetails - 1} folded into one part when there are more than {@code maxDetails}, then the
+ * macro's own entries (under the macro's id). None for a macro without details.
+ */
+export function barParts(macroId: number, details: { categoryId: number; name: string; amount: number; share: number | null }[],
+  maxDetails: number): BarPart[] {
+  const own = details.filter((d) => d.categoryId === macroId)
+  const named = details.filter((d) => d.categoryId !== macroId).toSorted((a, b) => b.amount - a.amount)
+  if (named.length === 0) return []
+  const shown = named.length > maxDetails ? named.slice(0, maxDetails - 1) : named
+  const rest = named.slice(shown.length)
+  const parts: BarPart[] = shown.map((d, i) => ({
+    key: String(d.categoryId), name: d.name, amount: d.amount, share: d.share, role: 'detail', step: i, count: 1, members: [],
+  }))
+  if (rest.length > 0) {
+    const shares = rest.map((d) => d.share)
+    parts.push({
+      key: 'rest', name: '', amount: rest.reduce((sum, d) => sum + d.amount, 0),
+      share: shares.includes(null) ? null : shares.reduce<number>((sum, s) => sum + (s ?? 0), 0),
+      role: 'rest', step: shown.length, count: rest.length,
+      members: rest.map((d) => ({ key: String(d.categoryId), name: d.name, amount: d.amount, share: d.share })),
+    })
+  }
+  for (const d of own) {
+    parts.push({ key: String(d.categoryId), name: '', amount: d.amount, share: d.share, role: 'own', step: -1, count: 0, members: [] })
+  }
+  return parts
+}

@@ -813,4 +813,6 @@ export const de: Messages = {
   'error.budget_conflict': 'Eine Hauptkategorie und ihre Unterkategorien können nicht beide ein Budget haben: Das Budget der Hauptkategorie umfasst die Unterkategorien bereits.',
   'import.error.unknown_subcategory': 'Keine Unterkategorie „{value}“',
   'import.error.ambiguous_category': '„{value}“ ist Unterkategorie mehrerer Hauptkategorien: Gib auch die Hauptkategorie an',
+  'cashflow.otherDetails': '{count} weitere Unterkategorien',
+  'cashflow.categoriesHelp': 'Die Balken teilen sich in die Unterkategorien auf, die grösste zuerst; grau die Buchungen ohne Unterkategorie. Öffne eine Kategorie, um die Beträge zu sehen.',
 }

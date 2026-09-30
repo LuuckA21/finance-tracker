@@ -811,4 +811,6 @@ export const it = {
   'error.budget_conflict': 'Una macro e i suoi dettagli non possono avere entrambi un budget: quello della macro comprende già i dettagli.',
   'import.error.unknown_subcategory': 'Dettaglio «{value}» inesistente',
   'import.error.ambiguous_category': '«{value}» è un dettaglio di più macro: indica anche la macro',
+  'cashflow.otherDetails': 'Altri {count} dettagli',
+  'cashflow.categoriesHelp': 'Le barre si dividono nei dettagli della categoria, il più grande per primo; in grigio i movimenti senza dettaglio. Apri una categoria per vedere gli importi.',
 }
