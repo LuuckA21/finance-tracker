@@ -11,6 +11,7 @@ import { useI18n } from '../i18n'
 import { date, money } from '../lib/format'
 import { EntryFormModal } from './EntryForm'
 import { ImportModal } from './EntryImport'
+import { CategoryOptions } from '../components/CategoryOptions'
 
 /** Stable while categories load, so memoized lookups are not rebuilt on every render. */
 const NO_CATEGORIES: Category[] = []
@@ -94,9 +95,7 @@ export function EntriesPage() {
           <select className="input" aria-label={t('entries.category')} value={filter.categoryId} disabled={filter.kind === 'TRANSFER'}
             onChange={(e) => update({ categoryId: e.target.value ? Number(e.target.value) : '' })}>
             <option value="">{t('entries.allCategories')}</option>
-            {categories.filter((c) => !filter.kind || c.kind === filter.kind).map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
+            <CategoryOptions categories={categories} kind={filter.kind === 'INCOME' || filter.kind === 'EXPENSE' ? filter.kind : undefined} />
           </select>
           {tags && tags.tags.length > 0 && (
             <select className="input" aria-label={t('tags.label')} value={filter.tagId}

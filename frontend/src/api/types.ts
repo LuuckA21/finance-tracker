@@ -32,11 +32,13 @@ export interface Me {
   passwordChangeRequired: boolean
 }
 
+/** A macro category, or a detail category under the macro {@code parentId} */
 export interface Category {
   id: number
   name: string
   kind: CategoryKind
   color: string
+  parentId: number | null
 }
 
 export interface CashEntry {
@@ -156,13 +158,14 @@ export interface FxRate {
 
 export type ImportRowError =
   | 'invalid_date' | 'invalid_amount' | 'zero_amount' | 'invalid_currency' | 'description_too_long'
-  | 'invalid_kind' | 'missing_category' | 'unknown_category' | 'category_kind_mismatch'
+  | 'invalid_kind' | 'missing_category' | 'unknown_category' | 'unknown_subcategory' | 'ambiguous_category'
+  | 'category_kind_mismatch'
   | 'unknown_position' | 'transfer_same_position' | 'invalid_tags'
 
 /** One CSV data row: raw text as in the file plus the values that could be read. */
 export interface ImportPreviewRow {
   line: number
-  raw: Partial<Record<'date' | 'kind' | 'category' | 'amount' | 'currency' | 'description' | 'from' | 'to' | 'tags', string>>
+  raw: Partial<Record<'date' | 'kind' | 'category' | 'subcategory' | 'amount' | 'currency' | 'description' | 'from' | 'to' | 'tags', string>>
   date: string | null
   kind: EntryKind | null
   categoryId: number | null
@@ -226,6 +229,7 @@ export interface CashflowYear {
   year: number
   months: { month: number; totals: CashflowTotals }[]
   totals: CashflowTotals
+  /** By macro category, largest first */
   categories: {
     categoryId: number
     name: string
@@ -233,6 +237,8 @@ export interface CashflowYear {
     kind: CategoryKind
     amount: number
     share: number | null
+    /** Largest first, when any detail has entries; the macro's own entries under the macro's id */
+    details: { categoryId: number; name: string; color: string; amount: number; share: number | null }[]
   }[]
   /** Transfers by asset class of the destination; null when no destination was given */
   transfers: { destination: AssetClass | null; amount: number; share: number | null }[]
@@ -449,7 +455,16 @@ export interface AnnualReport {
   /** 1 January to the same day one year earlier */
   previousTotals: CashflowTotals
   /** Income first, then expenses; largest first */
-  categories: { categoryId: number; name: string; color: string; kind: EntryKind; amount: number; previousAmount: number }[]
+  categories: {
+    categoryId: number
+    name: string
+    color: string
+    kind: EntryKind
+    amount: number
+    previousAmount: number
+    /** When any detail has entries; the macro's own entries under the macro's id */
+    details: { categoryId: number; name: string; color: string; amount: number; previousAmount: number }[]
+  }[]
   /** Value of every position on 31 December of the previous year */
   netWorthStart: number
   netWorthEnd: number

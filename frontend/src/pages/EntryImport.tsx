@@ -8,19 +8,21 @@ import { transferOptions } from '../components/TransferFields'
 import { Badge, Button, ErrorAlert, Field, Modal, Segmented } from '../components/ui'
 import { useI18n, type Language, type MessageKey } from '../i18n'
 import { date, money } from '../lib/format'
+import { CategoryOptions } from '../components/CategoryOptions'
+import { PATH_SEPARATOR } from '../lib/categories'
 
 type Mode = 'all' | 'review'
 
 /** Problems the review can fix by choosing type, category or positions; the others need a corrected file. */
-const FIXABLE: ImportRowError[] = ['invalid_kind', 'missing_category', 'unknown_category', 'category_kind_mismatch',
-  'unknown_position', 'transfer_same_position']
+const FIXABLE: ImportRowError[] = ['invalid_kind', 'missing_category', 'unknown_category', 'unknown_subcategory',
+  'ambiguous_category', 'category_kind_mismatch', 'unknown_position', 'transfer_same_position']
 const REVIEW_PAGE = 100
 /** Downloadable example file, with the headers and kind words of each interface language. */
 const TEMPLATES: Record<Language, { file: string; header: string; expense: string; income: string; transfer: string; shop: string; savings: string; tag: string }> = {
-  IT: { file: 'modello.csv', header: 'data;tipo;categoria;importo;valuta;descrizione;da;verso;etichette', expense: 'Uscita', income: 'Entrata', transfer: 'Trasferimento', shop: 'Supermercato', savings: 'Risparmio', tag: 'Casa' },
-  EN: { file: 'template.csv', header: 'date;type;category;amount;currency;description;from;to;tags', expense: 'Expense', income: 'Income', transfer: 'Transfer', shop: 'Supermarket', savings: 'Savings', tag: 'Home' },
-  DE: { file: 'vorlage.csv', header: 'datum;art;kategorie;betrag;währung;beschreibung;von;nach;tags', expense: 'Ausgabe', income: 'Einnahme', transfer: 'Umbuchung', shop: 'Supermarkt', savings: 'Sparen', tag: 'Haushalt' },
-  FR: { file: 'modele.csv', header: 'date;type;catégorie;montant;monnaie;description;de;vers;étiquettes', expense: 'Dépense', income: 'Revenu', transfer: 'Virement', shop: 'Supermarché', savings: 'Épargne', tag: 'Maison' },
+  IT: { file: 'modello.csv', header: 'data;tipo;categoria;sottocategoria;importo;valuta;descrizione;da;verso;etichette', expense: 'Uscita', income: 'Entrata', transfer: 'Trasferimento', shop: 'Supermercato', savings: 'Risparmio', tag: 'Casa' },
+  EN: { file: 'template.csv', header: 'date;type;category;subcategory;amount;currency;description;from;to;tags', expense: 'Expense', income: 'Income', transfer: 'Transfer', shop: 'Supermarket', savings: 'Savings', tag: 'Home' },
+  DE: { file: 'vorlage.csv', header: 'datum;art;kategorie;unterkategorie;betrag;währung;beschreibung;von;nach;tags', expense: 'Ausgabe', income: 'Einnahme', transfer: 'Umbuchung', shop: 'Supermarkt', savings: 'Sparen', tag: 'Haushalt' },
+  FR: { file: 'modele.csv', header: 'date;type;catégorie;sous-catégorie;montant;monnaie;description;de;vers;étiquettes', expense: 'Dépense', income: 'Revenu', transfer: 'Virement', shop: 'Supermarché', savings: 'Épargne', tag: 'Maison' },
 }
 const MAX_FILE_BYTES = 2 * 1024 * 1024
 
@@ -114,11 +116,14 @@ function SelectStep({ onStep }: { onStep: (step: Step) => void }) {
   }
 
   function downloadTemplate() {
-    const expense = categories.find((c) => c.kind === 'EXPENSE')?.name ?? ''
-    const income = categories.find((c) => c.kind === 'INCOME')?.name ?? ''
+    // An expense on a detail category (macro and detail), an income on a macro
+    const detail = categories.find((c) => c.kind === 'EXPENSE' && c.parentId !== null)
+    const macro = categories.find((c) => c.id === detail?.parentId)
+    const expense = macro ? `${macro.name};${detail!.name}` : `${categories.find((c) => c.kind === 'EXPENSE')?.name ?? ''};`
+    const income = categories.find((c) => c.kind === 'INCOME' && c.parentId === null)?.name ?? ''
     const tpl = TEMPLATES[language]
     const csv = `${tpl.header}\r\n2026-08-01;${tpl.expense};${expense};45.20;CHF;${tpl.shop};;;${tpl.tag}\r\n`
-      + `2026-08-25;${tpl.income};${income};6000;CHF;;;;\r\n2026-08-28;${tpl.transfer};;500;CHF;${tpl.savings};;;\r\n`
+      + `2026-08-25;${tpl.income};${income};;6000;CHF;;;;\r\n2026-08-28;${tpl.transfer};;;500;CHF;${tpl.savings};;;\r\n`
     saveBlob(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }), tpl.file)
   }
 
@@ -307,10 +312,10 @@ function ReviewStep({ preview, onStep }: { preview: ImportPreview; onStep: (step
                       aria-label={t('entries.category')} value={row.categoryId ?? ''} disabled={fatal.length > 0 || row.kind === null}
                       onChange={(e) => change(index, { categoryId: e.target.value ? Number(e.target.value) : null })}>
                       <option value="">{t('entryForm.choose')}</option>
-                      {options.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      <CategoryOptions categories={options} />
                     </select>
                     {row.source.raw.category && row.categoryId === null && (
-                      <p className="mt-0.5 text-xs text-muted">{t('import.inFile', { value: row.source.raw.category })}</p>
+                      <p className="mt-0.5 text-xs text-muted">{t('import.inFile', { value: [row.source.raw.category, row.source.raw.subcategory].filter(Boolean).join(PATH_SEPARATOR) })}</p>
                     )}
                     </>)}
                   </td>
@@ -420,7 +425,8 @@ function rowErrorText(error: ImportRowError, row: ImportPreviewRow, t: Translate
   // Only the side that did not match one of the user's positions
   const value = error === 'unknown_position'
     ? [row.fromPositionId === null ? row.raw.from : null, row.toPositionId === null ? row.raw.to : null].filter(Boolean).join(', ')
-    : error === 'invalid_kind' ? row.raw.kind : row.raw.category
+    : error === 'invalid_kind' ? row.raw.kind
+      : [row.raw.category, row.raw.subcategory].filter(Boolean).join(PATH_SEPARATOR)
   return t(`import.error.${error}` as MessageKey, { value: value ?? '' })
 }
 

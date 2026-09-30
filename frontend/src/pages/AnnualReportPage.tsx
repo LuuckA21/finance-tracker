@@ -4,6 +4,7 @@ import { useAnnualReport, useCategories } from '../api/hooks'
 import type { AnnualReport, Category } from '../api/types'
 import { Badge, Button, Card, EmptyState, MissingRatesNotice, PageHeader, Spinner, StatTile } from '../components/ui'
 import { useI18n } from '../i18n'
+import { categoryPath } from '../lib/categories'
 import { assetClassLabel, change, date, money, percent, signedMoney, signedPercent } from '../lib/format'
 
 /** Stable while categories load. */
@@ -56,7 +57,8 @@ function ReportBody({ data }: { data: AnnualReport }) {
   }
 
   const netWorth = change(data.netWorthEnd, data.netWorthStart)
-  const categoryName = (id: number | null) => categories.find((c) => c.id === id)?.name ?? '—'
+  const byId = new Map(categories.map((c) => [c.id, c]))
+  const categoryName = (id: number | null) => categoryPath(id, byId) || '—'
   const income = data.categories.filter((c) => c.kind === 'INCOME')
   const expense = data.categories.filter((c) => c.kind === 'EXPENSE')
   const startLabel = date(`${previousYear}-12-31`)
@@ -90,7 +92,7 @@ function ReportBody({ data }: { data: AnnualReport }) {
                 <tr key={group.label} className="border-b border-line bg-surface-2 text-xs font-semibold text-ink-2">
                   <td className="px-4 py-1.5 sm:px-2" colSpan={4}>{group.label}</td>
                 </tr>,
-                ...group.rows.map((c) => (
+                ...group.rows.flatMap((c) => [
                   <tr key={c.categoryId} className="border-b border-line last:border-0">
                     <td className="px-4 py-2 sm:px-2">
                       <span className="inline-flex items-center gap-2">
@@ -100,8 +102,19 @@ function ReportBody({ data }: { data: AnnualReport }) {
                     <Amount value={money(c.amount, currency)} />
                     <Amount value={money(c.previousAmount, currency)} muted />
                     <Amount value={signedMoney(c.amount - c.previousAmount, currency)} muted />
-                  </tr>
-                )),
+                  </tr>,
+                  // Details under their macro, the macro's own entries named as such
+                  ...c.details.map((d) => (
+                    <tr key={`${c.categoryId}-${d.categoryId}`} className="border-b border-line text-xs text-ink-2 last:border-0">
+                      <td className="py-1.5 pr-2 pl-9 sm:pl-7">
+                        {d.categoryId === c.categoryId ? t('categories.withoutDetail', { name: c.name }) : d.name}
+                      </td>
+                      <Amount value={money(d.amount, currency)} />
+                      <Amount value={money(d.previousAmount, currency)} muted />
+                      <Amount value={signedMoney(d.amount - d.previousAmount, currency)} muted />
+                    </tr>
+                  )),
+                ]),
               ])}
           </Table>
         )}

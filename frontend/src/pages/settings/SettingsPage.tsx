@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { NavLink, useParams } from 'react-router'
-import { History, Loader2, Pencil, RefreshCw, Trash2 } from 'lucide-react'
+import { History, Loader2, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { errorMessage } from '../../api/client'
 import {
   useCategories,
@@ -22,6 +22,7 @@ import { Badge, Button, Card, EmptyState, ErrorAlert, Field, Modal, PageHeader, 
 import { LANGUAGES, LANGUAGE_NAMES, useI18n, type Language, type MessageKey } from '../../i18n'
 import { applyPreferences } from '../../preferences'
 import { THEMES, type Theme } from '../../preferences/theme'
+import { categoryTree, macros } from '../../lib/categories'
 import { COMMON_CURRENCIES, date, dateTime, number, parseDecimal, today } from '../../lib/format'
 import { ChangePasswordForm } from './ChangePasswordForm'
 import { MfaSection } from './MfaSection'
@@ -172,12 +173,16 @@ function LoginHistory() {
 
 // ------------------------------------------------------------------ categories
 
+/** A category being edited, or a new one: of a kind and, for a detail, under a macro. */
+type CategoryDraft = Category | { kind: CategoryKind; parentId: number | null; color?: string }
+
 function CategoriesTab() {
   const categories = useCategories()
   const remove = useDeleteCategory()
-  const [editing, setEditing] = useState<Category | { kind: CategoryKind } | null>(null)
+  const [editing, setEditing] = useState<CategoryDraft | null>(null)
   const [error, setError] = useState<string | null>(null)
   const { t } = useI18n()
+  const all = categories.data ?? []
 
   async function onDelete(c: Category) {
     if (!confirm(t('categories.confirmDelete', { name: c.name }))) return
@@ -192,18 +197,26 @@ function CategoriesTab() {
   if (categories.isPending) return <Spinner />
   return (
     <>
+      <p className="mt-2 text-sm text-ink-2">{t('categories.levelsHelp')}</p>
       <ErrorAlert message={error} />
-      <div className="mt-2 grid gap-4 lg:grid-cols-2">
+      <div className="mt-3 grid gap-4 lg:grid-cols-2">
         {(['EXPENSE', 'INCOME'] as CategoryKind[]).map((kind) => (
           <Card key={kind} title={kind === 'EXPENSE' ? t('categories.expense') : t('categories.income')}
-            actions={<Button onClick={() => setEditing({ kind })}>{t('common.add')}</Button>}>
+            actions={<Button onClick={() => setEditing({ kind, parentId: null })}>{t('categories.addMacro')}</Button>}>
             <ul className="divide-y divide-line">
-              {(categories.data ?? []).filter((c) => c.kind === kind).map((c) => (
-                <li key={c.id} className="flex items-center justify-between py-2 text-sm">
-                  <span className="flex items-center gap-2">
-                    <span className="size-3 rounded-full" style={{ background: c.color }} aria-hidden />{c.name}
+              {categoryTree(all, kind).map(({ category: c, depth }) => (
+                <li key={c.id} className={`flex items-center justify-between gap-2 text-sm ${depth === 0 ? 'py-2 font-medium' : 'py-1.5 pl-6 text-ink-2'}`}>
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className={`shrink-0 rounded-full ${depth === 0 ? 'size-3' : 'size-2.5'}`} style={{ background: c.color }} aria-hidden />
+                    <span className="truncate">{c.name}</span>
                   </span>
-                  <span className="flex gap-1">
+                  <span className="flex shrink-0 gap-1">
+                    {depth === 0 && (
+                      <button type="button" className="rounded p-1.5 text-muted hover:text-ink" aria-label={t('categories.addDetailTo', { name: c.name })}
+                        title={t('categories.addDetailTo', { name: c.name })} onClick={() => setEditing({ kind, parentId: c.id, color: c.color })}>
+                        <Plus className="size-4" />
+                      </button>
+                    )}
                     <button type="button" className="rounded p-1.5 text-muted hover:text-ink" aria-label={t('categories.editName', { name: c.name })} onClick={() => setEditing(c)}>
                       <Pencil className="size-4" />
                     </button>
@@ -217,25 +230,30 @@ function CategoriesTab() {
           </Card>
         ))}
       </div>
-      <Modal title={editing && 'id' in editing ? t('categories.edit') : t('categories.new')} open={editing !== null} onClose={() => setEditing(null)}>
-        {editing && <CategoryForm initial={editing} onDone={() => setEditing(null)} />}
+      <Modal title={editing && 'id' in editing ? t('categories.edit') : editing?.parentId ? t('categories.newDetail') : t('categories.new')}
+        open={editing !== null} onClose={() => setEditing(null)}>
+        {editing && <CategoryForm initial={editing} categories={all} onDone={() => setEditing(null)} />}
       </Modal>
     </>
   )
 }
 
-function CategoryForm({ initial, onDone }: { initial: Category | { kind: CategoryKind }; onDone: () => void }) {
+function CategoryForm({ initial, categories, onDone }: { initial: CategoryDraft; categories: Category[]; onDone: () => void }) {
   const save = useSaveCategory()
   const { t } = useI18n()
   const existing = 'id' in initial ? initial : null
   const [name, setName] = useState(existing?.name ?? '')
-  const [color, setColor] = useState(existing?.color ?? '#2a78d6')
+  const [color, setColor] = useState(initial.color ?? '#2a78d6')
+  const [parentId, setParentId] = useState<number | null>(initial.parentId)
   const [error, setError] = useState<string | null>(null)
+  // A macro with details stays a macro; a category goes under a macro of its kind, never itself
+  const hasDetails = existing !== null && categories.some((c) => c.parentId === existing.id)
+  const parents = macros(categories, initial.kind).filter((c) => c.id !== existing?.id)
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     try {
-      await save.mutateAsync({ id: existing?.id, name, kind: initial.kind, color })
+      await save.mutateAsync({ id: existing?.id, name, kind: initial.kind, color, parentId })
       onDone()
     } catch (err) {
       setError(errorMessage(err))
@@ -245,6 +263,15 @@ function CategoryForm({ initial, onDone }: { initial: Category | { kind: Categor
     <form onSubmit={submit} className="flex flex-col gap-3">
       <Field label={t('common.name')}>
         {(id) => <input id={id} className="input" required maxLength={64} autoFocus value={name} onChange={(e) => setName(e.target.value)} />}
+      </Field>
+      <Field label={t('categories.parent')} hint={hasDetails ? t('categories.parentLocked') : t('categories.parentHint')}>
+        {(id) => (
+          <select id={id} className="input" value={parentId ?? ''} disabled={hasDetails}
+            onChange={(e) => setParentId(e.target.value ? Number(e.target.value) : null)}>
+            <option value="">{t('categories.noParent')}</option>
+            {parents.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        )}
       </Field>
       <Field label={t('categories.color')}>
         {(id) => <input id={id} type="color" className="h-10 w-20 cursor-pointer rounded border border-line bg-surface" value={color} onChange={(e) => setColor(e.target.value)} />}

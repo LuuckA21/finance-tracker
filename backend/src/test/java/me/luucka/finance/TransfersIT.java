@@ -168,12 +168,12 @@ class TransfersIT {
         transfer(alice, "2026-04-28", 700, bank, pillar);
 
         String csv = alice.get("/api/cash-entries/export").getResponse().getContentAsString(StandardCharsets.UTF_8);
-        assertTrue(csv.contains("2026-04-28;Trasferimento;;700;CHF;Risparmio;Conto UBS;Viac 3a;\r\n"), csv);
+        assertTrue(csv.contains("2026-04-28;Trasferimento;;;700;CHF;Risparmio;Conto UBS;Viac 3a;\r\n"), csv);
 
         // Another user with a position of the same name gets it matched; an unknown name is reported
         ApiClient bob = login(testUsers.create("transfer-csv-bob", Role.USER));
         int bobPillar = position(bob, "viac 3A", "PENSION");
-        String file = csv + "2026-04-29;Transfer;;50;CHF;;Conto UBS;Sconosciuto\r\n";
+        String file = csv + "2026-04-29;Transfer;;;50;CHF;;Conto UBS;Sconosciuto\r\n";
         MvcResult preview = bob.upload("/api/cash-entries/import/preview", "t.csv", file.getBytes(StandardCharsets.UTF_8));
         // Row 1: "Conto UBS" is not Bob's, "Viac 3a" matches "viac 3A" ignoring case
         assertEquals("TRANSFER", json(preview, "$.rows[0].kind"));

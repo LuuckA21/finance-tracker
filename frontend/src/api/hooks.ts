@@ -137,11 +137,12 @@ export const useCategories = () =>
 export function useSaveCategory() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (c: { id?: number; name: string; kind: CategoryKind; color: string }) =>
+    mutationFn: (c: { id?: number; name: string; kind: CategoryKind; color: string; parentId: number | null }) =>
       c.id
-        ? put<Category>(`/api/categories/${c.id}`, { name: c.name, color: c.color })
+        ? put<Category>(`/api/categories/${c.id}`, { name: c.name, color: c.color, parentId: c.parentId })
         : post<Category>('/api/categories', c),
-    onSuccess: () => Promise.all([qc.invalidateQueries({ queryKey: ['categories'] }), qc.invalidateQueries({ queryKey: ['dashboard'] })]),
+    // Names and levels show everywhere: entries, budgets, reports, forecasts
+    onSuccess: () => qc.invalidateQueries(),
   })
 }
 

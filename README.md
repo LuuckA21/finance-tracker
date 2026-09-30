@@ -21,7 +21,7 @@ Self-hosted personal finance app for a small group of users (you and your family
   at a date; the value of every position is carried forward until the next record. Dashboards
   show total net worth per month/year and its split by asset class.
 - **Budgets** – a monthly spending limit per expense category (the same every month, in any
-  currency). The Budget page shows, for any month, what was spent, what is left, the categories
+  currency), on a macro (covering its details) or on some of its details, never both. The Budget page shows, for any month, what was spent, what is left, the categories
   close to (80 %) or over their limit, an end-of-month projection for the current month and the
   spending in categories without a budget, with a suggestion from the last 3 months' average.
 - **Tags** – free labels on entries across categories ("Holidays 2026", "Wedding"): typed on
@@ -60,15 +60,25 @@ Self-hosted personal finance app for a small group of users (you and your family
   `01.08.2026`; amounts `1234.50`, `1234,50` or `1'234.50`. Transfers use the type
   "Trasferimento"/"Transfer"/"Umbuchung"/"Virement" and the optional columns `da`/`verso`
   (`from`/`to`, `von`/`nach`, `de`/`vers`) with position names. Tags go in an optional column
-  (`etichette`/`tags`/`étiquettes`), separated by commas.
+  (`etichette`/`tags`/`étiquettes`), separated by commas. The export writes the macro in
+  `categoria` and the detail in `sottocategoria` (`subcategory`, `unterkategorie`,
+  `sous-catégorie`); the import also reads a detail as `Casa › Affitto` (or `Casa > Affitto`) in the
+  category column, or by its name alone when no macro has that name.
 - **Multi-currency** – each entry/position keeps its own currency; dashboards convert to the
   user's base currency with the ECB reference rates, downloaded automatically every working day
   and shared by all users. A user's own manual rates take priority over them.
 - **Per-user preferences** – interface language (Italian, English, German, French) and theme (system, light,
   dark) are saved to the account and follow the user on every device.
-- **Personal categories** – each user starts with a set of categories named in the language chosen
-  when the account is created (`APP_ADMIN_LANGUAGE` for the first admin); from then on they are
-  the user's own to rename, recolour or delete.
+- **Personal categories in two levels** – like first- and second-level cost centres: macro
+  categories ("Casa") and, under them, optional detail categories ("Affitto", "Energia"). An entry
+  sits on a macro or on a detail; filters on a macro take in its details, and the Income & expenses
+  page, the categories × tags table, the annual summary and the forecast add details up to their
+  macro (the cash flow and the summary open each macro on its details; entries on the macro itself
+  show as "Casa (senza dettaglio)"). Each user starts with macros and details named in the language
+  chosen when the account is created (`APP_ADMIN_LANGUAGE` for the first admin); from then on they
+  are the user's own to rename, recolour, move between levels or delete (a macro once its details
+  are gone). Users created before the two levels got the default details under their default
+  macros, their entries staying on the macro. Tags stay independent of categories.
 
 | Layer    | Tech |
 |----------|------|
@@ -400,7 +410,7 @@ encrypted with it).
 |------|-----------|
 | Auth | `GET /api/auth/csrf`, `POST /api/auth/login`, `POST /api/auth/login/mfa`, `POST /api/auth/logout`, `GET /api/auth/me` |
 | Account | `PUT /api/account/password`, `PUT /api/account/settings` (partial: `baseCurrency`, `language` `IT\|EN\|DE\|FR`, `theme` `SYSTEM\|LIGHT\|DARK`), `GET /api/account/logins`, `POST /api/account/mfa/{setup,enable,disable,recovery-codes}` |
-| Categories | `GET/POST /api/categories`, `PUT/DELETE /api/categories/{id}` |
+| Categories | `GET/POST /api/categories` (`{name, kind, color, parentId}`: `parentId` null for a macro, a macro of the same kind for a detail), `PUT/DELETE /api/categories/{id}` (`{name, color, parentId}`; a macro with details cannot be deleted or moved under another) |
 | Entries | `GET /api/cash-entries?from&to&kind&categoryId&q&tagId&page&size` (each entry has `tags`: names; unknown names sent on save become new tags) (kind `INCOME\|EXPENSE\|TRANSFER`; transfers take `fromPositionId`/`toPositionId` instead of `categoryId`), `POST`, `PUT/DELETE /{id}`, `GET /export?filters` (CSV), `POST /import/preview` (multipart `file`), `POST /import` (`{entries:[…]}`) |
 | Recurring | `GET/POST /api/recurring-entries`, `PUT/DELETE /{id}` (frequency `DAILY\|WEEKLY\|MONTHLY\|QUARTERLY\|FOUR_MONTHLY\|SEMIANNUAL\|YEARLY`; `tags` are copied to the entries created) |
 | Positions | `GET/POST /api/positions`, `GET/PUT/DELETE /{id}`, `GET/POST /{id}/snapshots`, `PUT/DELETE /{id}/snapshots/{sid}`, `POST /api/positions/snapshots/bulk` |
@@ -411,7 +421,7 @@ encrypted with it).
 | Forecasts | `GET/POST /api/forecasts`, `PUT/DELETE /api/forecasts/{id}` (`{name, year, incomeGrowth, expenseGrowth, excludedTagIds, excludedCategoryIds, items:[{description, kind, categoryId, amount, schedule: MONTHLY\|ONCE, startMonth, endMonth}]}`), `POST /api/forecasts/preview` (the same body, saved or not: the forecast month by month) |
 | Reports | `GET /api/reports/annual?year` (totals and categories against the year before, net worth and positions at the start and end, tags, largest expenses) |
 | Notifications | `GET/PUT /api/account/notifications` (`mailEnabled`, `email`, `pendingEmail`, `budgetAlerts`, `goalAlerts`, `monthlySummary`), `POST /email` (`{email}`: sends a code), `POST /email/confirm` (`{code}`), `DELETE /email`, `POST /test` |
-| Dashboards | `GET /api/dashboard/cashflow?year` (with `tags`: income and expenses of each tag in the year, and `tagMatrices`: categories × tags), `/cashflow/years`, `/net-worth?granularity=MONTH\|YEAR&from=yyyy-MM&to=yyyy-MM`, `/net-worth/detail?date` |
+| Dashboards | `GET /api/dashboard/cashflow?year` (categories by macro with their `details`; with `tags`: income and expenses of each tag in the year, and `tagMatrices`: macro categories × tags), `/cashflow/years`, `/net-worth?granularity=MONTH\|YEAR&from=yyyy-MM&to=yyyy-MM`, `/net-worth/detail?date` |
 | Admin | `GET/POST /api/admin/users`, `PATCH/DELETE /{id}`, `POST /{id}/{reset-password,unlock,reset-mfa}`, `GET /api/admin/fx`, `POST /api/admin/fx/refresh`, `POST /api/admin/fx/history` (202, runs in background) |
 
 Errors are RFC 9457 problem details with a stable `code` (e.g. `invalid_credentials`,

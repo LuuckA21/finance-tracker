@@ -1,5 +1,6 @@
 import type { Category, TagCategoryAmount } from '../api/types'
 import { useI18n } from '../i18n'
+import { categoryPath } from '../lib/categories'
 import { money } from '../lib/format'
 import { amountStyle } from './TransferFields'
 
@@ -19,7 +20,7 @@ export function TagCategories({ rows, categories, currency }: {
         return (
           <li key={row.categoryId} className="inline-flex items-center gap-1.5">
             <span className="size-2.5 rounded-full" style={{ background: category?.color }} aria-hidden />
-            <span className="text-ink-2">{category?.name ?? '—'}</span>
+            <span className="text-ink-2">{categoryPath(row.categoryId, categories) || '—'}</span>
             <span className={`tabular ${style.className}`}>{style.sign}{money(row.amount, currency)}</span>
           </li>
         )
