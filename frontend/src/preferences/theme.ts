@@ -14,11 +14,11 @@ function systemIsDark(): boolean {
 }
 
 /** The palette actually shown. */
-export function isDark(): boolean {
+function isDark(): boolean {
   return current === 'DARK' || (current === 'SYSTEM' && systemIsDark())
 }
 
-export function getTheme(): Theme {
+function getTheme(): Theme {
   return current
 }
 

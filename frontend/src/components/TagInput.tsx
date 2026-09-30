@@ -2,7 +2,7 @@ import { useState, type KeyboardEvent } from 'react'
 import { X } from 'lucide-react'
 import { useI18n } from '../i18n'
 
-export const MAX_TAGS = 10
+const MAX_TAGS = 10
 export const MAX_TAG_LENGTH = 40
 
 const clean = (text: string) => text.replace(/[\s,]+/g, ' ').trim().slice(0, MAX_TAG_LENGTH)

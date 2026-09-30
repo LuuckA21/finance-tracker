@@ -67,10 +67,9 @@ public record AppProperties(
      * @param from     sender address, e.g. {@code Finanze <finanze@example.com>}
      * @param security {@code STARTTLS} (usually port 587), {@code SSL} (465) or {@code NONE} (local relay)
      * @param appUrl   public address of the app, linked from the emails (optional)
-     * @param cron     when the alerts are checked
      */
     public record Mail(String host, int port, String username, String password, String from, Security security,
-                       String appUrl, String cron) {
+                       String appUrl) {
 
         public enum Security { STARTTLS, SSL, NONE }
 

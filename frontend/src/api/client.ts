@@ -122,7 +122,7 @@ export function onUnauthorized(listener: () => void) {
   }
 }
 
-export async function api<T>(method: Method, url: string, body?: unknown): Promise<T> {
+async function api<T>(method: Method, url: string, body?: unknown): Promise<T> {
   const res = await send(method, url, body, true)
   if (!res.ok) {
     const error = await toError(res)
