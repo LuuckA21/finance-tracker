@@ -89,10 +89,10 @@ class CsvImportExportIT {
         assertEquals("no-store", export.getResponse().getHeader("Cache-Control"));
         byte[] bytes = export.getResponse().getContentAsByteArray();
         String csv = new String(bytes, StandardCharsets.UTF_8);
-        assertTrue(csv.startsWith("\uFEFFdata;tipo;categoria;importo;valuta;descrizione;da;verso;etichette\r\n"), csv);
-        assertTrue(csv.contains("2026-08-01;Uscita;Spesa alimentare;12.5;CHF;\"'=HYPERLINK(\"\"http://evil\"\",\"\"clic\"\")\""), csv);
-        assertTrue(csv.contains("2026-08-02;Uscita;Spesa alimentare;3.2;EUR;\"Caffè; bar \"\"centrale\"\"\""), csv);
-        assertTrue(csv.contains("2026-08-25;Entrata;Stipendio;6000;CHF;;;;\r\n"), csv);
+        assertTrue(csv.startsWith("\uFEFFdata;tipo;categoria;sottocategoria;importo;valuta;descrizione;da;verso;etichette\r\n"), csv);
+        assertTrue(csv.contains("2026-08-01;Uscita;Spesa alimentare;;12.5;CHF;\"'=HYPERLINK(\"\"http://evil\"\",\"\"clic\"\")\""), csv);
+        assertTrue(csv.contains("2026-08-02;Uscita;Spesa alimentare;;3.2;EUR;\"Caffè; bar \"\"centrale\"\"\""), csv);
+        assertTrue(csv.contains("2026-08-25;Entrata;Stipendio;;6000;CHF;;;;\r\n"), csv);
         // Filters apply to the export too
         String income = alice.get("/api/cash-entries/export?kind=INCOME").getResponse()
                 .getContentAsString(StandardCharsets.UTF_8);
@@ -138,8 +138,8 @@ class CsvImportExportIT {
         assertTrue(export.getResponse().getHeader("Content-Disposition").matches(
                 "attachment; filename=\"operations-\\d{4}-\\d{2}-\\d{2}\\.csv\""));
         String csv = export.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        assertTrue(csv.startsWith("\uFEFFdate;type;catégorie;montant;monnaie;description;de;vers;étiquettes\r\n"), csv);
-        assertTrue(csv.contains("2026-08-01;Dépense;Spesa alimentare;12.5;CHF;Migros;;;\r\n"), csv);
+        assertTrue(csv.startsWith("\uFEFFdate;type;catégorie;sous-catégorie;montant;monnaie;description;de;vers;étiquettes\r\n"), csv);
+        assertTrue(csv.contains("2026-08-01;Dépense;Spesa alimentare;;12.5;CHF;Migros;;;\r\n"), csv);
         assertEquals(Integer.valueOf(1), json(upload(client, csv), "$.duplicates"));
 
         MvcResult preview = upload(client, """
@@ -150,6 +150,45 @@ class CsvImportExportIT {
         assertEquals(200, preview.getResponse().getStatus());
         assertEquals(Integer.valueOf(2), json(preview, "$.valid"));
         assertEquals(List.of("EXPENSE", "TRANSFER"), json(preview, "$.rows[*].kind"));
+    }
+
+    @Test
+    void detailCategoriesExportAndImportInTheirOwnColumnOrAsAPath() throws Exception {
+        ApiClient client = login(testUsers.create("csv-sub", Role.USER));
+        long rent = category(client, "Affitto");
+        client.post("/api/cash-entries", """
+                {"date":"2026-08-01","kind":"EXPENSE","categoryId":%d,"amount":1800,"currency":"CHF"}"""
+                .formatted(rent));
+        String csv = client.get("/api/cash-entries/export").getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertTrue(csv.contains("2026-08-01;Uscita;Casa;Affitto;1800;CHF;;;;\r\n"), csv);
+        assertEquals(Integer.valueOf(1), json(upload(client, csv), "$.duplicates"));
+
+        // "Auto" is now a detail of two macros: only the macro tells them apart
+        long transport = category(client, "Trasporti");
+        client.post("/api/categories", """
+                {"name":"Auto","kind":"EXPENSE","color":"#123456","parentId":%d}""".formatted(transport));
+        MvcResult preview = upload(client, """
+                data;tipo;categoria;sottocategoria;importo
+                2026-08-02;Uscita;casa;energia;90
+                2026-08-03;Uscita;Casa › Manutenzione;;40
+                2026-08-04;Uscita;Casa > Arredamento;;300
+                2026-08-05;Uscita;Farmacia;;25
+                2026-08-06;Uscita;Casa;;15
+                2026-08-07;Uscita;Assicurazioni;Auto;700
+                2026-08-08;Uscita;Casa;Garage;10
+                2026-08-09;Uscita;Auto;;50
+                2026-08-10;Uscita;Nessuna;Affitto;10
+                """);
+        assertEquals(Integer.valueOf(6), json(preview, "$.valid"));
+        List<Number> ids = json(preview, "$.rows[*].categoryId");
+        assertEquals(category(client, "Energia"), ids.get(0).longValue());
+        assertEquals(category(client, "Manutenzione"), ids.get(1).longValue());
+        assertEquals(category(client, "Arredamento"), ids.get(2).longValue());
+        assertEquals(category(client, "Farmacia"), ids.get(3).longValue());
+        assertEquals(category(client, "Casa"), ids.get(4).longValue());
+        assertEquals(List.of("unknown_subcategory"), json(preview, "$.rows[6].errors"));
+        assertEquals(List.of("ambiguous_category"), json(preview, "$.rows[7].errors"));
+        assertEquals(List.of("unknown_category"), json(preview, "$.rows[8].errors"));
     }
 
     @Test

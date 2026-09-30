@@ -185,7 +185,10 @@ public class CashEntryService {
     }
 
     /** Every predicate is combined with the owner check, so filters can never widen access. */
-    private static Specification<CashEntry> specification(long userId, Filter filter) {
+    private Specification<CashEntry> specification(long userId, Filter filter) {
+        // A macro takes in its details; ids that are not the user's still match only their entries
+        Set<Long> categoryIds = filter.categoryId() == null ? null
+                : categories.tree(userId).withDetails(filter.categoryId());
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(cb.equal(root.get("userId"), userId));
@@ -199,7 +202,7 @@ public class CashEntryService {
                 predicates.add(cb.equal(root.get("kind"), filter.kind()));
             }
             if (filter.categoryId() != null) {
-                predicates.add(cb.equal(root.get("categoryId"), filter.categoryId()));
+                predicates.add(root.get("categoryId").in(categoryIds));
             }
             if (filter.tagId() != null) {
                 // Another user's tag id matches nothing: the owner check above still applies

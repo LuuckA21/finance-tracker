@@ -12,11 +12,12 @@ import java.util.stream.Collectors;
 
 import me.luucka.finance.cashflow.CashEntry;
 import me.luucka.finance.cashflow.CashEntryRepository;
-import me.luucka.finance.category.Category;
 import me.luucka.finance.category.CategoryRepository;
+import me.luucka.finance.category.CategoryService;
 import me.luucka.finance.core.AssetClass;
 import me.luucka.finance.core.EntryKind;
 import me.luucka.finance.core.cashflow.CashflowTotals;
+import me.luucka.finance.core.category.CategoryTree;
 import me.luucka.finance.core.fx.FxTable;
 import me.luucka.finance.core.report.AnnualReportCalculator;
 import me.luucka.finance.fx.FxService;
@@ -33,8 +34,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class AnnualReportService {
 
+    /**
+     * A macro category's income or expenses in the year and the year before, with its {@code details}
+     * when any has entries (the macro's own entries under the macro's id).
+     */
     public record CategoryRow(long categoryId, String name, String color, EntryKind kind, BigDecimal amount,
-                              BigDecimal previousAmount) {
+                              BigDecimal previousAmount, List<DetailRow> details) {
+    }
+
+    public record DetailRow(long categoryId, String name, String color, BigDecimal amount,
+                            BigDecimal previousAmount) {
     }
 
     public record PositionRow(long positionId, String name, AssetClass assetClass, String currency, boolean archived,
@@ -94,17 +103,22 @@ public class AnnualReportService {
         AnnualReportCalculator.Report r = AnnualReportCalculator.compute(year, data, positionService.histories(userId),
                 table, today);
 
-        Map<Long, Category> categoryById = categories.findByUserIdOrderByKindAscNameAsc(userId).stream()
-                .collect(Collectors.toMap(Category::getId, Function.identity()));
+        CategoryTree tree = CategoryService.tree(categories.findByUserIdOrderByKindAscNameAsc(userId));
         Map<Long, AssetPosition> positionById = positions.findByUserIdOrderByArchivedAscNameAsc(userId).stream()
                 .collect(Collectors.toMap(AssetPosition::getId, Function.identity()));
         Map<Long, String> tagNames = tags.names(userId);
 
-        List<CategoryRow> categoryRows = r.categories().stream().map(c -> {
-            Category category = categoryById.get(c.categoryId());
-            return new CategoryRow(c.categoryId(), category == null ? "?" : category.getName(),
-                    category == null ? "#6b7280" : category.getColor(), c.kind(), c.amount(), c.previousAmount());
-        }).toList();
+        List<CategoryRow> categoryRows = AnnualReportCalculator.byMacro(r.categories(), tree::macroId).stream()
+                .map(m -> {
+                    AnnualReportCalculator.CategoryChange c = m.total();
+                    CategoryTree.Node macro = tree.node(c.categoryId());
+                    List<DetailRow> details = m.details().stream().map(d -> {
+                        CategoryTree.Node node = tree.node(d.categoryId());
+                        return new DetailRow(d.categoryId(), name(node), color(node), d.amount(), d.previousAmount());
+                    }).toList();
+                    return new CategoryRow(c.categoryId(), name(macro), color(macro), c.kind(), c.amount(),
+                            c.previousAmount(), details);
+                }).toList();
         List<PositionRow> positionRows = r.positions().stream()
                 .filter(p -> positionById.containsKey(p.positionId()))
                 .map(p -> {
@@ -126,6 +140,14 @@ public class AnnualReportService {
         return new AnnualReport(table.baseCurrency(), year, r.periodEnd(), r.months(), years(userId, today),
                 r.totals(), r.previousTotals(), categoryRows, r.netWorthStart(), r.netWorthEnd(), r.classes(),
                 positionRows, tagRows, expenseRows, r.unconvertedCurrencies());
+    }
+
+    private static String name(CategoryTree.Node node) {
+        return node == null ? "?" : node.name();
+    }
+
+    private static String color(CategoryTree.Node node) {
+        return node == null ? "#6b7280" : node.color();
     }
 
     /** Years with entries or position values, up to the current one. */

@@ -126,4 +126,28 @@ class AnnualReportCalculatorTest {
         assertEquals(new BigDecimal("120.00"), report.largestExpenses().getFirst().amountBase());
         assertEquals(new BigDecimal("30.00"), report.largestExpenses().getLast().amountBase());
     }
+
+    @Test
+    void categoriesRollUpByMacro() {
+        List<AnnualReportCalculator.CategoryChange> changes = List.of(
+                new AnnualReportCalculator.CategoryChange(2, EntryKind.EXPENSE, new BigDecimal("1800.00"),
+                        new BigDecimal("1700.00")),
+                new AnnualReportCalculator.CategoryChange(4, EntryKind.EXPENSE, new BigDecimal("900.00"),
+                        BigDecimal.ZERO),
+                new AnnualReportCalculator.CategoryChange(1, EntryKind.EXPENSE, new BigDecimal("100.00"),
+                        new BigDecimal("50.00")),
+                new AnnualReportCalculator.CategoryChange(9, EntryKind.INCOME, new BigDecimal("5.00"),
+                        BigDecimal.ZERO));
+        // 2 is a detail of 1; 4 and 9 are macros
+        List<AnnualReportCalculator.MacroChange> rows = AnnualReportCalculator.byMacro(changes,
+                id -> id == 2 ? 1 : id);
+        assertEquals(List.of(9L, 1L, 4L), rows.stream().map(r -> r.total().categoryId()).toList());
+        AnnualReportCalculator.MacroChange housing = rows.get(1);
+        assertEquals(new BigDecimal("1900.00"), housing.total().amount());
+        assertEquals(new BigDecimal("1750.00"), housing.total().previousAmount());
+        assertEquals(List.of(2L, 1L), housing.details().stream().map(AnnualReportCalculator.CategoryChange::categoryId)
+                .toList());
+        // Only its own entries: nothing to detail
+        assertEquals(List.of(), rows.get(2).details());
+    }
 }

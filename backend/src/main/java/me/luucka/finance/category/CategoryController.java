@@ -31,12 +31,15 @@ public class CategoryController {
     public record CreateCategoryRequest(
             @NotBlank @Size(max = 64) String name,
             @NotNull EntryKind kind,
-            @NotNull @Pattern(regexp = COLOR_PATTERN) String color) {
+            @NotNull @Pattern(regexp = COLOR_PATTERN) String color,
+            Long parentId) {
     }
 
+    /** {@code parentId}: the macro the category is placed under, null to make it a macro. */
     public record UpdateCategoryRequest(
             @NotBlank @Size(max = 64) String name,
-            @NotNull @Pattern(regexp = COLOR_PATTERN) String color) {
+            @NotNull @Pattern(regexp = COLOR_PATTERN) String color,
+            Long parentId) {
     }
 
     private final CategoryService service;
@@ -54,13 +57,13 @@ public class CategoryController {
     @ResponseStatus(HttpStatus.CREATED)
     public CategoryService.CategoryResponse create(@AuthenticationPrincipal AppPrincipal me,
                                                    @Valid @RequestBody CreateCategoryRequest body) {
-        return service.create(me.id(), body.name(), body.kind(), body.color());
+        return service.create(me.id(), body.name(), body.kind(), body.color(), body.parentId());
     }
 
     @PutMapping("/{id}")
     public CategoryService.CategoryResponse update(@AuthenticationPrincipal AppPrincipal me, @PathVariable long id,
                                                    @Valid @RequestBody UpdateCategoryRequest body) {
-        return service.update(me.id(), id, body.name(), body.color());
+        return service.update(me.id(), id, body.name(), body.color(), body.parentId());
     }
 
     @DeleteMapping("/{id}")

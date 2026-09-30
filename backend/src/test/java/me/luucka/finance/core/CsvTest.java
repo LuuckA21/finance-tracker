@@ -153,4 +153,15 @@ class CsvTest {
         assertEquals("a b c", EntryCsvFormat.text(" a‮b\tc "));
         assertEquals("=1+1", EntryCsvFormat.text("'=1+1"));
     }
+
+    @Test
+    void categoryCellsMayNameAMacroAndADetail() {
+        assertEquals(Optional.of(new EntryCsvFormat.CategoryPath("Casa", "Affitto")),
+                EntryCsvFormat.categoryPath(" Casa › Affitto "));
+        assertEquals(Optional.of(new EntryCsvFormat.CategoryPath("Casa e RC", "Auto")),
+                EntryCsvFormat.categoryPath("Casa e RC>Auto"));
+        for (String plain : List.of("Casa", "", "Casa ›", "› Affitto", "a > b > c")) {
+            assertEquals(Optional.empty(), EntryCsvFormat.categoryPath(plain), plain);
+        }
+    }
 }

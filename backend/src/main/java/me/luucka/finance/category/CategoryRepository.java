@@ -12,5 +12,13 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
 
     Optional<Category> findByIdAndUserId(Long id, Long userId);
 
-    boolean existsByUserIdAndKindAndNameIgnoreCase(Long userId, EntryKind kind, String name);
+    /** A macro of that kind and name, ignoring case. */
+    boolean existsByUserIdAndKindAndParentIdIsNullAndNameIgnoreCase(Long userId, EntryKind kind, String name);
+
+    /** A detail of that name under the macro, ignoring case. */
+    boolean existsByParentIdAndNameIgnoreCase(Long parentId, String name);
+
+    boolean existsByParentId(Long parentId);
+
+    List<Category> findByParentId(Long parentId);
 }

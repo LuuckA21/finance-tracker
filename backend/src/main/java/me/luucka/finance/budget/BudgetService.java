@@ -5,8 +5,10 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.SortedSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -18,6 +20,7 @@ import me.luucka.finance.common.ApiException;
 import me.luucka.finance.core.Currencies;
 import me.luucka.finance.core.EntryKind;
 import me.luucka.finance.core.budget.BudgetCalculator;
+import me.luucka.finance.core.category.CategoryTree;
 import me.luucka.finance.core.fx.FxTable;
 import me.luucka.finance.fx.FxService;
 import org.springframework.stereotype.Service;
@@ -72,12 +75,25 @@ public class BudgetService {
                 .toList();
     }
 
-    /** Creates or changes the monthly budget of one of the user's expense categories. */
+    /**
+     * Creates or changes the monthly budget of one of the user's expense categories. A macro's budget
+     * covers its details too, so a macro and its details never both have one.
+     */
     @Transactional
     public BudgetResponse save(long userId, long categoryId, BigDecimal amount, String currency) {
         Category category = categories.get(userId, categoryId);
         if (category.getKind() != EntryKind.EXPENSE) {
             throw ApiException.badRequest("budget_expense_only", "Budgets apply to expense categories only");
+        }
+        CategoryTree tree = categories.tree(userId);
+        Set<Long> related = new HashSet<>(tree.withDetails(tree.macroId(categoryId)));
+        related.remove(categoryId);
+        if (!category.isMacro()) {
+            // Sibling details may have budgets of their own; only the macro clashes
+            related.retainAll(Set.of(category.getParentId()));
+        }
+        if (budgets.findByUserId(userId).stream().anyMatch(b -> related.contains(b.getCategoryId()))) {
+            throw ApiException.conflict("budget_conflict", "A macro category and its details cannot both have a budget");
         }
         Budget budget = budgets.findByUserIdAndCategoryId(userId, categoryId)
                 .orElseGet(() -> new Budget(userId, category.getId()));
@@ -104,38 +120,48 @@ public class BudgetService {
                 .map(b -> new BudgetCalculator.BudgetLine(b.getCategoryId(), b.getAmount(), b.getCurrency()))
                 .toList();
         LocalDate from = selected.minusMonths(BudgetCalculator.AVERAGE_MONTHS).atDay(1);
+        CategoryTree tree = categories.tree(userId);
+        Set<Long> withBudget = own.stream().map(Budget::getCategoryId).collect(Collectors.toSet());
         List<BudgetCalculator.Expense> expenses = entries.findByUserIdAndDateBetween(userId, from,
                         selected.atEndOfMonth()).stream()
                 .filter(e -> e.getKind() == EntryKind.EXPENSE)
-                .map(e -> new BudgetCalculator.Expense(e.getDate(), e.getAmount(), e.getCurrency(), e.getCategoryId(),
-                        e.getRecurringEntryId() != null))
+                .map(e -> new BudgetCalculator.Expense(e.getDate(), e.getAmount(), e.getCurrency(),
+                        budgetCategory(tree, withBudget, e.getCategoryId()), e.getRecurringEntryId() != null))
                 .toList();
         BudgetCalculator.MonthStatus result = BudgetCalculator.month(lines, expenses, table, selected, today);
 
-        Map<Long, Category> byId = categories.owned(userId).stream()
-                .collect(Collectors.toMap(Category::getId, Function.identity()));
         Map<Long, Budget> budgetById = own.stream().collect(Collectors.toMap(Budget::getCategoryId, Function.identity()));
         List<CategoryStatusResponse> rows = result.categories().stream().map(c -> {
-            Category category = byId.get(c.categoryId());
+            CategoryTree.Node category = tree.node(c.categoryId());
             Budget budget = budgetById.get(c.categoryId());
-            return new CategoryStatusResponse(c.categoryId(), name(category), color(category), budget.getAmount(),
+            return new CategoryStatusResponse(c.categoryId(), name(tree, c.categoryId()), color(category),
+                    budget.getAmount(),
                     budget.getCurrency(), c.budget(), c.spent(), c.remaining(), c.percent(), c.state(),
                     c.projected(), c.average());
         }).toList();
         List<UnbudgetedResponse> others = result.others().stream().map(o -> {
-            Category category = byId.get(o.categoryId());
-            return new UnbudgetedResponse(o.categoryId(), name(category), color(category), o.spent(), o.average());
+            return new UnbudgetedResponse(o.categoryId(), name(tree, o.categoryId()), color(tree.node(o.categoryId())),
+                    o.spent(), o.average());
         }).toList();
         return new StatusResponse(table.baseCurrency(), selected, selected.equals(YearMonth.from(today)),
                 result.budgeted(), result.spent(), result.remaining(), result.unbudgeted(), rows, others,
                 result.unconvertedCurrencies());
     }
 
-    private static String name(Category category) {
-        return category == null ? "?" : category.getName();
+    /**
+     * Where an expense counts: its detail when that has a budget, else its macro (whose budget, if
+     * any, covers the details); spending without a budget is grouped by macro.
+     */
+    static long budgetCategory(CategoryTree tree, Set<Long> withBudget, long categoryId) {
+        return withBudget.contains(categoryId) ? categoryId : tree.macroId(categoryId);
     }
 
-    private static String color(Category category) {
-        return category == null ? "#6b7280" : category.getColor();
+    private static String name(CategoryTree tree, long categoryId) {
+        String path = tree.path(categoryId);
+        return path.isEmpty() ? "?" : path;
+    }
+
+    private static String color(CategoryTree.Node category) {
+        return category == null ? "#6b7280" : category.color();
     }
 }
