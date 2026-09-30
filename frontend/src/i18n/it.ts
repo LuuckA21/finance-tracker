@@ -809,4 +809,13 @@ export const it = {
   'import.error.ambiguous_category': '«{value}» è un dettaglio di più macro: indica anche la macro',
   'cashflow.otherDetails': 'Altri {count} dettagli',
   'cashflow.categoriesHelp': 'Le barre si dividono nei dettagli della categoria, il più grande per primo; in grigio i movimenti senza dettaglio. Apri una categoria per vedere gli importi.',
+  'import.missingTitle': 'Categorie non trovate: {count}',
+  'import.newCategoryTitle': 'Serve una categoria nuova?',
+  'import.newCategory': 'Nuova categoria',
+  'import.missingHelp': 'Il file usa categorie che non hai: creale qui, come macro o come dettaglio, e le righe che le usano le ricevono subito.',
+  'import.missingRows': 'righe: {count}',
+  'import.createCategory': 'Crea…',
+  'import.newMacro': 'Nuova macro «{name}»',
+  'import.createAndAssign': 'Crea e assegna',
+  'import.create': 'Crea',
 }

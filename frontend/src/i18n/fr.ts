@@ -812,4 +812,13 @@ export const fr: Messages = {
   'import.error.ambiguous_category': '«\u00a0{value}\u00a0» est une sous-catégorie de plusieurs catégories principales\u00a0: indiquez aussi la catégorie principale',
   'cashflow.otherDetails': '{count} autres sous-catégories',
   'cashflow.categoriesHelp': 'Les barres se divisent en sous-catégories, la plus grande d\'abord\u202f; en gris les opérations sans sous-catégorie. Ouvrez une catégorie pour voir les montants.',
+  'import.missingTitle': 'Catégories introuvables\u00a0: {count}',
+  'import.newCategoryTitle': 'Besoin d\'une nouvelle catégorie\u202f?',
+  'import.newCategory': 'Nouvelle catégorie',
+  'import.missingHelp': 'Le fichier utilise des catégories que vous n\'avez pas\u00a0: créez-les ici, comme catégorie principale ou sous-catégorie, et les lignes qui les utilisent les reçoivent aussitôt.',
+  'import.missingRows': 'lignes\u00a0: {count}',
+  'import.createCategory': 'Créer…',
+  'import.newMacro': 'Nouvelle catégorie principale «\u00a0{name}\u00a0»',
+  'import.createAndAssign': 'Créer et attribuer',
+  'import.create': 'Créer',
 }
