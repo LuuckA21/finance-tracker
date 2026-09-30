@@ -62,3 +62,54 @@ test('importing the same file twice finds only duplicates', async ({ signedIn: p
   }
   await expect(page.locator('tbody tr')).toHaveCount(1)
 })
+
+const NEW_CATEGORIES = [
+  'data;tipo;categoria;sottocategoria;importo;valuta;descrizione',
+  '04.08.2026;Uscita;Ristorazione;;32.50;CHF;Pizzeria',
+  '05.08.2026;Uscita;ristorazione;;18;CHF;Kebab',
+  '06.08.2026;Uscita;Casa;Garage;150;CHF;Box auto',
+  '07.08.2026;Uscita;Animali;Veterinario;90;CHF;Visita gatto',
+].join('\r\n')
+
+test('import row by row: create the categories the file names on the spot', async ({ signedIn: page }) => {
+  await page.goto('/movimenti')
+  await page.getByRole('button', { name: 'Importa CSV' }).click()
+  const dialog = page.locator('dialog[open]')
+  await dialog.getByLabel('File CSV').setInputFiles({ name: 'nuove.csv', mimeType: 'text/csv', buffer: Buffer.from(NEW_CATEGORIES) })
+  await dialog.getByRole('radio', { name: 'Rivedi riga per riga' }).click()
+  await dialog.getByRole('button', { name: 'Analizza file' }).click()
+
+  const missing = dialog.getByRole('region', { name: 'Categorie non trovate: 3' })
+  const item = (name: string) => missing.getByRole('listitem').filter({ hasText: name })
+
+  // A new macro, for both rows that name it (case aside)
+  await item('Ristorazione').getByRole('button', { name: 'Crea…' }).click()
+  await expect(missing.getByLabel('Nome')).toHaveValue('Ristorazione')
+  await expect(missing.getByLabel('Macro categoria')).toHaveValue('')
+  await missing.getByRole('button', { name: 'Crea e assegna' }).click()
+  await expect(dialog.locator('tbody tr').filter({ hasText: 'Kebab' }).getByLabel('Categoria')).toHaveValue(/\d+/)
+  await expect(dialog.locator('tbody tr').filter({ hasText: 'Pizzeria' }).getByRole('checkbox')).toBeChecked()
+
+  // A detail under a macro the user has
+  const left = dialog.getByRole('region', { name: 'Categorie non trovate: 2' })
+  await left.getByRole('listitem').filter({ hasText: 'Casa › Garage' }).getByRole('button', { name: 'Crea…' }).click()
+  await expect(left.getByLabel('Macro categoria').locator('option:checked')).toHaveText('Casa')
+  await left.getByRole('button', { name: 'Crea e assegna' }).click()
+
+  // A new macro with its detail
+  const last = dialog.getByRole('region', { name: 'Categorie non trovate: 1' })
+  await last.getByRole('button', { name: 'Crea…' }).click()
+  await expect(last.getByLabel('Nome')).toHaveValue('Veterinario')
+  await expect(last.getByLabel('Macro categoria').locator('option:checked')).toHaveText('Nuova macro «Animali»')
+  await last.getByRole('button', { name: 'Crea e assegna' }).click()
+  await expect(dialog.getByRole('region', { name: 'Serve una categoria nuova?' })).toBeVisible()
+
+  await dialog.getByRole('button', { name: 'Importa selezionati (4)' }).click()
+  await expect(dialog.getByText('Movimenti importati: 4.')).toBeVisible()
+  await dialog.getByRole('button', { name: 'Chiudi' }).first().click()
+
+  const rows = page.locator('tbody tr')
+  await expect(rows.filter({ hasText: 'Kebab' })).toContainText('Ristorazione')
+  await expect(rows.filter({ hasText: 'Box auto' })).toContainText('Casa › Garage')
+  await expect(rows.filter({ hasText: 'Visita gatto' })).toContainText('Animali › Veterinario')
+})

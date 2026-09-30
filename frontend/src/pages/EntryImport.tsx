@@ -10,6 +10,8 @@ import { useI18n, type Language, type MessageKey } from '../i18n'
 import { date, money } from '../lib/format'
 import { CategoryOptions } from '../components/CategoryOptions'
 import { PATH_SEPARATOR } from '../lib/categories'
+import { missingCategories, type MissingCategory } from '../lib/importCategories'
+import { MissingCategories } from './MissingCategories'
 
 type Mode = 'all' | 'review'
 
@@ -25,6 +27,8 @@ const TEMPLATES: Record<Language, { file: string; header: string; expense: strin
   FR: { file: 'modele.csv', header: 'date;type;catégorie;sous-catégorie;montant;monnaie;description;de;vers;étiquettes', expense: 'Dépense', income: 'Revenu', transfer: 'Virement', shop: 'Supermarché', savings: 'Épargne', tag: 'Maison' },
 }
 const MAX_FILE_BYTES = 2 * 1024 * 1024
+/** Stable while categories load, so the memoized lookups below are not rebuilt on every render. */
+const NO_CATEGORIES: Category[] = []
 
 interface ReviewRow {
   source: ImportPreviewRow
@@ -190,7 +194,7 @@ function InvalidStep({ preview, onReview, onBack }: { preview: ImportPreview; on
 
 function ReviewStep({ preview, onStep }: { preview: ImportPreview; onStep: (step: Step) => void }) {
   const { t } = useI18n()
-  const categories = useCategories().data ?? []
+  const categories = useCategories().data ?? NO_CATEGORIES
   const positions = usePositions().data ?? []
   const baseCurrency = useMe().data?.baseCurrency ?? 'CHF'
   const save = useImportEntries()
@@ -211,6 +215,20 @@ function ReviewStep({ preview, onStep }: { preview: ImportPreview; onStep: (step
   const pages = Math.max(1, Math.ceil(visible.length / REVIEW_PAGE))
   const shown = visible.slice(page * REVIEW_PAGE, (page + 1) * REVIEW_PAGE)
   const selected = rows.filter((r) => r.include && isReady(r, categories))
+  const missing = useMemo(() => missingCategories(rows.map((r) => ({
+    kind: r.kind, categoryId: r.categoryId, errors: r.source.errors, raw: r.source.raw,
+  })), categories), [rows, categories])
+
+  /** A category created while reviewing goes to the rows that name it (and are of its kind). */
+  function created(group: MissingCategory | null, category: Category) {
+    if (!group) return
+    const known = [...categories, category]
+    setRows((all) => all.map((row, i) => {
+      if (!group.rows.includes(i) || row.categoryId !== null || row.kind !== category.kind) return row
+      const next = { ...row, categoryId: category.id }
+      return { ...next, include: isReady(next, known) && !row.source.duplicate }
+    }))
+  }
 
   function change(index: number, patch: Partial<ReviewRow>) {
     setRows((all) => all.map((row, i) => {
@@ -257,6 +275,7 @@ function ReviewStep({ preview, onStep }: { preview: ImportPreview; onStep: (step
         )}
       </div>
       <p className="text-xs text-ink-2">{t('import.reviewHelp')}</p>
+      <MissingCategories missing={missing} categories={categories} onCreated={created} />
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <button type="button" className="text-accent hover:underline" onClick={() => selectAll(true)}>{t('import.selectReady')}</button>
         <button type="button" className="text-accent hover:underline" onClick={() => selectAll(false)}>{t('import.selectNone')}</button>

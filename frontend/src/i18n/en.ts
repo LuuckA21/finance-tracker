@@ -811,4 +811,13 @@ export const en: Messages = {
   'import.error.ambiguous_category': '“{value}” is a detail of several macros: give the macro too',
   'cashflow.otherDetails': '{count} other details',
   'cashflow.categoriesHelp': 'Bars split into the category\'s details, largest first; in grey the entries without a detail. Open a category to see the amounts.',
+  'import.missingTitle': 'Categories not found: {count}',
+  'import.newCategoryTitle': 'Need a new category?',
+  'import.newCategory': 'New category',
+  'import.missingHelp': 'The file uses categories you don\'t have: create them here, as a macro or a detail, and the rows that use them get them right away.',
+  'import.missingRows': 'rows: {count}',
+  'import.createCategory': 'Create…',
+  'import.newMacro': 'New macro “{name}”',
+  'import.createAndAssign': 'Create and assign',
+  'import.create': 'Create',
 }

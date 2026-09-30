@@ -56,7 +56,8 @@ Self-hosted personal finance app for a small group of users (you and your family
 - **CSV import/export** – export the entries matching the current filters (Excel-friendly: UTF-8,
   `;`, ISO dates). Import either everything at once (valid rows, duplicates skipped, nothing saved
   if a row has problems) or row by row: include or exclude each row, fix type and category,
-  see duplicates. Headers in Italian, English, German or French; dates `2026-08-01` or
+  see duplicates, and create on the spot the categories the file names but you don't have (as a
+  macro, or as a detail of a macro: the rows that name one get it at once). Headers in Italian, English, German or French; dates `2026-08-01` or
   `01.08.2026`; amounts `1234.50`, `1234,50` or `1'234.50`. Transfers use the type
   "Trasferimento"/"Transfer"/"Umbuchung"/"Virement" and the optional columns `da`/`verso`
   (`from`/`to`, `von`/`nach`, `de`/`vers`) with position names. Tags go in an optional column

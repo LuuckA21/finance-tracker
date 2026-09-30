@@ -811,4 +811,13 @@ export const de: Messages = {
   'import.error.ambiguous_category': '„{value}“ ist Unterkategorie mehrerer Hauptkategorien: Gib auch die Hauptkategorie an',
   'cashflow.otherDetails': '{count} weitere Unterkategorien',
   'cashflow.categoriesHelp': 'Die Balken teilen sich in die Unterkategorien auf, die grösste zuerst; grau die Buchungen ohne Unterkategorie. Öffne eine Kategorie, um die Beträge zu sehen.',
+  'import.missingTitle': 'Nicht gefundene Kategorien: {count}',
+  'import.newCategoryTitle': 'Brauchst du eine neue Kategorie?',
+  'import.newCategory': 'Neue Kategorie',
+  'import.missingHelp': 'Die Datei verwendet Kategorien, die du nicht hast: Erstelle sie hier als Haupt- oder Unterkategorie, und die Zeilen, die sie verwenden, erhalten sie sofort.',
+  'import.missingRows': 'Zeilen: {count}',
+  'import.createCategory': 'Erstellen…',
+  'import.newMacro': 'Neue Hauptkategorie „{name}“',
+  'import.createAndAssign': 'Erstellen und zuweisen',
+  'import.create': 'Erstellen',
 }
