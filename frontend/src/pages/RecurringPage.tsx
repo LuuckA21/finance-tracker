@@ -8,6 +8,8 @@ import { amountStyle, EntryTarget, TransferFields, transferRoute } from '../comp
 import { Badge, Button, Card, EmptyState, ErrorAlert, Field, Modal, PageHeader, Segmented, Spinner } from '../components/ui'
 import { useI18n, type MessageKey } from '../i18n'
 import { COMMON_CURRENCIES, date, money, parseDecimal, today } from '../lib/format'
+import { CategoryOptions } from '../components/CategoryOptions'
+import { categoryPath } from '../lib/categories'
 
 /** Stable while categories load, so memoized lookups are not rebuilt on every render. */
 const NO_CATEGORIES: Category[] = []
@@ -78,11 +80,10 @@ export function RecurringPage() {
               </thead>
               <tbody>
                 {list.map((r) => {
-                  const cat = r.categoryId === null ? undefined : byId.get(r.categoryId)
                   const style = amountStyle(r.kind)
                   const fallback = r.kind === 'TRANSFER'
                     ? transferRoute(positions, r.fromPositionId, r.toPositionId, '?') ?? t('transfer.label')
-                    : cat?.name ?? '—'
+                    : categoryPath(r.categoryId, byId) || '—'
                   return (
                     <tr key={r.id} className={`border-b border-line last:border-0 hover:bg-surface-2 ${r.active ? '' : 'opacity-60'}`}>
                       <td className="px-4 py-2 sm:px-2">
@@ -160,7 +161,6 @@ function RecurringForm({ rule, onDone }: { rule: RecurringEntry | null; onDone: 
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
-  const options = categories.filter((c) => c.kind === kind)
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -229,7 +229,7 @@ function RecurringForm({ rule, onDone }: { rule: RecurringEntry | null; onDone: 
               <select id={id} className="input" required value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : '')}>
                 <option value="">{t('entryForm.choose')}</option>
-                {options.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                <CategoryOptions categories={categories} kind={kind === 'INCOME' ? 'INCOME' : 'EXPENSE'} />
               </select>
             )}
           </Field>

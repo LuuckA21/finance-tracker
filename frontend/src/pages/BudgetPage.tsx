@@ -2,7 +2,8 @@ import { useState, type FormEvent } from 'react'
 import { ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react'
 import { ApiError, errorMessage } from '../api/client'
 import { useBudgetStatus, useCategories, useDeleteBudget, useSaveBudget } from '../api/hooks'
-import type { BudgetState, BudgetStatus } from '../api/types'
+import type { BudgetState, BudgetStatus, Category } from '../api/types'
+import { CategoryOptions } from '../components/CategoryOptions'
 import { Button, Card, EmptyState, ErrorAlert, Field, MissingRatesNotice, Modal, PageHeader, Spinner, StatTile } from '../components/ui'
 import { useI18n } from '../i18n'
 import { COMMON_CURRENCIES, money, monthName, parseDecimal, percent } from '../lib/format'
@@ -42,9 +43,15 @@ export function BudgetPage() {
   const remove = useDeleteBudget()
   const [draft, setDraft] = useState<Draft | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const categories = useCategories().data ?? []
   const data = status.data
   const currency = data?.baseCurrency ?? 'CHF'
   const shown = month ?? data?.month
+  const taken = data?.categories.map((c) => c.categoryId) ?? []
+  const conflicted = (id: number) => {
+    const category = categories.find((c) => c.id === id)
+    return category !== undefined && budgetConflict(category, categories, taken)
+  }
 
   async function onDelete(row: Row) {
     if (!confirm(t('budget.confirmDelete', { category: row.name }))) return
@@ -124,7 +131,7 @@ export function BudgetPage() {
                     <span className="flex flex-wrap items-center gap-3">
                       <span className="tabular">{money(o.spent, currency)}</span>
                       <span className="text-xs text-muted">{t('budget.average', { amount: money(o.average, currency) })}</span>
-                      <Button onClick={() => setDraft({ categoryId: o.categoryId, amount: suggestion(o.average), currency, average: o.average, base: currency, editing: false })}>
+                      <Button onClick={() => setDraft({ categoryId: conflicted(o.categoryId) ? null : o.categoryId, amount: suggestion(o.average), currency, average: o.average, base: currency, editing: false })}>
                         {t('budget.set')}
                       </Button>
                     </span>
@@ -137,7 +144,7 @@ export function BudgetPage() {
       )}
 
       <Modal title={draft?.editing ? t('budget.edit') : t('budget.new')} open={draft !== null} onClose={() => setDraft(null)}>
-        {draft && <BudgetForm draft={draft} taken={data?.categories.map((c) => c.categoryId) ?? []} onDone={() => setDraft(null)} />}
+        {draft && <BudgetForm draft={draft} taken={taken} onDone={() => setDraft(null)} />}
       </Modal>
     </>
   )
@@ -199,6 +206,16 @@ function BudgetRow({ row, currency, currentMonth, onEdit, onDelete }: {
   )
 }
 
+/**
+ * A macro's budget covers its details, so a macro and its details never both have one: a macro is
+ * out once a detail has a budget, a detail once its macro has.
+ */
+function budgetConflict(category: Category, categories: Category[], taken: number[]) {
+  return category.parentId === null
+    ? categories.some((c) => c.parentId === category.id && taken.includes(c.id))
+    : taken.includes(category.parentId)
+}
+
 function BudgetForm({ draft, taken, onDone }: { draft: Draft; taken: number[]; onDone: () => void }) {
   const { t } = useI18n()
   const categories = (useCategories().data ?? []).filter((c) => c.kind === 'EXPENSE')
@@ -208,7 +225,6 @@ function BudgetForm({ draft, taken, onDone }: { draft: Draft; taken: number[]; o
   const [currency, setCurrency] = useState(draft.currency)
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
-  const options = categories.filter((c) => c.id === draft.categoryId || !taken.includes(c.id))
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -240,7 +256,8 @@ function BudgetForm({ draft, taken, onDone }: { draft: Draft; taken: number[]; o
           <select id={id} className="input" required value={categoryId} disabled={draft.editing}
             onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : '')}>
             <option value="">{t('entryForm.choose')}</option>
-            {options.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            <CategoryOptions categories={categories} kind="EXPENSE"
+              disabled={(c) => c.id !== draft.categoryId && (taken.includes(c.id) || budgetConflict(c, categories, taken))} />
           </select>
         )}
       </Field>

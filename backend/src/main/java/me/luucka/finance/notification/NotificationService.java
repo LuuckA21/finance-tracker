@@ -7,6 +7,7 @@ import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -15,8 +16,10 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import me.luucka.finance.budget.BudgetService;
+import me.luucka.finance.category.CategoryService;
 import me.luucka.finance.core.budget.BudgetCalculator;
 import me.luucka.finance.core.cashflow.CashflowTotals;
+import me.luucka.finance.core.category.CategoryTree;
 import me.luucka.finance.core.goal.GoalCalculator;
 import me.luucka.finance.dashboard.DashboardService;
 import me.luucka.finance.goal.SavingsGoalService;
@@ -53,18 +56,20 @@ public class NotificationService {
     private final BudgetService budgets;
     private final SavingsGoalService goals;
     private final DashboardService dashboards;
+    private final CategoryService categories;
     private final Mailer mailer;
     private final Clock clock;
 
     public NotificationService(NotificationSettingsRepository settings, SentAlerts sent, AppUserRepository users,
                                BudgetService budgets, SavingsGoalService goals, DashboardService dashboards,
-                               Mailer mailer, Clock clock) {
+                               CategoryService categories, Mailer mailer, Clock clock) {
         this.settings = settings;
         this.sent = sent;
         this.users = users;
         this.budgets = budgets;
         this.goals = goals;
         this.dashboards = dashboards;
+        this.categories = categories;
         this.mailer = mailer;
         this.clock = clock;
     }
@@ -245,9 +250,15 @@ public class NotificationService {
 
         record Spent(String name, String color, BigDecimal amount) {
         }
-        List<Spent> spent = new ArrayList<>();
-        status.categories().forEach(c -> spent.add(new Spent(c.name(), c.color(), c.spent())));
-        status.others().forEach(o -> spent.add(new Spent(o.name(), o.color(), o.spent())));
+        // By macro category, as on the Income & expenses page: a detail's budget row adds up to its macro
+        CategoryTree tree = categories.tree(userId);
+        Map<Long, BigDecimal> byMacro = new LinkedHashMap<>();
+        status.categories().forEach(c -> byMacro.merge(tree.macroId(c.categoryId()), c.spent(), BigDecimal::add));
+        status.others().forEach(o -> byMacro.merge(tree.macroId(o.categoryId()), o.spent(), BigDecimal::add));
+        List<Spent> spent = byMacro.entrySet().stream().map(e -> {
+            CategoryTree.Node macro = tree.node(e.getKey());
+            return new Spent(macro == null ? "?" : macro.name(), macro == null ? "#6b7280" : macro.color(), e.getValue());
+        }).toList();
         List<Spent> top = spent.stream()
                 .filter(x -> x.amount().signum() > 0)
                 .sorted(Comparator.comparing(Spent::amount).reversed())

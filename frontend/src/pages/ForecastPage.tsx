@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { ApiError, errorMessage } from '../api/client'
 import { useCategories, useDeleteForecast, useForecastPreview, useForecasts, useMe, useSaveForecast, useTags } from '../api/hooks'
-import type { ForecastInput, ForecastItem, ForecastScenario } from '../api/types'
+import type { Category, ForecastInput, ForecastItem, ForecastScenario } from '../api/types'
 import { ForecastResult } from '../components/ForecastResult'
 import { Badge, Button, Card, ErrorAlert, Field, Modal, PageHeader, Spinner } from '../components/ui'
 import { useI18n } from '../i18n'
+import { categoryPath, categoryTree } from '../lib/categories'
 import { money, monthName, monthShort, parseDecimal, signedMoney } from '../lib/format'
 import { ForecastItemForm } from './ForecastItemForm'
 
@@ -207,7 +208,7 @@ function ScenarioEditor({ saved, first, currency, onEdit, onSaved, onDeleted }: 
               <Chips label={t('tags.label')} options={tags.map((tag) => ({ id: tag.id, name: tag.name }))}
                 selected={draft.excludedTagIds} onToggle={(id) => toggle('excludedTagIds', id)} />
             )}
-            <Chips label={t('forecast.categories')} options={categories.map((c) => ({ id: c.id, name: c.name, color: c.color }))}
+            <CategoryChips label={t('forecast.categories')} categories={categories}
               selected={draft.excludedCategoryIds} onToggle={(id) => toggle('excludedCategoryIds', id)} />
           </details>
 
@@ -237,7 +238,7 @@ function ScenarioEditor({ saved, first, currency, onEdit, onSaved, onDeleted }: 
                           {item.description}
                           <span className="ml-2 text-xs text-muted">{item.kind === 'INCOME' ? t('entryForm.income') : t('entryForm.expense')}</span>
                         </td>
-                        <td className="px-2 py-2 text-ink-2">{item.categoryId !== null ? byId.get(item.categoryId)?.name ?? '—' : '—'}</td>
+                        <td className="px-2 py-2 text-ink-2">{categoryPath(item.categoryId, byId) || '—'}</td>
                         <td className="whitespace-nowrap px-2 py-2 text-ink-2">{when(item)}</td>
                         <td className="tabular whitespace-nowrap px-2 py-2 text-right">{amount(item.amount, currency)}</td>
                         <td className="tabular whitespace-nowrap px-2 py-2 text-right text-ink-2">
@@ -280,7 +281,64 @@ function ScenarioEditor({ saved, first, currency, onEdit, onSaved, onDeleted }: 
   )
 }
 
-/** Toggle buttons for a set of tags or categories. */
+/**
+ * Toggle buttons for the categories, a line per macro with its details after it; excluding a macro
+ * excludes its details too.
+ */
+function CategoryChips({ label, categories, selected, onToggle }: {
+  label: string
+  categories: Category[]
+  selected: number[]
+  onToggle: (id: number) => void
+}) {
+  const { t } = useI18n()
+  const byId = new Map(categories.map((c) => [c.id, c]))
+  const groups = categoryTree(categories).reduce<Category[][]>((all, { category, depth }) => {
+    if (depth === 0) all.push([category])
+    else all.at(-1)?.push(category)
+    return all
+  }, [])
+  return (
+    <div className="mt-3">
+      <p className="mb-1.5 text-xs font-medium text-ink-2">{label}</p>
+      <div className="flex flex-col gap-1.5" role="group" aria-label={label}>
+        {groups.map(([macro, ...details]) => {
+          const macroOff = selected.includes(macro.id)
+          return (
+            <div key={macro.id} className="flex flex-wrap items-center gap-1.5">
+              <Chip name={macro.name} color={macro.color} on={macroOff} onToggle={() => onToggle(macro.id)} />
+              {details.map((d) => (
+                <Chip key={d.id} small name={d.name} label={categoryPath(d.id, byId)} on={macroOff || selected.includes(d.id)}
+                  disabled={macroOff} title={macroOff ? t('forecast.excludedWithMacro') : undefined} onToggle={() => onToggle(d.id)} />
+              ))}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function Chip({ name, label, color, on, small, disabled, title, onToggle }: {
+  name: string
+  label?: string
+  color?: string
+  on: boolean
+  small?: boolean
+  disabled?: boolean
+  title?: string
+  onToggle: () => void
+}) {
+  return (
+    <button type="button" aria-pressed={on} aria-label={label} title={title} disabled={disabled} onClick={onToggle}
+      className={`inline-flex items-center gap-1.5 rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${small ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-xs'} ${on ? 'border-accent bg-accent-soft text-ink line-through' : 'border-line text-ink-2 hover:bg-surface-2'}`}>
+      {color && <span className="size-2 rounded-full" style={{ background: color }} aria-hidden />}
+      {name}
+    </button>
+  )
+}
+
+/** Toggle buttons for a set of tags. */
 function Chips({ label, options, selected, onToggle }: {
   label: string
   options: { id: number; name: string; color?: string }[]

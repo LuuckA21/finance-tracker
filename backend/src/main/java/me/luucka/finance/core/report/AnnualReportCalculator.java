@@ -8,12 +8,14 @@ import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.function.LongUnaryOperator;
 
 import me.luucka.finance.core.AssetClass;
 import me.luucka.finance.core.EntryKind;
@@ -156,6 +158,38 @@ public final class AnnualReportCalculator {
                 List.copyOf(expenses.subList(0, Math.min(LARGEST_EXPENSES, expenses.size()))), unconverted);
     }
 
+    /**
+     * A macro category's change: {@code total} under the macro's id and, when any of its details has
+     * entries, the {@code details} (the macro's own entries under its id).
+     */
+    public record MacroChange(CategoryChange total, List<CategoryChange> details) {
+    }
+
+    /** The categories' changes rolled up by macro, in the same order as the categories. */
+    public static List<MacroChange> byMacro(List<CategoryChange> categories, LongUnaryOperator macroOf) {
+        Map<Long, List<CategoryChange>> parts = new LinkedHashMap<>();
+        for (CategoryChange c : categories) {
+            parts.computeIfAbsent(macroOf.applyAsLong(c.categoryId()), id -> new ArrayList<>()).add(c);
+        }
+        List<MacroChange> rows = new ArrayList<>();
+        parts.forEach((macroId, changes) -> {
+            BigDecimal amount = changes.stream().map(CategoryChange::amount).reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal previous = changes.stream().map(CategoryChange::previousAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            boolean detailed = changes.stream().anyMatch(c -> c.categoryId() != macroId);
+            rows.add(new MacroChange(new CategoryChange(macroId, changes.getFirst().kind(), amount, previous),
+                    detailed ? changes.stream().sorted(ORDER).toList() : List.of()));
+        });
+        rows.sort(Comparator.comparing(MacroChange::total, ORDER));
+        return rows;
+    }
+
+    /** Income before expenses, then largest first (this year, then the year before). */
+    private static final Comparator<CategoryChange> ORDER = Comparator.comparing(CategoryChange::kind)
+            .thenComparing(Comparator.comparing(CategoryChange::amount).reversed())
+            .thenComparing(Comparator.comparing(CategoryChange::previousAmount).reversed())
+            .thenComparing(CategoryChange::categoryId);
+
     private static List<CategoryChange> categories(Sums current, Sums previous) {
         Set<Long> ids = new HashSet<>(current.byCategory.keySet());
         ids.addAll(previous.byCategory.keySet());
@@ -166,10 +200,7 @@ public final class AnnualReportCalculator {
                     Money.round(current.byCategory.getOrDefault(id, BigDecimal.ZERO)),
                     Money.round(previous.byCategory.getOrDefault(id, BigDecimal.ZERO))));
         }
-        rows.sort(Comparator.comparing(CategoryChange::kind)
-                .thenComparing(Comparator.comparing(CategoryChange::amount).reversed())
-                .thenComparing(Comparator.comparing(CategoryChange::previousAmount).reversed())
-                .thenComparing(CategoryChange::categoryId));
+        rows.sort(ORDER);
         return rows;
     }
 

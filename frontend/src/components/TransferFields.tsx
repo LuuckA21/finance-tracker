@@ -1,6 +1,7 @@
 import { ArrowLeftRight } from 'lucide-react'
 import { usePositions } from '../api/hooks'
 import type { Category, EntryKind, Position } from '../api/types'
+import { PATH_SEPARATOR } from '../lib/categories'
 import { useI18n } from '../i18n'
 import { Field } from './ui'
 
@@ -66,10 +67,14 @@ export function EntryTarget({ kind, categoryId, from, to, categories, positions 
     )
   }
   const category = categoryId === null ? undefined : categories.get(categoryId)
+  const macro = category?.parentId == null ? undefined : categories.get(category.parentId)
   return (
     <span className="flex items-center gap-2">
-      <span className="size-2.5 rounded-full" style={{ background: category?.color }} aria-hidden />
-      {category?.name ?? '—'}
+      <span className="size-2.5 shrink-0 rounded-full" style={{ background: category?.color }} aria-hidden />
+      <span>
+        {macro && <span className="text-muted">{macro.name}{PATH_SEPARATOR}</span>}
+        {category?.name ?? '—'}
+      </span>
     </span>
   )
 }

@@ -2,6 +2,7 @@ package me.luucka.finance;
 
 import static me.luucka.finance.support.ApiClient.json;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -296,7 +297,9 @@ class NotificationsIT {
                 .formatted(last.atDay(25), category(client, "Stipendio")));
         expense(client, last.atDay(10), food, 700);
         expense(client, last.atDay(12), category(client, "Casa"), 1800);
+        expense(client, last.atDay(14), category(client, "Energia"), 200);
         client.put("/api/budgets/" + food, "{\"amount\":600,\"currency\":\"CHF\"}");
+        client.put("/api/budgets/" + category(client, "Energia"), "{\"amount\":500,\"currency\":\"CHF\"}");
 
         confirm(client, "monthly@example.test");
         // Confirming does not send last month's summary; forget that to see it
@@ -309,7 +312,9 @@ class NotificationsIT {
         assertTrue(summary.getSubject().startsWith("Finanze: riepilogo di "), summary.getSubject());
         String body = text(summary);
         assertTrue(body.contains("Entrate: CHF"), body);
-        assertTrue(body.contains("Casa: CHF"), body);
+        // Largest spending by macro, a detail with its own budget included in it
+        assertTrue(Pattern.compile("Casa: CHF.?2.?000").matcher(body).find(), body);
+        assertFalse(body.contains("Energia"), body);
         assertTrue(body.contains("Budget superati"), body);
         int count = received().length;
         notifications.run(user.getId());

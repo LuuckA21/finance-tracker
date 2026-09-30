@@ -193,7 +193,7 @@ class TagsIT {
         String csv = client.get("/api/cash-entries/export").getResponse().getContentAsString(StandardCharsets.UTF_8);
         assertTrue(csv.contains(";etichette\r\n"), csv);
         // Tag names are user text: neutralized like descriptions
-        assertTrue(csv.contains("2026-08-01;Uscita;Spesa alimentare;45;CHF;Migros;;;'=SUM(A1), Casa\r\n"), csv);
+        assertTrue(csv.contains("2026-08-01;Uscita;Spesa alimentare;;45;CHF;Migros;;;'=SUM(A1), Casa\r\n"), csv);
 
         ApiClient other = login(testUsers.create("tags-csv-2", Role.USER));
         MvcResult preview = other.upload("/api/cash-entries/import/preview", "a.csv", """

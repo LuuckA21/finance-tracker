@@ -21,6 +21,7 @@ import me.luucka.finance.common.ApiException;
 import me.luucka.finance.core.Currencies;
 import me.luucka.finance.core.EntryKind;
 import me.luucka.finance.core.TagNames;
+import me.luucka.finance.core.category.CategoryTree;
 import me.luucka.finance.core.csv.CsvReader;
 import me.luucka.finance.core.csv.CsvWriter;
 import me.luucka.finance.core.csv.EntryCsvFormat;
@@ -85,20 +86,20 @@ public class CashEntryCsvService {
     @Transactional(readOnly = true)
     public byte[] export(long userId, CashEntryService.Filter filter) {
         Locale language = user(userId).getLanguage().locale();
-        Map<Long, String> names = categories.owned(userId).stream()
-                .collect(Collectors.toMap(Category::getId, Category::getName));
+        CategoryTree tree = categories.tree(userId);
         Map<Long, String> positionNames = positions.findByUserIdOrderByArchivedAscNameAsc(userId).stream()
                 .collect(Collectors.toMap(AssetPosition::getId, AssetPosition::getName));
         Map<Long, String> tagNames = tags.names(userId);
         // Category, description, position and tag names are user text; the rest is produced here
-        boolean[] text = {false, false, true, false, false, true, true, true, true};
+        boolean[] text = {false, false, true, true, false, false, true, true, true, true};
         CsvWriter csv = new CsvWriter(EXPORT_DELIMITER);
         csv.textRow(EntryCsvFormat.headers(language));
         for (CashEntry entry : entries.all(userId, filter)) {
             csv.row(Arrays.asList(
                     entry.getDate().toString(),
                     EntryCsvFormat.kindLabel(entry.getKind(), language),
-                    entry.getCategoryId() == null ? "" : names.getOrDefault(entry.getCategoryId(), ""),
+                    macroName(tree, entry.getCategoryId()),
+                    detailName(tree, entry.getCategoryId()),
                     entry.getAmount().stripTrailingZeros().toPlainString(),
                     entry.getCurrency(),
                     entry.getDescription(),
@@ -108,6 +109,18 @@ public class CashEntryCsvService {
                     text);
         }
         return (BOM + csv).getBytes(StandardCharsets.UTF_8);
+    }
+
+    /** The macro of an entry's category: the category itself or its parent. */
+    private static String macroName(CategoryTree tree, Long categoryId) {
+        CategoryTree.Node macro = categoryId == null ? null : tree.macro(categoryId);
+        return macro == null ? "" : macro.name();
+    }
+
+    /** The detail an entry's category is, empty for a macro. */
+    private static String detailName(CategoryTree tree, Long categoryId) {
+        CategoryTree.Node node = categoryId == null ? null : tree.node(categoryId);
+        return node == null || node.isMacro() ? "" : node.name();
     }
 
     public String exportFileName(long userId, LocalDate today) {
@@ -180,9 +193,7 @@ public class CashEntryCsvService {
         }
 
         String baseCurrency = user(userId).getBaseCurrency();
-        // Folded once: names are compared ignoring case and accents
-        Map<String, List<Category>> byName = categories.owned(userId).stream()
-                .collect(Collectors.groupingBy(c -> EntryCsvFormat.fold(c.getName())));
+        CategoryNames byName = new CategoryNames(categories.owned(userId));
         // Active positions first, so a name shared with an archived one picks the active one
         Map<String, List<AssetPosition>> positionsByName = positions.findByUserIdOrderByArchivedAscNameAsc(userId)
                 .stream().collect(Collectors.groupingBy(p -> EntryCsvFormat.fold(p.getName())));
@@ -210,7 +221,7 @@ public class CashEntryCsvService {
     }
 
     private static PreviewRow readRow(CsvReader.Row record, Map<Column, Integer> columns,
-                                      Map<String, List<Category>> byName,
+                                      CategoryNames byName,
                                       Map<String, List<AssetPosition>> positionsByName, String baseCurrency) {
         Map<String, String> raw = new LinkedHashMap<>();
         for (Column column : Column.values()) {
@@ -258,8 +269,8 @@ public class CashEntryCsvService {
             }
         }
         String categoryText = raw.getOrDefault("category", "");
-        String folded = EntryCsvFormat.fold(categoryText);
-        List<Category> named = folded.isEmpty() ? List.of() : byName.getOrDefault(folded, List.of());
+        String subcategoryText = raw.getOrDefault("subcategory", "");
+        List<Category> named = byName.find(categoryText, subcategoryText);
         if (kind == null && kindText.isEmpty()) {
             if (named.size() == 1) {
                 kind = named.getFirst().getKind();
@@ -279,17 +290,17 @@ public class CashEntryCsvService {
                 toPositionId = null;
             }
         } else if (categoryText.isEmpty()) {
-            errors.add("missing_category");
+            errors.add(subcategoryText.isEmpty() ? "missing_category" : "unknown_category");
+        } else if (named.isEmpty()) {
+            errors.add(byName.knownMacro(categoryText, subcategoryText) ? "unknown_subcategory" : "unknown_category");
         } else if (kind != null) {
             EntryKind rowKind = kind;
-            Optional<Category> match = named.stream().filter(c -> c.getKind() == rowKind).findFirst();
-            if (match.isPresent()) {
-                categoryId = match.get().getId();
+            List<Category> matches = named.stream().filter(c -> c.getKind() == rowKind).toList();
+            if (matches.size() == 1) {
+                categoryId = matches.getFirst().getId();
             } else {
-                errors.add(named.isEmpty() ? "unknown_category" : "category_kind_mismatch");
+                errors.add(matches.isEmpty() ? "category_kind_mismatch" : "ambiguous_category");
             }
-        } else if (named.isEmpty()) {
-            errors.add("unknown_category");
         }
 
         List<String> tags = TagNames.parseCell(raw.getOrDefault("tags", "")).orElse(null);
@@ -300,6 +311,52 @@ public class CashEntryCsvService {
         return new PreviewRow(record.line(), raw, date, kind, categoryId, amount, currency,
                 description.isEmpty() ? null : description, fromPositionId, toPositionId,
                 tags == null ? List.of() : tags, false, errors);
+    }
+
+    /**
+     * The user's categories by name, ignoring case and accents. A row names a macro and, optionally,
+     * a detail under it (in the subcategory column or as "Casa › Affitto"); a detail's name alone
+     * also finds it when no macro has that name.
+     */
+    static final class CategoryNames {
+
+        private final Map<String, List<Category>> macros;
+        private final Map<String, List<Category>> details;
+
+        CategoryNames(List<Category> categories) {
+            macros = categories.stream().filter(Category::isMacro)
+                    .collect(Collectors.groupingBy(c -> EntryCsvFormat.fold(c.getName())));
+            details = categories.stream().filter(c -> !c.isMacro())
+                    .collect(Collectors.groupingBy(c -> EntryCsvFormat.fold(c.getName())));
+        }
+
+        /** The categories a row may mean, of either kind: several only when its kind has to decide. */
+        List<Category> find(String category, String subcategory) {
+            if (subcategory.isEmpty()) {
+                Optional<EntryCsvFormat.CategoryPath> path = EntryCsvFormat.categoryPath(category);
+                if (path.isPresent()) {
+                    return under(path.get().macro(), path.get().detail());
+                }
+                String name = EntryCsvFormat.fold(category);
+                return name.isEmpty() ? List.of() : macros.getOrDefault(name, details.getOrDefault(name, List.of()));
+            }
+            return under(category, subcategory);
+        }
+
+        /** Whether the macro a row names exists, though the detail it names does not. */
+        boolean knownMacro(String category, String subcategory) {
+            String macro = subcategory.isEmpty()
+                    ? EntryCsvFormat.categoryPath(category).map(EntryCsvFormat.CategoryPath::macro).orElse(null)
+                    : category;
+            return macro != null && macros.containsKey(EntryCsvFormat.fold(macro));
+        }
+
+        private List<Category> under(String macro, String detail) {
+            List<Category> parents = macros.getOrDefault(EntryCsvFormat.fold(macro), List.of());
+            return details.getOrDefault(EntryCsvFormat.fold(detail), List.of()).stream()
+                    .filter(d -> parents.stream().anyMatch(p -> p.getId().equals(d.getParentId())))
+                    .toList();
+        }
     }
 
     private static Long position(String name, Map<String, List<AssetPosition>> positionsByName,

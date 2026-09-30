@@ -7,7 +7,19 @@ import { RankedBars } from '../charts/ChartParts'
 import { useI18n } from '../i18n'
 import { assetClassLabel, money, monthName, monthShort, percent } from '../lib/format'
 import { assetClassColor, useChartTheme } from '../charts/theme'
-import type { CashflowTotals, CashflowYear } from '../api/types'
+import type { CashflowTotals, CashflowYear, CategoryKind } from '../api/types'
+
+/** A kind's macro categories, each opening on its details (the macro's own entries named as such). */
+function categoryRows(data: CashflowYear, kind: CategoryKind, t: ReturnType<typeof useI18n>['t']) {
+  return data.categories.filter((c) => c.kind === kind).map((c) => ({
+    key: String(c.categoryId), label: c.name, swatch: c.color, value: c.amount, share: c.share,
+    details: c.details.map((d) => ({
+      key: String(d.categoryId),
+      label: d.categoryId === c.categoryId ? t('categories.withoutDetail', { name: c.name }) : d.name,
+      swatch: d.color, value: d.amount, share: d.share,
+    })),
+  }))
+}
 
 export function CashflowPage() {
   const [year, setYear] = useState(() => new Date().getFullYear())
@@ -61,15 +73,11 @@ export function CashflowPage() {
             <div className="mb-4 grid gap-4 lg:grid-cols-2">
               <Card title={t('cashflow.expenseByCategory')}>
                 <RankedBars currency={currency} emptyText={t('cashflow.noExpenses')}
-                  rows={data.data.categories.filter((c) => c.kind === 'EXPENSE').map((c) => ({
-                    key: String(c.categoryId), label: c.name, swatch: c.color, value: c.amount, share: c.share,
-                  }))} />
+                  rows={categoryRows(data.data, 'EXPENSE', t)} />
               </Card>
               <Card title={t('cashflow.incomeByCategory')}>
                 <RankedBars currency={currency} emptyText={t('cashflow.noIncome')}
-                  rows={data.data.categories.filter((c) => c.kind === 'INCOME').map((c) => ({
-                    key: String(c.categoryId), label: c.name, swatch: c.color, value: c.amount, share: c.share,
-                  }))} />
+                  rows={categoryRows(data.data, 'INCOME', t)} />
               </Card>
             </div>
 

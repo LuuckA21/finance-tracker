@@ -6,6 +6,8 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -17,14 +19,15 @@ import java.util.stream.Collectors;
 import me.luucka.finance.cashflow.CashEntry;
 import me.luucka.finance.cashflow.CashEntryRepository;
 import me.luucka.finance.cashflow.EntryTag;
-import me.luucka.finance.category.Category;
 import me.luucka.finance.category.CategoryRepository;
+import me.luucka.finance.category.CategoryService;
 import me.luucka.finance.core.AssetClass;
 import me.luucka.finance.core.EntryKind;
 import me.luucka.finance.core.cashflow.CashflowCalculator;
 import me.luucka.finance.core.cashflow.CashflowEntry;
 import me.luucka.finance.core.cashflow.CashflowTotals;
 import me.luucka.finance.core.cashflow.DatedAmount;
+import me.luucka.finance.core.category.CategoryTree;
 import me.luucka.finance.core.fx.FxTable;
 import me.luucka.finance.core.valuation.NetWorthCalculator;
 import me.luucka.finance.core.valuation.PositionHistory;
@@ -54,8 +57,16 @@ public class DashboardService {
     public record MonthRow(int month, CashflowTotals totals) {
     }
 
+    /**
+     * A macro category's income or expenses in the year, with its {@code details} largest first when
+     * any detail has entries; entries on the macro itself are then the detail with the macro's id.
+     */
     public record CategoryRow(long categoryId, String name, String color, EntryKind kind, BigDecimal amount,
-                              BigDecimal share) {
+                              BigDecimal share, List<DetailRow> details) {
+    }
+
+    /** A detail category's part of its macro; {@code share} of the year's income or expenses. */
+    public record DetailRow(long categoryId, String name, String color, BigDecimal amount, BigDecimal share) {
     }
 
     /** Transfers by the asset class they went to; {@code destination} null when not given. */
@@ -152,17 +163,8 @@ public class DashboardService {
         List<CashflowEntry> data = yearEntries.stream().map(e -> toCashflow(e, classes)).toList();
         CashflowCalculator.YearResult result = CashflowCalculator.year(data, fx, year);
 
-        Map<Long, Category> byId = categories.findByUserIdOrderByKindAscNameAsc(userId).stream()
-                .collect(Collectors.toMap(Category::getId, Function.identity()));
-        List<CategoryRow> rows = new ArrayList<>();
-        for (CashflowCalculator.CategoryResult c : result.byCategory()) {
-            Category category = byId.get(c.categoryId());
-            BigDecimal total = c.kind() == EntryKind.INCOME ? result.totals().income() : result.totals().expense();
-            rows.add(new CategoryRow(c.categoryId(),
-                    category == null ? "?" : category.getName(),
-                    category == null ? "#6b7280" : category.getColor(),
-                    c.kind(), c.amount(), percentage(c.amount(), total)));
-        }
+        CategoryTree tree = CategoryService.tree(categories.findByUserIdOrderByKindAscNameAsc(userId));
+        List<CategoryRow> rows = categoryRows(tree, result.byCategory(), result.totals());
 
         List<TransferRow> transfers = result.transfers().stream()
                 .map(t -> new TransferRow(t.destination(), t.amount(),
@@ -178,14 +180,47 @@ public class DashboardService {
             years.add(currentYear);
         }
         years.sort(null);
-        TagBreakdown.Result byTag = tagBreakdown(userId, yearEntries, from, to, fx, result.totals());
+        TagBreakdown.Result byTag = tagBreakdown(userId, tree, yearEntries, from, to, fx, result.totals());
         return new CashflowYearResponse(fx.baseCurrency(), year, months, result.totals(), rows, transfers,
                 byTag.tags(), byTag.matrices(), years, result.unconvertedCurrencies());
     }
 
-    /** Income and expenses of the year by tag; transfers stay out, as in the totals. */
-    private TagBreakdown.Result tagBreakdown(long userId, List<CashEntry> yearEntries, LocalDate from, LocalDate to,
-                                             FxTable fx, CashflowTotals totals) {
+    /** The year's totals per category rolled up by macro, largest first, each with its details. */
+    static List<CategoryRow> categoryRows(CategoryTree tree, List<CashflowCalculator.CategoryResult> byCategory,
+                                          CashflowTotals totals) {
+        Map<Long, List<CashflowCalculator.CategoryResult>> byMacro = new LinkedHashMap<>();
+        for (CashflowCalculator.CategoryResult c : byCategory) {
+            byMacro.computeIfAbsent(tree.macroId(c.categoryId()), id -> new ArrayList<>()).add(c);
+        }
+        List<CategoryRow> rows = new ArrayList<>();
+        for (Map.Entry<Long, List<CashflowCalculator.CategoryResult>> e : byMacro.entrySet()) {
+            List<CashflowCalculator.CategoryResult> parts = e.getValue();
+            EntryKind kind = parts.getFirst().kind();
+            BigDecimal total = kind == EntryKind.INCOME ? totals.income() : totals.expense();
+            BigDecimal amount = parts.stream().map(CashflowCalculator.CategoryResult::amount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            CategoryTree.Node macro = tree.node(e.getKey());
+            // Only the macro's own entries: nothing to detail
+            boolean detailed = parts.stream().anyMatch(p -> p.categoryId() != e.getKey());
+            List<DetailRow> details = !detailed ? List.of() : parts.stream().map(p -> {
+                CategoryTree.Node node = tree.node(p.categoryId());
+                return new DetailRow(p.categoryId(), node == null ? "?" : node.name(), color(node), p.amount(),
+                        percentage(p.amount(), total));
+            }).toList();
+            rows.add(new CategoryRow(e.getKey(), macro == null ? "?" : macro.name(), color(macro), kind, amount,
+                    percentage(amount, total), details));
+        }
+        rows.sort(Comparator.comparing(CategoryRow::amount).reversed());
+        return rows;
+    }
+
+    private static String color(CategoryTree.Node node) {
+        return node == null ? "#6b7280" : node.color();
+    }
+
+    /** Income and expenses of the year by tag, categories rolled up by macro; transfers stay out, as in the totals. */
+    private TagBreakdown.Result tagBreakdown(long userId, CategoryTree tree, List<CashEntry> yearEntries,
+                                             LocalDate from, LocalDate to, FxTable fx, CashflowTotals totals) {
         Map<Long, Set<Long>> entryTags = entries.findEntryTagsBetween(userId, from, to).stream()
                 .collect(Collectors.groupingBy(EntryTag::entryId,
                         Collectors.mapping(EntryTag::tagId, Collectors.toSet())));
@@ -199,7 +234,7 @@ public class DashboardService {
             }
             // Without a rate the entry is left out of the totals too (its currency is reported there)
             fx.toBase(e.getAmount(), e.getCurrency(), e.getDate()).ifPresent(value -> items.add(new TagBreakdown.Item(
-                    e.getCategoryId(), e.getKind(), value, entryTags.getOrDefault(e.getId(), Set.of()))));
+                    tree.macroId(e.getCategoryId()), e.getKind(), value, entryTags.getOrDefault(e.getId(), Set.of()))));
         }
         return TagBreakdown.of(items, tags.names(userId), totals);
     }

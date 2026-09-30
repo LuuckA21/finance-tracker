@@ -7,6 +7,7 @@ import { TransferFields } from '../components/TransferFields'
 import { Button, ErrorAlert, Field, Modal, Segmented } from '../components/ui'
 import { useI18n } from '../i18n'
 import { COMMON_CURRENCIES, parseDecimal, today } from '../lib/format'
+import { CategoryOptions } from '../components/CategoryOptions'
 
 let lastCurrency: string | null = null
 
@@ -38,7 +39,6 @@ function EntryForm({ entry, onDone }: { entry: CashEntry | null; onDone: () => v
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
-  const options = categories.filter((c) => c.kind === kind)
 
   async function submit(e: FormEvent, again = false) {
     e.preventDefault()
@@ -110,7 +110,7 @@ function EntryForm({ entry, onDone }: { entry: CashEntry | null; onDone: () => v
               <select id={id} className="input" required value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : '')}>
                 <option value="">{t('entryForm.choose')}</option>
-                {options.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                <CategoryOptions categories={categories} kind={kind === 'INCOME' ? 'INCOME' : 'EXPENSE'} />
               </select>
             )}
           </Field>

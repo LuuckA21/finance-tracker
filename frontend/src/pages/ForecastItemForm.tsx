@@ -3,6 +3,7 @@ import type { Category, CategoryKind, ForecastItem, ForecastSchedule } from '../
 import { Button, Field, Segmented } from '../components/ui'
 import { useI18n } from '../i18n'
 import { monthName, parseDecimal } from '../lib/format'
+import { CategoryOptions } from '../components/CategoryOptions'
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1)
 
@@ -22,7 +23,6 @@ export function ForecastItemForm({ item, categories, currency, onDone }: {
   const [startMonth, setStartMonth] = useState(item?.startMonth ?? 1)
   const [endMonth, setEndMonth] = useState(item?.endMonth ?? 12)
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const options = categories.filter((c) => c.kind === kind)
 
   function changeKind(next: CategoryKind) {
     setKind(next)
@@ -65,7 +65,7 @@ export function ForecastItemForm({ item, categories, currency, onDone }: {
           {(id) => (
             <select id={id} className="input" value={categoryId ?? ''} onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : null)}>
               <option value="">{t('forecast.noCategory')}</option>
-              {options.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              <CategoryOptions categories={categories} kind={kind} />
             </select>
           )}
         </Field>

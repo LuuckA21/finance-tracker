@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import me.luucka.finance.core.EntryKind;
@@ -25,26 +26,29 @@ import me.luucka.finance.core.EntryKind;
 public final class EntryCsvFormat {
 
     /**
+     * {@code CATEGORY}: the macro category, {@code SUBCATEGORY}: the detail under it, optional.
      * {@code FROM}/{@code TO}: position names of a transfer, both optional. {@code TAGS}: tag names
      * separated by commas, optional.
      */
-    public enum Column { DATE, KIND, CATEGORY, AMOUNT, CURRENCY, DESCRIPTION, FROM, TO, TAGS }
+    public enum Column { DATE, KIND, CATEGORY, SUBCATEGORY, AMOUNT, CURRENCY, DESCRIPTION, FROM, TO, TAGS }
 
     /** Export headers per interface language. */
     public static final Map<Locale, List<String>> HEADERS = Map.of(
-            Locale.ITALIAN, List.of("data", "tipo", "categoria", "importo", "valuta", "descrizione", "da", "verso",
-                    "etichette"),
-            Locale.ENGLISH, List.of("date", "type", "category", "amount", "currency", "description", "from", "to",
-                    "tags"),
-            Locale.GERMAN, List.of("datum", "art", "kategorie", "betrag", "währung", "beschreibung", "von", "nach",
-                    "tags"),
-            Locale.FRENCH, List.of("date", "type", "catégorie", "montant", "monnaie", "description", "de", "vers",
-                    "étiquettes"));
+            Locale.ITALIAN, List.of("data", "tipo", "categoria", "sottocategoria", "importo", "valuta", "descrizione",
+                    "da", "verso", "etichette"),
+            Locale.ENGLISH, List.of("date", "type", "category", "subcategory", "amount", "currency", "description",
+                    "from", "to", "tags"),
+            Locale.GERMAN, List.of("datum", "art", "kategorie", "unterkategorie", "betrag", "währung", "beschreibung",
+                    "von", "nach", "tags"),
+            Locale.FRENCH, List.of("date", "type", "catégorie", "sous-catégorie", "montant", "monnaie", "description",
+                    "de", "vers", "étiquettes"));
 
     private static final Map<Column, List<String>> ALIASES = new EnumMap<>(Map.of(
             Column.DATE, List.of("data", "date", "datum", "giorno", "day"),
             Column.KIND, List.of("tipo", "type", "kind", "typ", "art"),
             Column.CATEGORY, List.of("categoria", "category", "kategorie", "categorie"),
+            Column.SUBCATEGORY, List.of("sottocategoria", "subcategory", "sub-category", "unterkategorie",
+                    "sous-categorie", "souscategorie", "dettaglio", "detail", "detail category"),
             Column.AMOUNT, List.of("importo", "amount", "betrag", "valore", "value", "somma", "montant"),
             Column.CURRENCY, List.of("valuta", "currency", "wahrung", "waehrung", "divisa", "monnaie", "devise"),
             Column.DESCRIPTION, List.of("descrizione", "description", "beschreibung", "note", "nota", "notes",
@@ -79,6 +83,7 @@ public final class EntryCsvFormat {
 
     private static final Pattern AMOUNT_CHARS = Pattern.compile("[0-9.,]+");
     private static final Pattern CONTROL = Pattern.compile("[\\p{Cc}\\p{Cf}]");
+    private static final Pattern PATH = Pattern.compile("\\s*([^›>]*[^›>\\s])\\s*[›>]\\s*([^›>]*[^›>\\s])\\s*");
 
     public static final LocalDate MIN_DATE = LocalDate.of(1900, 1, 1);
     public static final LocalDate MAX_DATE = LocalDate.of(2199, 12, 31);
@@ -180,6 +185,16 @@ public final class EntryCsvFormat {
     }
 
     /** Lower case without accents or surrounding spaces, for matching names and headers. */
+    /** A category cell naming a macro and a detail: {@code Casa › Affitto} or {@code Casa > Affitto}. */
+    public record CategoryPath(String macro, String detail) {
+    }
+
+    /** The macro and detail of a category cell with a path, empty for a plain name. */
+    public static Optional<CategoryPath> categoryPath(String value) {
+        Matcher m = PATH.matcher(value);
+        return m.matches() ? Optional.of(new CategoryPath(m.group(1).strip(), m.group(2).strip())) : Optional.empty();
+    }
+
     public static String fold(String value) {
         String decomposed = Normalizer.normalize(value.strip(), Normalizer.Form.NFD);
         return decomposed.replaceAll("\\p{M}", "").toLowerCase(Locale.ROOT);

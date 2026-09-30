@@ -21,9 +21,11 @@ import me.luucka.finance.cashflow.CashEntryRepository;
 import me.luucka.finance.cashflow.EntryTag;
 import me.luucka.finance.category.Category;
 import me.luucka.finance.category.CategoryRepository;
+import me.luucka.finance.category.CategoryService;
 import me.luucka.finance.common.ApiException;
 import me.luucka.finance.core.EntryKind;
 import me.luucka.finance.core.cashflow.CashflowTotals;
+import me.luucka.finance.core.category.CategoryTree;
 import me.luucka.finance.core.forecast.ForecastCalculator;
 import me.luucka.finance.core.fx.FxTable;
 import me.luucka.finance.fx.FxService;
@@ -121,20 +123,21 @@ public class ForecastService {
         FxTable table = fx.table(userId);
         ForecastCalculator.Period base = ForecastCalculator.basePeriod(data.year(), LocalDate.now(clock));
         SortedSet<String> unconverted = new TreeSet<>();
-        List<ForecastCalculator.BaseAmount> amounts = baseAmounts(userId, base, data, table, unconverted);
+        // The forecast goes by macro category: details and extra items roll up to their macro
+        CategoryTree tree = CategoryService.tree(categories.findByUserIdOrderByKindAscNameAsc(userId));
+        List<ForecastCalculator.BaseAmount> amounts = baseAmounts(userId, tree, base, data, table, unconverted);
         ForecastCalculator.Result r = ForecastCalculator.forecast(new ForecastCalculator.Scenario(data.year(),
                 data.incomeGrowth(), data.expenseGrowth(), data.items().stream()
-                .map(i -> new ForecastCalculator.Item(i.kind(), i.categoryId(), i.amount(), i.schedule(),
+                .map(i -> new ForecastCalculator.Item(i.kind(),
+                        i.categoryId() == null ? null : tree.macroId(i.categoryId()), i.amount(), i.schedule(),
                         i.startMonth(), i.endMonth()))
                 .toList()), base, amounts);
 
-        Map<Long, Category> byId = categories.findByUserIdOrderByKindAscNameAsc(userId).stream()
-                .collect(Collectors.toMap(Category::getId, Function.identity()));
         List<CategoryRow> rows = r.categories().stream()
                 .map(c -> {
-                    Category category = byId.get(c.categoryId());
-                    return new CategoryRow(c.categoryId(), category == null ? "?" : category.getName(),
-                            category == null ? "#6b7280" : category.getColor(), c.kind(), c.base(), c.forecast());
+                    CategoryTree.Node category = tree.node(c.categoryId());
+                    return new CategoryRow(c.categoryId(), category == null ? "?" : category.name(),
+                            category == null ? "#6b7280" : category.color(), c.kind(), c.base(), c.forecast());
                 })
                 .toList();
         return new ForecastResponse(table.baseCurrency(), data.year(), base.from().toString(), base.to().toString(),
@@ -142,10 +145,13 @@ public class ForecastService {
                 r.baseTotals(), r.forecastTotals(), r.fromGrowth(), r.fromItems(), rows, r.itemTotals(), unconverted);
     }
 
-    /** Income and expenses of the base period, converted, without the excluded tags and categories. */
-    private List<ForecastCalculator.BaseAmount> baseAmounts(long userId, ForecastCalculator.Period base,
-                                                            ScenarioData data, FxTable table,
-                                                            SortedSet<String> unconverted) {
+    /**
+     * Income and expenses of the base period, converted and by macro, without the excluded tags and
+     * categories (an excluded macro takes its details with it).
+     */
+    private List<ForecastCalculator.BaseAmount> baseAmounts(long userId, CategoryTree tree,
+                                                            ForecastCalculator.Period base, ScenarioData data,
+                                                            FxTable table, SortedSet<String> unconverted) {
         LocalDate from = base.from().atDay(1);
         LocalDate to = base.to().atEndOfMonth();
         Set<Long> excludedEntries = data.excludedTagIds().isEmpty() ? Set.of()
@@ -153,10 +159,13 @@ public class ForecastService {
                         .filter(t -> data.excludedTagIds().contains(t.tagId()))
                         .map(EntryTag::entryId)
                         .collect(Collectors.toSet());
+        Set<Long> excludedCategories = data.excludedCategoryIds().stream()
+                .flatMap(id -> tree.withDetails(id).stream())
+                .collect(Collectors.toSet());
         List<ForecastCalculator.BaseAmount> amounts = new ArrayList<>();
         for (CashEntry e : entries.findByUserIdAndDateBetween(userId, from, to)) {
             if (e.getKind() == EntryKind.TRANSFER || e.getCategoryId() == null
-                    || data.excludedCategoryIds().contains(e.getCategoryId()) || excludedEntries.contains(e.getId())) {
+                    || excludedCategories.contains(e.getCategoryId()) || excludedEntries.contains(e.getId())) {
                 continue;
             }
             Optional<BigDecimal> value = table.toBase(e.getAmount(), e.getCurrency(), e.getDate());
@@ -164,8 +173,8 @@ public class ForecastService {
                 unconverted.add(e.getCurrency());
                 continue;
             }
-            amounts.add(new ForecastCalculator.BaseAmount(YearMonth.from(e.getDate()), e.getCategoryId(), e.getKind(),
-                    value.get()));
+            amounts.add(new ForecastCalculator.BaseAmount(YearMonth.from(e.getDate()), tree.macroId(e.getCategoryId()),
+                    e.getKind(), value.get()));
         }
         return amounts;
     }
