@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import { ChevronRight } from 'lucide-react'
 import { useI18n } from '../i18n'
 import { money, percent } from '../lib/format'
 
@@ -56,23 +55,12 @@ export function Legend({ items }: { items: { key: string; label: string; color: 
   )
 }
 
-interface RankedRow {
-  key: string
-  label: string
-  swatch?: string
-  value: number
-  share?: number | null
-  /** Parts of the row, shown when it is opened (a macro category's details) */
-  details?: RankedRow[]
-}
-
 /**
  * Horizontal bars in plain HTML for ranked lists (categories, allocation): the label and value
- * are text, the bar only shows magnitude relative to the largest item. A row with details opens
- * on them, their bars relative to the row.
+ * are text, the bar only shows magnitude relative to the largest item.
  */
 export function RankedBars({ rows, currency, emptyText }: {
-  rows: RankedRow[]
+  rows: { key: string; label: string; swatch?: string; value: number; share?: number | null }[]
   currency: string
   emptyText: string
 }) {
@@ -83,52 +71,23 @@ export function RankedBars({ rows, currency, emptyText }: {
     <ul className="flex flex-col gap-3">
       {rows.map((r) => (
         <li key={r.key}>
-          {r.details && r.details.length > 0 ? (
-            <details className="group">
-              <summary className="cursor-pointer list-none rounded focus-visible:outline-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
-                <RankedLine row={r} max={max} currency={currency} expandable />
-              </summary>
-              <ul className="mt-2 flex flex-col gap-2 border-l border-line pl-4">
-                {r.details.map((d) => (
-                  <li key={d.key}><RankedLine row={d} max={r.value} currency={currency} small /></li>
-                ))}
-              </ul>
-            </details>
-          ) : (
-            <RankedLine row={r} max={max} currency={currency} />
-          )}
+          <div className="mb-1 flex items-baseline justify-between gap-3 text-sm">
+            <span className="flex min-w-0 items-center gap-2 text-ink">
+              {r.swatch && <span className="size-2.5 shrink-0 rounded-full" style={{ background: r.swatch }} aria-hidden />}
+              <span className="truncate">{r.label}</span>
+            </span>
+            <span className="tabular shrink-0 text-ink">
+              {money(r.value, currency)}
+              {r.share !== undefined && r.share !== null && (
+                <span className="ml-2 text-xs text-muted">{percent(r.share)}</span>
+              )}
+            </span>
+          </div>
+          <div className="h-1.5 rounded-full bg-surface-2" aria-hidden>
+            <div className="h-1.5 rounded-full bg-accent" style={{ width: `${max > 0 ? Math.max((r.value / max) * 100, 1) : 0}%` }} />
+          </div>
         </li>
       ))}
     </ul>
-  )
-}
-
-function RankedLine({ row, max, currency, expandable, small }: {
-  row: RankedRow
-  max: number
-  currency: string
-  expandable?: boolean
-  small?: boolean
-}) {
-  return (
-    <>
-      <div className={`mb-1 flex items-baseline justify-between gap-3 ${small ? 'text-xs' : 'text-sm'}`}>
-        <span className={`flex min-w-0 items-center gap-2 ${small ? 'text-ink-2' : 'text-ink'}`}>
-          {expandable && <ChevronRight className="size-3.5 shrink-0 text-muted transition-transform group-open:rotate-90" aria-hidden />}
-          {row.swatch && <span className={`shrink-0 rounded-full ${small ? 'size-2' : 'size-2.5'}`} style={{ background: row.swatch }} aria-hidden />}
-          <span className="truncate">{row.label}</span>
-        </span>
-        <span className={`tabular shrink-0 ${small ? 'text-ink-2' : 'text-ink'}`}>
-          {money(row.value, currency)}
-          {row.share !== undefined && row.share !== null && (
-            <span className="ml-2 text-xs text-muted">{percent(row.share)}</span>
-          )}
-        </span>
-      </div>
-      <div className={`rounded-full bg-surface-2 ${small ? 'h-1' : 'h-1.5'}`} aria-hidden>
-        <div className={`rounded-full ${small ? 'h-1 bg-accent/70' : 'h-1.5 bg-accent'}`}
-          style={{ width: `${max > 0 ? Math.max((row.value / max) * 100, 1) : 0}%` }} />
-      </div>
-    </>
   )
 }

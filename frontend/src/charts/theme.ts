@@ -14,6 +14,11 @@ const LIGHT = {
   axis: '#c3c2b7',
   series: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'],
   other: '#a3a29c',
+  /**
+   * Parts of one bar (a macro category's details), largest first: one hue stepping away from the
+   * bar colour (series 1), validated as an ordinal ramp
+   */
+  parts: ['#2a78d6', '#5598e7', '#86b6ef'],
 }
 
 const DARK = {
@@ -25,6 +30,7 @@ const DARK = {
   axis: '#383835',
   series: ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'],
   other: '#6f6e69',
+  parts: ['#3987e5', '#256abf', '#184f95'],
 }
 
 export type ChartTheme = typeof LIGHT

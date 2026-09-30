@@ -813,4 +813,6 @@ export const en: Messages = {
   'error.budget_conflict': 'A macro and its details cannot both have a budget: the macro\'s budget already covers its details.',
   'import.error.unknown_subcategory': 'No detail “{value}”',
   'import.error.ambiguous_category': '“{value}” is a detail of several macros: give the macro too',
+  'cashflow.otherDetails': '{count} other details',
+  'cashflow.categoriesHelp': 'Bars split into the category\'s details, largest first; in grey the entries without a detail. Open a category to see the amounts.',
 }

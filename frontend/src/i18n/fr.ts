@@ -814,4 +814,6 @@ export const fr: Messages = {
   'error.budget_conflict': 'Une catégorie principale et ses sous-catégories ne peuvent pas avoir toutes deux un budget\u00a0: celui de la catégorie principale couvre déjà ses sous-catégories.',
   'import.error.unknown_subcategory': 'Aucune sous-catégorie «\u00a0{value}\u00a0»',
   'import.error.ambiguous_category': '«\u00a0{value}\u00a0» est une sous-catégorie de plusieurs catégories principales\u00a0: indiquez aussi la catégorie principale',
+  'cashflow.otherDetails': '{count} autres sous-catégories',
+  'cashflow.categoriesHelp': 'Les barres se divisent en sous-catégories, la plus grande d\'abord\u202f; en gris les opérations sans sous-catégorie. Ouvrez une catégorie pour voir les montants.',
 }
