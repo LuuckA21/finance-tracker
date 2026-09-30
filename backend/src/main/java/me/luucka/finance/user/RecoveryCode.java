@@ -57,12 +57,4 @@ public class RecoveryCode {
     public String getCodeHash() {
         return codeHash;
     }
-
-    public Instant getUsedAt() {
-        return usedAt;
-    }
-
-    public void markUsed(Instant when) {
-        this.usedAt = when;
-    }
 }

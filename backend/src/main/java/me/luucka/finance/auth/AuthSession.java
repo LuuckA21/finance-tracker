@@ -59,12 +59,6 @@ public class AuthSession {
         holder.clearContext();
     }
 
-    /** Changes the session id while keeping its content (used between login steps). */
-    public void rotateId(HttpServletRequest request) {
-        request.getSession(true);
-        request.changeSessionId();
-    }
-
     private void storePrincipal(AppPrincipal principal, HttpServletRequest request, HttpServletResponse response) {
         var authentication = UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.authorities());
         SecurityContext context = holder.createEmptyContext();

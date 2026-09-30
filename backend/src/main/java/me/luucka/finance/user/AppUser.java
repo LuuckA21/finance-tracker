@@ -215,10 +215,6 @@ public class AppUser {
         return failedLoginAttempts;
     }
 
-    public Instant getLockedUntil() {
-        return lockedUntil;
-    }
-
     public Instant getLastLoginAt() {
         return lastLoginAt;
     }

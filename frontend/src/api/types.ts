@@ -81,12 +81,6 @@ export interface RecurringEntry {
   tags: string[]
 }
 
-export interface Budget {
-  categoryId: number
-  amount: number
-  currency: string
-}
-
 export type BudgetState = 'OK' | 'WARNING' | 'OVER'
 
 export interface BudgetStatus {
