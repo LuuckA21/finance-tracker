@@ -161,7 +161,6 @@ function RecurringForm({ rule, onDone }: { rule: RecurringEntry | null; onDone: 
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
-  const options = categories.filter((c) => c.kind === kind)
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -230,7 +229,7 @@ function RecurringForm({ rule, onDone }: { rule: RecurringEntry | null; onDone: 
               <select id={id} className="input" required value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : '')}>
                 <option value="">{t('entryForm.choose')}</option>
-                <CategoryOptions categories={options} />
+                <CategoryOptions categories={categories} kind={kind === 'INCOME' ? 'INCOME' : 'EXPENSE'} />
               </select>
             )}
           </Field>

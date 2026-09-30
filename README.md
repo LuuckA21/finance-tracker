@@ -27,8 +27,8 @@ Self-hosted personal finance app for a small group of users (you and your family
 - **Tags** – free labels on entries across categories ("Holidays 2026", "Wedding"): typed on
   the entry (existing ones suggested, case does not matter, up to 10 per entry), clickable to
   filter the list, with the totals of each tag (spent, received, transferred, period) and their
-  split by category; the Income & expenses page shows each tag's spending and income of the year
-  and a table of every category against the 8 largest tags, the other tags together and no tag.
+  split by macro category; the Income & expenses page shows each tag's spending and income of the year
+  and a table of every macro category against the 8 largest tags, the other tags together and no tag.
   Recurring rules can carry tags too: every entry they create gets them. Tags can be renamed or
   deleted in the settings, and travel through the CSV export and import.
 - **Email notifications** (optional, needs an SMTP server): budgets at 80 % and over their limit,
@@ -72,8 +72,8 @@ Self-hosted personal finance app for a small group of users (you and your family
 - **Personal categories in two levels** – like first- and second-level cost centres: macro
   categories ("Casa") and, under them, optional detail categories ("Affitto", "Energia"). An entry
   sits on a macro or on a detail; filters on a macro take in its details, and the Income & expenses
-  page, the categories × tags table, the annual summary and the forecast add details up to their
-  macro (the cash flow and the summary open each macro on its details; entries on the macro itself
+  page, the categories × tags table, the tag totals, the monthly email, the annual summary and the
+  forecast add details up to their macro (the cash flow and the summary open each macro on its details; entries on the macro itself
   show as "Casa (senza dettaglio)"). Each user starts with macros and details named in the language
   chosen when the account is created (`APP_ADMIN_LANGUAGE` for the first admin); from then on they
   are the user's own to rename, recolour, move between levels or delete (a macro once its details
@@ -138,7 +138,8 @@ ops/systemd/     backup service and timer (user units)
 - **CSRF**: synchronizer token in the session, sent by the SPA in `X-CSRF-TOKEN`.
 - **Transfers**: the positions a transfer points to must be the user's own (404 otherwise, also on
   CSV import); database checks keep categories on income/expense only and positions on transfers
-  only, and a deleted position just clears the link.
+  only, a detail category under a macro of the same user and kind (never under another detail),
+  and a deleted position just clears the link.
 - **Authorization**: every query is scoped by the owner id taken from the session; accessing
   another user's record returns 404. Covered by `DataIsolationIT`.
 - **Headers**: strict CSP, `frame-ancestors 'none'`, `nosniff`, `no-referrer` (Nginx + Spring).

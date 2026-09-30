@@ -3,6 +3,7 @@ package me.luucka.finance;
 import static me.luucka.finance.support.ApiClient.json;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.List;
 
@@ -13,6 +14,8 @@ import me.luucka.finance.user.AppUser;
 import me.luucka.finance.user.Role;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -24,6 +27,9 @@ class CategoriesIT {
 
     @Autowired
     TestUsers testUsers;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     private ApiClient login(AppUser user) throws Exception {
         ApiClient client = new ApiClient(mvc);
@@ -179,7 +185,7 @@ class CategoriesIT {
         long leisure = category(client, "Svago");
         long sport = category(client, "Sport");
         entry(client, "2025-08-01", rent, 1800, "[\"Casa\"]");
-        entry(client, "2025-08-05", energy, 120, "[]");
+        entry(client, "2025-08-05", energy, 120, "[\"Casa\"]");
         entry(client, "2025-08-06", housing, 80, "[]");
         entry(client, "2025-08-10", leisure, 50, "[]");
         entry(client, "2025-08-11", sport, 70, "[]");
@@ -195,6 +201,11 @@ class CategoriesIT {
         // The tag matrix goes by macro too
         assertEquals(housing, ((Number) json(year, "$.tagMatrices[0].rows[0].categoryId")).longValue());
         assertEquals(2000.0, number(year, "$.tagMatrices[0].rows[0].total"));
+        // A tag's totals go by macro too, matching the table
+        MvcResult tags = client.get("/api/tags");
+        List<Number> tagCategories = json(tags, "$.tags[0].categories[*].categoryId");
+        assertEquals(List.of(housing), tagCategories.stream().map(Number::longValue).toList());
+        assertEquals(1920.0, number(tags, "$.tags[0].categories[0].amount"));
 
         // Filtering on a macro takes in its details; on a detail, only that detail
         assertEquals(3, ((List<?>) json(client.get("/api/cash-entries?categoryId=" + housing), "$.content")).size());
@@ -216,5 +227,38 @@ class CategoriesIT {
         List<Number> macros = json(report, "$.categories[*].categoryId");
         assertEquals(List.of(housing, leisure), macros.stream().map(Number::longValue).toList());
         assertEquals(3, ((List<?>) json(report, "$.categories[0].details")).size());
+    }
+
+    @Test
+    void theDatabaseKeepsTheTwoLevelsToo() throws Exception {
+        AppUser user = testUsers.create("catdb", Role.USER);
+        ApiClient client = login(user);
+        long housing = category(client, "Casa");
+        long rent = category(client, "Affitto");
+        long salary = category(client, "Stipendio");
+        String insert = "insert into category (user_id, name, kind, color, parent_id) values (?, ?, ?, '#000000', ?)";
+        // Under a detail, under a macro of the other kind or of another user
+        assertThrows(DataAccessException.class, () -> jdbc.update(insert, user.getId(), "X", "EXPENSE", rent));
+        assertThrows(DataAccessException.class, () -> jdbc.update(insert, user.getId(), "X", "EXPENSE", salary));
+        AppUser other = testUsers.create("catdb2", Role.USER);
+        assertThrows(DataAccessException.class, () -> jdbc.update(insert, other.getId(), "X", "EXPENSE", housing));
+        // A macro with details stays a macro of its kind
+        assertThrows(DataAccessException.class, () -> jdbc.update(
+                "update category set parent_id = ? where id = ?", category(client, "Svago"), housing));
+        assertThrows(DataAccessException.class, () -> jdbc.update(
+                "update category set kind = 'INCOME' where id = ?", housing));
+        assertEquals(1, jdbc.update(insert, user.getId(), "Garage", "EXPENSE", housing));
+    }
+
+    @Test
+    void deletingAUserTakesTheirDetailsAndEntriesWithIt() throws Exception {
+        AppUser admin = testUsers.create("catadmin", Role.ADMIN);
+        AppUser user = testUsers.create("catgone", Role.USER);
+        ApiClient client = login(user);
+        entry(client, "2025-08-01", category(client, "Affitto"), 1800, "[\"Casa\"]");
+        client.put("/api/budgets/" + category(client, "Affitto"), "{\"amount\":2000,\"currency\":\"CHF\"}");
+        assertEquals(204, login(admin).delete("/api/admin/users/" + user.getId()).getResponse().getStatus());
+        assertEquals(0, jdbc.queryForObject("select count(*) from category where user_id = ?", Integer.class,
+                user.getId()));
     }
 }

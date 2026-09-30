@@ -16,10 +16,13 @@ import java.util.stream.Collectors;
 
 import me.luucka.finance.cashflow.CashEntryRepository;
 import me.luucka.finance.cashflow.TaggedAmount;
+import me.luucka.finance.category.CategoryRepository;
+import me.luucka.finance.category.CategoryService;
 import me.luucka.finance.common.ApiException;
 import me.luucka.finance.core.EntryKind;
 import me.luucka.finance.core.Money;
 import me.luucka.finance.core.TagNames;
+import me.luucka.finance.core.category.CategoryTree;
 import me.luucka.finance.core.fx.FxTable;
 import me.luucka.finance.fx.FxService;
 import org.springframework.stereotype.Service;
@@ -35,14 +38,15 @@ public class TagService {
      * A tag with the totals of its entries in the base currency, all dates.
      *
      * @param firstDate  null for a tag without entries
-     * @param categories income and expenses split by category, largest first (transfers have none)
+     * @param categories income and expenses split by macro category (details added up to their macro,
+     *                   as in the categories × tags table), largest first (transfers have none)
      */
     public record TagSummary(long id, String name, int entryCount, BigDecimal income, BigDecimal expense,
                              BigDecimal transferred, LocalDate firstDate, LocalDate lastDate,
                              List<CategoryAmount> categories) {
     }
 
-    /** What the entries of a tag add up to in one category, in the base currency. */
+    /** What the entries of a tag add up to in one macro category, in the base currency. */
     public record CategoryAmount(long categoryId, EntryKind kind, BigDecimal amount) {
     }
 
@@ -51,11 +55,13 @@ public class TagService {
 
     private final TagRepository tags;
     private final CashEntryRepository entries;
+    private final CategoryRepository categories;
     private final FxService fx;
 
-    public TagService(TagRepository tags, CashEntryRepository entries, FxService fx) {
+    public TagService(TagRepository tags, CashEntryRepository entries, CategoryRepository categories, FxService fx) {
         this.tags = tags;
         this.entries = entries;
+        this.categories = categories;
         this.fx = fx;
     }
 
@@ -73,6 +79,7 @@ public class TagService {
     @Transactional(readOnly = true)
     public TagsResponse list(long userId) {
         FxTable table = fx.table(userId);
+        CategoryTree tree = CategoryService.tree(categories.findByUserIdOrderByKindAscNameAsc(userId));
         Map<Long, Totals> totals = new HashMap<>();
         SortedSet<String> unconverted = new TreeSet<>();
         for (TaggedAmount row : entries.findTaggedAmounts(userId)) {
@@ -80,7 +87,8 @@ public class TagService {
             if (value.isEmpty()) {
                 unconverted.add(row.currency());
             }
-            totals.computeIfAbsent(row.tagId(), id -> new Totals()).add(row, value.orElse(null));
+            totals.computeIfAbsent(row.tagId(), id -> new Totals()).add(row, value.orElse(null),
+                    row.categoryId() == null ? null : tree.macroId(row.categoryId()));
         }
         List<TagSummary> rows = tags.findByUserIdOrderByNameAsc(userId).stream()
                 .sorted(Comparator.comparing(t -> TagNames.key(t.getName())))
@@ -169,7 +177,7 @@ public class TagService {
         private final Map<Long, BigDecimal> byCategory = new HashMap<>();
         private final Map<Long, EntryKind> categoryKinds = new HashMap<>();
 
-        void add(TaggedAmount entry, BigDecimal value) {
+        void add(TaggedAmount entry, BigDecimal value, Long macroId) {
             count++;
             first = first == null || entry.date().isBefore(first) ? entry.date() : first;
             last = last == null || entry.date().isAfter(last) ? entry.date() : last;
@@ -181,9 +189,9 @@ public class TagService {
                 case EXPENSE -> expense = expense.add(value, Money.CONTEXT);
                 case TRANSFER -> transferred = transferred.add(value, Money.CONTEXT);
             }
-            if (entry.categoryId() != null) {
-                byCategory.merge(entry.categoryId(), value, (a, b) -> a.add(b, Money.CONTEXT));
-                categoryKinds.put(entry.categoryId(), entry.kind());
+            if (macroId != null) {
+                byCategory.merge(macroId, value, (a, b) -> a.add(b, Money.CONTEXT));
+                categoryKinds.put(macroId, entry.kind());
             }
         }
 

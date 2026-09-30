@@ -256,7 +256,7 @@ function BudgetForm({ draft, taken, onDone }: { draft: Draft; taken: number[]; o
           <select id={id} className="input" required value={categoryId} disabled={draft.editing}
             onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : '')}>
             <option value="">{t('entryForm.choose')}</option>
-            <CategoryOptions categories={categories}
+            <CategoryOptions categories={categories} kind="EXPENSE"
               disabled={(c) => c.id !== draft.categoryId && (taken.includes(c.id) || budgetConflict(c, categories, taken))} />
           </select>
         )}

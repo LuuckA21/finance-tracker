@@ -119,7 +119,7 @@ function SelectStep({ onStep }: { onStep: (step: Step) => void }) {
     // An expense on a detail category (macro and detail), an income on a macro
     const detail = categories.find((c) => c.kind === 'EXPENSE' && c.parentId !== null)
     const macro = categories.find((c) => c.id === detail?.parentId)
-    const expense = macro ? `${macro.name};${detail!.name}` : `${categories.find((c) => c.kind === 'EXPENSE')?.name ?? ''};`
+    const expense = macro ? `${macro.name};${detail!.name}` : `${categories.find((c) => c.kind === 'EXPENSE' && c.parentId === null)?.name ?? ''};`
     const income = categories.find((c) => c.kind === 'INCOME' && c.parentId === null)?.name ?? ''
     const tpl = TEMPLATES[language]
     const csv = `${tpl.header}\r\n2026-08-01;${tpl.expense};${expense};45.20;CHF;${tpl.shop};;;${tpl.tag}\r\n`
@@ -284,7 +284,6 @@ function ReviewStep({ preview, onStep }: { preview: ImportPreview; onStep: (step
             {shown.map(({ row, index }) => {
               const fatal = blocking(row.source)
               const ready = isReady(row, categories)
-              const options = categories.filter((c) => c.kind === row.kind)
               return (
                 <tr key={row.source.line} className={`border-b border-line align-top last:border-0 ${fatal.length > 0 ? 'bg-bad-soft/40' : ''}`}>
                   <td className="px-2 py-1.5">
@@ -312,7 +311,7 @@ function ReviewStep({ preview, onStep }: { preview: ImportPreview; onStep: (step
                       aria-label={t('entries.category')} value={row.categoryId ?? ''} disabled={fatal.length > 0 || row.kind === null}
                       onChange={(e) => change(index, { categoryId: e.target.value ? Number(e.target.value) : null })}>
                       <option value="">{t('entryForm.choose')}</option>
-                      <CategoryOptions categories={options} />
+                      <CategoryOptions categories={categories} kind={row.kind === 'INCOME' ? 'INCOME' : 'EXPENSE'} />
                     </select>
                     {row.source.raw.category && row.categoryId === null && (
                       <p className="mt-0.5 text-xs text-muted">{t('import.inFile', { value: [row.source.raw.category, row.source.raw.subcategory].filter(Boolean).join(PATH_SEPARATOR) })}</p>
