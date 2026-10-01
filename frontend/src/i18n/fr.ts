@@ -36,6 +36,7 @@ export const fr: Messages = {
   'nav.settings': 'Paramètres',
   'nav.users': 'Utilisateurs',
   'nav.signedInAs': 'Connecté en tant que',
+  'nav.version': 'Version {version}',
   'nav.logout': 'Se déconnecter',
   'nav.openMenu': 'Ouvrir le menu',
   'nav.closeMenu': 'Fermer le menu',

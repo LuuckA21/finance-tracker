@@ -12,4 +12,6 @@ test('the menu goes from the overview through cash flow and net worth to the rep
   ])
   // Groups are separated, the separators stay out of the accessibility tree
   await expect(menu.locator('hr')).toHaveCount(4)
+  // The running release, from package.json
+  await expect(page.getByText(/^Versione \d+\.\d+\.\d+$/).first()).toBeVisible()
 })

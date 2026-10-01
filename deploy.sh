@@ -4,6 +4,7 @@
 #
 # Usage: ./deploy.sh                 # update the current branch
 #        ./deploy.sh master          # switch to and update master
+#        ./deploy.sh v1.0.0          # install exactly that release (also to go back to it)
 #        FINANCE_HEALTH_TIMEOUT=600 ./deploy.sh master
 #        FINANCE_SKIP_BACKUP=1 ./deploy.sh master   # skip the pre-deploy database backup
 #
@@ -19,8 +20,8 @@ green() { printf '\033[32m%s\033[0m\n' "$1"; }
 info()  { printf '\033[34m→\033[0m %s\n' "$1"; }
 
 usage() {
-    printf 'Usage: %s [BRANCH]\n' "${0##*/}"
-    printf '\nWithout BRANCH, the current branch is updated.\n'
+    printf 'Usage: %s [BRANCH | vX.Y.Z]\n' "${0##*/}"
+    printf '\nWithout an argument, the current branch is updated. A version (vX.Y.Z) installs that release.\n'
 }
 
 if (( $# > 1 )); then
@@ -65,20 +66,29 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
     exit 1
 fi
 
-BRANCH="${1:-$(git symbolic-ref --quiet --short HEAD || true)}"
-if [[ -z "$BRANCH" ]]; then
-    red "The repository is detached. Specify the branch explicitly, for example: $0 master"
+TARGET="${1:-$(git symbolic-ref --quiet --short HEAD || true)}"
+if [[ -z "$TARGET" ]]; then
+    red "A release is installed (no current branch). Name a branch or a version, for example: $0 master or $0 v1.0.0"
     exit 1
 fi
-if ! git check-ref-format --branch "$BRANCH" >/dev/null 2>&1; then
-    red "Invalid branch name: $BRANCH"
+# A release tag (vX.Y.Z) is installed as it is; anything else is a branch to update
+RELEASE=0
+if [[ "$TARGET" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    RELEASE=1
+elif ! git check-ref-format --branch "$TARGET" >/dev/null 2>&1; then
+    red "Invalid branch name: $TARGET"
     exit 2
 fi
 
 info "Fetching origin"
-git fetch --prune origin
-if ! git show-ref --verify --quiet "refs/remotes/origin/$BRANCH"; then
-    red "Remote branch not found: origin/$BRANCH"
+git fetch --prune --tags origin
+if (( RELEASE )); then
+    if ! git show-ref --verify --quiet "refs/tags/$TARGET"; then
+        red "Release not found: $TARGET (git tag --list 'v*' shows the ones available)"
+        exit 1
+    fi
+elif ! git show-ref --verify --quiet "refs/remotes/origin/$TARGET"; then
+    red "Remote branch not found: origin/$TARGET"
     exit 1
 fi
 
@@ -95,18 +105,21 @@ else
 fi
 
 PREVIOUS_COMMIT="$(git rev-parse HEAD)"
-if git show-ref --verify --quiet "refs/heads/$BRANCH"; then
-    git switch "$BRANCH"
+if (( RELEASE )); then
+    git switch --detach "refs/tags/$TARGET"
+elif git show-ref --verify --quiet "refs/heads/$TARGET"; then
+    git switch "$TARGET"
+    git merge --ff-only "origin/$TARGET"
 else
-    git switch --track -c "$BRANCH" "origin/$BRANCH"
+    git switch --track -c "$TARGET" "origin/$TARGET"
 fi
-git merge --ff-only "origin/$BRANCH"
 DEPLOYED_COMMIT="$(git rev-parse HEAD)"
 
 if [[ "$PREVIOUS_COMMIT" == "$DEPLOYED_COMMIT" ]]; then
     info "Code already at ${DEPLOYED_COMMIT:0:7}"
 else
     info "Updated from ${PREVIOUS_COMMIT:0:7} to ${DEPLOYED_COMMIT:0:7}"
+    # Empty when going back to an older release
     git --no-pager log --max-count=10 --oneline "$PREVIOUS_COMMIT..$DEPLOYED_COMMIT"
 fi
 
@@ -131,5 +144,5 @@ done
 
 docker image prune -f >/dev/null
 
-green "Deployed $BRANCH at ${DEPLOYED_COMMIT:0:7}"
+green "Deployed $TARGET at ${DEPLOYED_COMMIT:0:7}"
 docker compose ps

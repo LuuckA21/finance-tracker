@@ -35,6 +35,7 @@ export const en: Messages = {
   'nav.settings': 'Settings',
   'nav.users': 'Users',
   'nav.signedInAs': 'Signed in as',
+  'nav.version': 'Version {version}',
   'nav.logout': 'Sign out',
   'nav.openMenu': 'Open menu',
   'nav.closeMenu': 'Close menu',

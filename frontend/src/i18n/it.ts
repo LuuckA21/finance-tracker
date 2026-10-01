@@ -33,6 +33,7 @@ export const it = {
   'nav.settings': 'Impostazioni',
   'nav.users': 'Utenti',
   'nav.signedInAs': 'Connesso come',
+  'nav.version': 'Versione {version}',
   'nav.logout': 'Esci',
   'nav.openMenu': 'Apri menu',
   'nav.closeMenu': 'Chiudi menu',
