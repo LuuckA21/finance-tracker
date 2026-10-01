@@ -5,14 +5,17 @@ import java.time.Instant;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import me.luucka.finance.core.budget.BudgetCalculator;
 
-/** Monthly spending limit of one of the user's expense categories. */
+/** Spending limit of one of the user's expense categories, for each month, quarter or year. */
 @Entity
 @Table(name = "budget")
 public class Budget {
@@ -32,6 +35,10 @@ public class Budget {
 
     @Column(nullable = false, length = 3)
     private String currency;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private BudgetCalculator.Period period = BudgetCalculator.Period.MONTHLY;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -84,5 +91,13 @@ public class Budget {
 
     public void setCurrency(String currency) {
         this.currency = currency;
+    }
+
+    public BudgetCalculator.Period getPeriod() {
+        return period;
+    }
+
+    public void setPeriod(BudgetCalculator.Period period) {
+        this.period = period;
     }
 }

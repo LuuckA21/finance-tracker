@@ -23,10 +23,13 @@ Self-hosted personal finance app for a small group of users (you and your family
 - **Net worth** – bank accounts, crypto, ETFs, stocks, pension, … Record *quantity × unit price*
   at a date; the value of every position is carried forward until the next record. Dashboards
   show total net worth per month/year and its split by asset class.
-- **Budgets** – a monthly spending limit per expense category (the same every month, in any
-  currency), on a macro (covering its details) or on some of its details, never both. The Budget page shows, for any month, what was spent, what is left, the categories
-  close to (80 %) or over their limit, an end-of-month projection for the current month and the
-  spending in categories without a budget, with a suggestion from the last 3 months' average.
+- **Budgets** – a spending limit per expense category for each month, calendar quarter or calendar
+  year (in any currency), on a macro (covering its details) or on some of its details, never both.
+  The Budget page shows, for any month, what was spent, what is left, the categories close to
+  (80 %) or over their limit, an end-of-month projection for the current month and the spending in
+  categories without a budget, with a suggestion from the last 3 months' average. A quarterly or
+  yearly budget (health insurance, taxes) compares its period so far, so a yearly payment is not
+  "over" in the month it falls in, with the month's share and the whole previous period beside it.
 - **Category rules** – "the description contains *migros* → Groceries › Supermarket" (case, accents
   and punctuation aside; the longest matching text wins), managed in Settings › Rules or created
   from a row while reviewing an import (it then also categorizes the other rows it matches).
@@ -393,7 +396,10 @@ encrypted with it).
   Positions don't exist before their first record; a record with quantity 0 closes a position.
   Monthly series use month-end dates (today for the current month); yearly series use Dec 31.
 - **Budgets**: only expenses count (income and transfers never do); a budget in another currency
-  is converted at the end of the month (today for the current month). The projection counts
+  is converted at the end of the month (today for the current month). A quarterly or yearly
+  budget counts the expenses from the first month of its calendar quarter or year to the end of
+  the selected month; the page's totals add up monthly budgets only. Its alerts go out once per
+  quarter or year. The projection counts
   expenses created by recurring rules as booked and extrapolates the rest over the month's days.
 - **Savings goals**, in the base currency: a balance goal compares the value of its positions
   today with the target, converted at today's rate; its pace is their average monthly change
@@ -430,7 +436,7 @@ encrypted with it).
 | Recurring | `GET/POST /api/recurring-entries`, `PUT/DELETE /{id}` (frequency `DAILY\|WEEKLY\|MONTHLY\|QUARTERLY\|FOUR_MONTHLY\|SEMIANNUAL\|YEARLY`; `tags` are copied to the entries created) |
 | Positions | `GET/POST /api/positions`, `GET/PUT/DELETE /{id}`, `GET/POST /{id}/snapshots`, `PUT/DELETE /{id}/snapshots/{sid}`, `POST /api/positions/snapshots/bulk` |
 | FX | `GET/POST /api/fx-rates`, `DELETE /{id}` (manual rates), `GET /api/fx-rates/central?date` (ECB rates in the base currency on a day, default today) |
-| Budgets | `GET /api/budgets`, `PUT/DELETE /api/budgets/{categoryId}` (`{amount,currency}`), `GET /api/budgets/status?month=yyyy-MM` |
+| Budgets | `GET /api/budgets`, `PUT/DELETE /api/budgets/{categoryId}` (`{amount,currency,period}`, period `MONTHLY` (default), `QUARTERLY` or `YEARLY`), `GET /api/budgets/status?month=yyyy-MM` |
 | Tags | `GET /api/tags` (with totals in the base currency, also per category), `PUT/DELETE /api/tags/{id}` (`{name}`; deleting keeps the entries) |
 | Goals | `GET/POST /api/goals` (list with progress), `PUT/DELETE /api/goals/{id}` (`{name,kind:BALANCE\|YEARLY,targetAmount,currency,targetDate?,positionIds}`) |
 | Forecasts | `GET/POST /api/forecasts`, `PUT/DELETE /api/forecasts/{id}` (`{name, year, incomeGrowth, expenseGrowth, excludedTagIds, excludedCategoryIds, items:[{description, kind, categoryId, amount, schedule: MONTHLY\|ONCE, startMonth, endMonth}]}`), `POST /api/forecasts/preview` (the same body, saved or not: the forecast month by month) |

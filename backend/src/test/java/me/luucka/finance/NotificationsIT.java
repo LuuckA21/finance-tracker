@@ -287,6 +287,30 @@ class NotificationsIT {
     }
 
     @Test
+    void aYearlyBudgetAlertsOncePerYear() throws Exception {
+        AppUser user = testUsers.create("mail-yearly", Role.USER);
+        ApiClient client = login(user);
+        LocalDate today = LocalDate.now();
+        int health = category(client, "Cassa malati");
+        client.put("/api/budgets/" + health, """
+                {"amount":4000,"currency":"CHF","period":"YEARLY"}""");
+        confirm(client, "yearly@example.test");
+        SMTP.purgeEmailFromAllMailboxes();
+
+        // 85 % of the year: one email naming the year; the same alert never again this year
+        expense(client, today, health, 3400);
+        notifications.run(user.getId());
+        assertEquals(1, received().length);
+        String body = text(received()[0]);
+        assertTrue(body.contains("Assicurazioni › Cassa malati · anno " + today.getYear() + ": 85"), body);
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM notification_sent WHERE user_id = ? AND alert_key = ?",
+                Integer.class, user.getId(),
+                "budget:" + health + ":" + today.getYear() + ":80"));
+        notifications.run(user.getId());
+        assertEquals(1, received().length);
+    }
+
+    @Test
     void theSummaryOfLastMonthGoesOutOnce() throws Exception {
         AppUser user = testUsers.create("mail-monthly", Role.USER);
         ApiClient client = login(user);

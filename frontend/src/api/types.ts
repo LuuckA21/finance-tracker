@@ -83,11 +83,15 @@ export interface RecurringEntry {
 
 export type BudgetState = 'OK' | 'WARNING' | 'OVER'
 
+/** How often a budget's limit starts again: calendar months, quarters or years */
+export type BudgetPeriod = 'MONTHLY' | 'QUARTERLY' | 'YEARLY'
+
 export interface BudgetStatus {
   baseCurrency: string
   /** yyyy-MM */
   month: string
   currentMonth: boolean
+  /** Monthly budgets only: a quarter or a year is not comparable with a month */
   budgeted: number
   spent: number
   remaining: number
@@ -99,9 +103,16 @@ export interface BudgetStatus {
     /** As entered, in its own currency */
     amount: number
     currency: string
+    period: BudgetPeriod
+    /** First and last month of the period (yyyy-MM); the month itself for a monthly budget */
+    from: string
+    to: string
     /** In the base currency; null when the currency cannot be converted */
     budget: number | null
+    /** From the start of the period to the end of the month */
     spent: number
+    /** The month alone */
+    monthSpent: number
     remaining: number | null
     percent: number | null
     state: BudgetState
@@ -109,6 +120,8 @@ export interface BudgetStatus {
     projected: number | null
     /** Average monthly spending of the previous 3 months */
     average: number
+    /** Spending of the whole previous period */
+    previous: number
   }[]
   others: { categoryId: number; name: string; color: string; spent: number; average: number }[]
   unconvertedCurrencies: string[]

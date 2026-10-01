@@ -162,10 +162,11 @@ public class NotificationService {
                 if (c.state() == BudgetCalculator.State.OK || c.budget() == null || c.percent() == null) {
                     continue;
                 }
-                String prefix = "budget:" + c.categoryId() + ":" + status.month() + ":";
+                String prefix = "budget:" + c.categoryId() + ":" + periodKey(c) + ":";
                 boolean over = c.state() == BudgetCalculator.State.OVER;
                 String percent = MailTexts.percent(c.percent(), language);
-                MailContent.Row row = new MailContent.Row(c.name(), amountOf(c.spent(), c.budget(), currency, language),
+                MailContent.Row row = new MailContent.Row(budgetLabel(c, language),
+                        amountOf(c.spent(), c.budget(), currency, language),
                         MailTexts.text(language, over ? "alerts.budgetOver" : "alerts.budgetWarning",
                                 Map.of("percent", percent)),
                         over ? MailContent.Tone.BAD : MailContent.Tone.WARN,
@@ -253,7 +254,7 @@ public class NotificationService {
         // By macro category, as on the Income & expenses page: a detail's budget row adds up to its macro
         CategoryTree tree = categories.tree(userId);
         Map<Long, BigDecimal> byMacro = new LinkedHashMap<>();
-        status.categories().forEach(c -> byMacro.merge(tree.macroId(c.categoryId()), c.spent(), BigDecimal::add));
+        status.categories().forEach(c -> byMacro.merge(tree.macroId(c.categoryId()), c.monthSpent(), BigDecimal::add));
         status.others().forEach(o -> byMacro.merge(tree.macroId(o.categoryId()), o.spent(), BigDecimal::add));
         List<Spent> spent = byMacro.entrySet().stream().map(e -> {
             CategoryTree.Node macro = tree.node(e.getKey());
@@ -273,7 +274,7 @@ public class NotificationService {
         }
         List<MailContent.Row> over = status.categories().stream()
                 .filter(c -> c.state() == BudgetCalculator.State.OVER && c.budget() != null)
-                .map(c -> new MailContent.Row(c.name(), amountOf(c.spent(), c.budget(), currency, language), null,
+                .map(c -> new MailContent.Row(budgetLabel(c, language), amountOf(c.spent(), c.budget(), currency, language), null,
                         MailContent.Tone.BAD, new MailContent.Bar(100, null)))
                 .toList();
         if (!over.isEmpty()) {
@@ -290,6 +291,33 @@ public class NotificationService {
         String preheader = MailTexts.text(language, "monthly.net") + ": " + MailTexts.money(totals.net(), currency, language);
         return new MailContent(language, MailTexts.text(language, "subject.monthly", Map.of("month", monthName)),
                 preheader, greeting(user), blocks);
+    }
+
+    /**
+     * What a budget alert is sent once for: the category and its period (the month, as before, for
+     * a monthly budget; the quarter or the year for the others).
+     */
+    static String periodKey(BudgetService.CategoryStatusResponse c) {
+        return switch (c.period()) {
+            case MONTHLY -> c.from().toString();
+            case QUARTERLY -> c.from().getYear() + "-Q" + quarter(c.from());
+            case YEARLY -> String.valueOf(c.from().getYear());
+        };
+    }
+
+    /** A budget's name, with its quarter or year when it is not a monthly one. */
+    static String budgetLabel(BudgetService.CategoryStatusResponse c, Language language) {
+        String year = String.valueOf(c.from().getYear());
+        return switch (c.period()) {
+            case MONTHLY -> c.name();
+            case QUARTERLY -> MailTexts.text(language, "budget.quarter",
+                    Map.of("name", c.name(), "quarter", String.valueOf(quarter(c.from())), "year", year));
+            case YEARLY -> MailTexts.text(language, "budget.year", Map.of("name", c.name(), "year", year));
+        };
+    }
+
+    private static int quarter(YearMonth month) {
+        return (month.getMonthValue() + 2) / 3;
     }
 
     static String greeting(AppUser user) {
