@@ -520,3 +520,29 @@ export interface NotificationSettings {
   goalAlerts: boolean
   monthlySummary: boolean
 }
+
+/** One category (a macro with its details) month by month in a year, against the year before */
+export interface CategoryTrend {
+  baseCurrency: string
+  year: number
+  categoryId: number
+  name: string
+  color: string
+  kind: CategoryKind
+  parentId: number | null
+  /** The last month the year has had so far: 12 for a past year, the current month for this year */
+  lastMonth: number
+  /** The months of the year already over */
+  completedMonths: number
+  /** details: the year's amount per detail id (the macro's own entries under the macro's id) */
+  months: { month: number; amount: number; previous: number; details: Record<string, number> }[]
+  /** Largest first */
+  details: { categoryId: number; name: string; amount: number; previous: number }[]
+  total: number
+  previousTotal: number
+  /** The year up to today (all of a past year), and the year before up to the same day */
+  toDate: number
+  previousToDate: number
+  availableYears: number[]
+  unconvertedCurrencies: string[]
+}

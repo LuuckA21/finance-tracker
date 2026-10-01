@@ -12,6 +12,7 @@ const GoalsPage = lazy(() => import('./pages/GoalsPage').then((m) => ({ default:
 const BudgetPage = lazy(() => import('./pages/BudgetPage').then((m) => ({ default: m.BudgetPage })))
 const AnnualReportPage = lazy(() => import('./pages/AnnualReportPage').then((m) => ({ default: m.AnnualReportPage })))
 const CashflowPage = lazy(() => import('./pages/CashflowPage').then((m) => ({ default: m.CashflowPage })))
+const CategoryTrendPage = lazy(() => import('./pages/CategoryTrendPage').then((m) => ({ default: m.CategoryTrendPage })))
 const ForecastPage = lazy(() => import('./pages/ForecastPage').then((m) => ({ default: m.ForecastPage })))
 const NetWorthPage = lazy(() => import('./pages/NetWorthPage').then((m) => ({ default: m.NetWorthPage })))
 const PositionsPage = lazy(() => import('./pages/PositionsPage').then((m) => ({ default: m.PositionsPage })))
@@ -36,6 +37,7 @@ export function App() {
           <Route path="movimenti" element={<EntriesPage />} />
           <Route path="ricorrenti" element={<RecurringPage />} />
           <Route path="flussi" element={<CashflowPage />} />
+          <Route path="flussi/categoria/:id" element={<CategoryTrendPage />} />
           <Route path="previsione" element={<ForecastPage />} />
           <Route path="riepilogo" element={<AnnualReportPage />} />
           <Route path="budget" element={<BudgetPage />} />

@@ -52,17 +52,21 @@ class CategoryTrendTest {
     }
 
     @Test
-    void thisYearComparesWithTheSameMonthsOfTheYearBefore() {
+    void thisYearComparesWithTheSameStretchOfTheYearBefore() {
         List<Entry> entries = List.of(entry("2026-02-01", 1, "50", "CHF"), entry("2025-02-01", 1, "40", "CHF"),
+                entry("2025-10-01", 1, "70", "CHF"), entry("2025-10-20", 1, "30", "CHF"),
                 entry("2025-11-01", 1, "500", "CHF"));
-        CategoryTrend.Result current = CategoryTrend.of(entries, fx, 2026, LocalDate.of(2026, 9, 30));
-        assertEquals(9, current.lastMonth());
+        // On 1 October: up to 1 October of the year before, not all of its October
+        CategoryTrend.Result current = CategoryTrend.of(entries, fx, 2026, LocalDate.of(2026, 10, 1));
+        assertEquals(10, current.lastMonth());
+        assertEquals(9, current.completedMonths());
         assertEquals(chf("50.00"), current.toDate());
-        assertEquals(chf("40.00"), current.previousToDate());
+        assertEquals(chf("110.00"), current.previousToDate());
 
         CategoryTrend.Result past = CategoryTrend.of(entries, fx, 2025, LocalDate.of(2026, 9, 30));
         assertEquals(12, past.lastMonth());
-        assertEquals(chf("540.00"), past.toDate());
+        assertEquals(12, past.completedMonths());
+        assertEquals(chf("640.00"), past.toDate());
 
         assertEquals(0, CategoryTrend.of(entries, fx, 2027, LocalDate.of(2026, 9, 30)).lastMonth());
     }

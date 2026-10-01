@@ -1,4 +1,5 @@
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, LineChart } from 'lucide-react'
+import { Link } from 'react-router'
 import type { CashflowYear } from '../api/types'
 import { useI18n } from '../i18n'
 import { barParts, type BarPart } from '../lib/categories'
@@ -8,14 +9,14 @@ import { useChartTheme, type ChartTheme } from './theme'
 type Row = CashflowYear['categories'][number]
 
 /** Details shown as parts of a bar, one per shade; past it the smallest share the last one. */
-const MAX_PARTS = 3
+export const MAX_PARTS = 3
 
 /**
  * A kind's macro categories as horizontal bars, largest first, on one scale. A macro with details
  * shows them as parts of its bar (one hue, the largest in the bar colour; its own entries in grey) and opens
  * on the list of them, which is also the bar's legend.
  */
-export function CategoryBars({ rows, currency, emptyText }: { rows: Row[]; currency: string; emptyText: string }) {
+export function CategoryBars({ rows, currency, emptyText, year }: { rows: Row[]; currency: string; emptyText: string; year: number }) {
   const { t } = useI18n()
   const theme = useChartTheme()
   if (rows.length === 0) return <p className="py-6 text-center text-sm text-muted">{emptyText}</p>
@@ -37,6 +38,7 @@ export function CategoryBars({ rows, currency, emptyText }: { rows: Row[]; curre
                   : hasDetails && <span className="size-3.5 shrink-0" aria-hidden />}
                 <span className="size-2.5 shrink-0 self-center rounded-full" style={{ background: row.color }} aria-hidden />
                 <span className="truncate">{row.name}</span>
+                <TrendLink categoryId={row.categoryId} name={row.name} year={year} />
               </span>
               <span className="tabular shrink-0 text-ink">
                 {money(row.amount, currency)}
@@ -71,6 +73,7 @@ export function CategoryBars({ rows, currency, emptyText }: { rows: Row[]; curre
                           <span className="flex min-w-0 items-center gap-2 text-ink-2">
                             <span className="size-2.5 shrink-0 self-center rounded-sm" style={{ background: partColor(theme, part) }} aria-hidden />
                             <span className="truncate">{line.name}</span>
+                            {line.key !== String(row.categoryId) && <TrendLink categoryId={Number(line.key)} name={line.name} year={year} />}
                           </span>
                           <span className="tabular shrink-0 text-ink-2">
                             {money(line.amount, currency)}
@@ -90,6 +93,18 @@ export function CategoryBars({ rows, currency, emptyText }: { rows: Row[]; curre
   )
 }
 
-function partColor(theme: ChartTheme, part: BarPart) {
+/** The way to a category's months: a small link beside its name. */
+function TrendLink({ categoryId, name, year }: { categoryId: number; name: string; year: number }) {
+  const { t } = useI18n()
+  return (
+    <Link to={`/flussi/categoria/${categoryId}?anno=${year}`} aria-label={t('trend.open', { name })} title={t('trend.open', { name })}
+      className="shrink-0 self-center rounded p-0.5 text-muted hover:bg-surface-2 hover:text-accent" onClick={(e) => e.stopPropagation()}>
+      <LineChart className="size-3.5" aria-hidden />
+    </Link>
+  )
+}
+
+/** The colour of a part of a macro's bar: a shade by its position, grey for the macro's own entries. */
+export function partColor(theme: ChartTheme, part: BarPart) {
   return part.role === 'own' ? theme.other : theme.parts[Math.min(part.step, theme.parts.length - 1)]
 }

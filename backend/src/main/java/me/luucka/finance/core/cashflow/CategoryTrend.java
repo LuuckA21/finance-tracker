@@ -37,14 +37,15 @@ public final class CategoryTrend {
     }
 
     /**
-     * @param lastMonth      the last month the year has had so far: 12 for a past year, the current
-     *                       month for this year, 0 for a future one
-     * @param toDate         the year's amount up to {@code lastMonth}
-     * @param previousToDate the year before's amount over the same months
-     * @param parts          largest first
+     * @param lastMonth       the last month the year has had so far: 12 for a past year, the current
+     *                        month for this year, 0 for a future one
+     * @param completedMonths the months of the year already over (for a monthly average)
+     * @param toDate          the year's amount up to today (all of it for a past year)
+     * @param previousToDate  the year before's amount up to the same day
+     * @param parts           largest first
      */
     public record Result(List<Month> months, List<Part> parts, BigDecimal total, BigDecimal previousTotal,
-                         int lastMonth, BigDecimal toDate, BigDecimal previousToDate,
+                         int lastMonth, int completedMonths, BigDecimal toDate, BigDecimal previousToDate,
                          SortedSet<String> unconvertedCurrencies) {
     }
 
@@ -60,6 +61,10 @@ public final class CategoryTrend {
         }
         Map<Long, BigDecimal[]> parts = new HashMap<>();
         SortedSet<String> unconverted = new TreeSet<>();
+        // The same stretch of both years: up to today this year (and its day a year earlier), all of a past year
+        LocalDate cutoff = year < today.getYear() ? LocalDate.of(year, 12, 31) : today;
+        BigDecimal toDate = BigDecimal.ZERO;
+        BigDecimal previousToDate = BigDecimal.ZERO;
         for (Entry entry : entries) {
             int entryYear = entry.date().getYear();
             if (entryYear != year && entryYear != year - 1) {
@@ -73,31 +78,36 @@ public final class CategoryTrend {
             int m = entry.date().getMonthValue() - 1;
             BigDecimal[] part = parts.computeIfAbsent(entry.categoryId(), id -> new BigDecimal[] {BigDecimal.ZERO, BigDecimal.ZERO});
             if (entryYear == year) {
+                if (!entry.date().isAfter(cutoff)) {
+                    toDate = toDate.add(value.get(), Money.CONTEXT);
+                }
                 current[m] = current[m].add(value.get(), Money.CONTEXT);
                 monthParts.get(m).merge(entry.categoryId(), value.get(), (a, b) -> a.add(b, Money.CONTEXT));
                 part[0] = part[0].add(value.get(), Money.CONTEXT);
             } else {
+                if (!entry.date().isAfter(cutoff.minusYears(1))) {
+                    previousToDate = previousToDate.add(value.get(), Money.CONTEXT);
+                }
                 previous[m] = previous[m].add(value.get(), Money.CONTEXT);
                 part[1] = part[1].add(value.get(), Money.CONTEXT);
             }
         }
 
         int lastMonth = year < today.getYear() ? 12 : year == today.getYear() ? today.getMonthValue() : 0;
+        int completedMonths = year < today.getYear() ? 12 : year == today.getYear() ? today.getMonthValue() - 1 : 0;
+        if (year > today.getYear()) {
+            toDate = BigDecimal.ZERO;
+            previousToDate = BigDecimal.ZERO;
+        }
         List<Month> months = new ArrayList<>();
         BigDecimal total = BigDecimal.ZERO;
         BigDecimal previousTotal = BigDecimal.ZERO;
-        BigDecimal toDate = BigDecimal.ZERO;
-        BigDecimal previousToDate = BigDecimal.ZERO;
         for (int m = 0; m < 12; m++) {
             Map<Long, BigDecimal> rounded = new LinkedHashMap<>();
             monthParts.get(m).forEach((id, amount) -> rounded.put(id, Money.round(amount)));
             months.add(new Month(m + 1, Money.round(current[m]), Money.round(previous[m]), rounded));
             total = total.add(current[m], Money.CONTEXT);
             previousTotal = previousTotal.add(previous[m], Money.CONTEXT);
-            if (m < lastMonth) {
-                toDate = toDate.add(current[m], Money.CONTEXT);
-                previousToDate = previousToDate.add(previous[m], Money.CONTEXT);
-            }
         }
         List<Part> partList = parts.entrySet().stream()
                 .map(e -> new Part(e.getKey(), Money.round(e.getValue()[0]), Money.round(e.getValue()[1])))
@@ -106,7 +116,7 @@ public final class CategoryTrend {
                         .thenComparingLong(Part::categoryId))
                 .toList();
         return new Result(months, partList, Money.round(total), Money.round(previousTotal), lastMonth,
-                Money.round(toDate), Money.round(previousToDate), unconverted);
+                completedMonths, Money.round(toDate), Money.round(previousToDate), unconverted);
     }
 
     private static BigDecimal[] zeros() {

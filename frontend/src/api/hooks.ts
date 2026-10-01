@@ -10,6 +10,7 @@ import type {
   CashflowYears,
   Category,
   CategoryRule,
+  CategoryTrend,
   CategorySuggestion,
   BudgetStatus,
   Goal,
@@ -540,6 +541,14 @@ export const useAnnualReport = (year: number) =>
     queryKey: ['dashboard', 'annual', year],
     queryFn: () => get<AnnualReport>(`/api/reports/annual?year=${year}`),
     placeholderData: keepPreviousData,
+  })
+
+export const useCategoryTrend = (categoryId: number, year: number) =>
+  useQuery({
+    queryKey: ['dashboard', 'category-trend', categoryId, year],
+    queryFn: () => get<CategoryTrend>(`/api/dashboard/category-trend?categoryId=${categoryId}&year=${year}`),
+    placeholderData: keepPreviousData,
+    enabled: Number.isFinite(categoryId),
   })
 
 export const useCashflowYears = () =>

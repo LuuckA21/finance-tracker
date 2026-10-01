@@ -120,11 +120,13 @@ public class DashboardService {
 
     /**
      * One category's income or expenses month by month (a macro with its details), against the year
-     * before; {@code lastMonth} is the last month the year has had so far, {@code toDate} and
-     * {@code previousToDate} compare the same months.
+     * before; {@code lastMonth} is the last month the year has had so far, {@code completedMonths} the
+     * months already over, {@code toDate} and {@code previousToDate} compare the year up to today with
+     * the year before up to the same day.
      */
     public record CategoryTrendResponse(String baseCurrency, int year, long categoryId, String name, String color,
-                                        EntryKind kind, Long parentId, int lastMonth, List<TrendMonth> months,
+                                        EntryKind kind, Long parentId, int lastMonth, int completedMonths,
+                                        List<TrendMonth> months,
                                         List<TrendDetail> details, BigDecimal total, BigDecimal previousTotal,
                                         BigDecimal toDate, BigDecimal previousToDate, List<Integer> availableYears,
                                         SortedSet<String> unconvertedCurrencies) {
@@ -256,7 +258,7 @@ public class DashboardService {
             return new TrendDetail(p.categoryId(), node == null ? "?" : node.name(), p.amount(), p.previous());
         }).toList();
         return new CategoryTrendResponse(fx.baseCurrency(), year, categoryId, category.name(), category.color(),
-                category.kind(), category.parentId(), r.lastMonth(),
+                category.kind(), category.parentId(), r.lastMonth(), r.completedMonths(),
                 r.months().stream().map(m -> new TrendMonth(m.month(), m.amount(), m.previous(), m.parts())).toList(),
                 details, r.total(), r.previousTotal(), r.toDate(), r.previousToDate(), availableYears(userId),
                 r.unconvertedCurrencies());
