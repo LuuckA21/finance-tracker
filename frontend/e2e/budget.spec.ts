@@ -66,5 +66,6 @@ test('a yearly budget compares the year so far instead of the month', async ({ s
   await dialog.getByLabel('Importo mensile').fill('400')
   await dialog.getByRole('button', { name: 'Salva' }).click()
   await expect(page.getByRole('region', { name: 'Budget trimestrali e annuali' })).toHaveCount(0)
-  await expect(page.locator('li').filter({ hasText: 'Cassa malati' })).toContainText('Previsione a fine mese')
+  // Monthly again: the row compares the month (with the recent average beside it)
+  await expect(page.locator('li').filter({ hasText: 'Cassa malati' })).toContainText('Media ultimi 3 mesi')
 })

@@ -400,7 +400,11 @@ encrypted with it).
   budget counts the expenses from the first month of its calendar quarter or year to the end of
   the selected month; the page's totals add up monthly budgets only. Its alerts go out once per
   quarter or year. The projection counts
-  expenses created by recurring rules as booked and extrapolates the rest over the month's days.
+  expenses created by recurring rules as booked and carries the rest over the days left at a pace
+  that weighs a usual month (the last 3 months' average outside recurring rules, counted as a
+  month of days) against the days gone: close to the usual pace on the 1st, close to the month's
+  own by its end, so one large early expense is not multiplied by 30. A category without spending
+  in the last 3 months gets no projection before the 7th, then the month's own pace.
 - **Savings goals**, in the base currency: a balance goal compares the value of its positions
   today with the target, converted at today's rate; its pace is their average monthly change
   since 6 months ago (deposits and market moves alike, from at least 4 weeks of records). A

@@ -33,6 +33,11 @@ public final class BudgetCalculator {
     public static final BigDecimal WARNING_PERCENT = BigDecimal.valueOf(80);
     /** Full months before the selected one used for the spending average (budget suggestion). */
     public static final int AVERAGE_MONTHS = 3;
+    /**
+     * Without spending in the previous {@link #AVERAGE_MONTHS} months, no projection before this day
+     * of the month: a few days say too little to scale to a whole month.
+     */
+    public static final int FIRST_PROJECTION_DAY = 7;
 
     public enum State { OK, WARNING, OVER }
 
@@ -82,7 +87,9 @@ public final class BudgetCalculator {
      * @param monthSpent spending of the month alone (the same as {@code spent} for a monthly budget)
      * @param percent   spent / budget × 100, null without a convertible budget
      * @param projected monthly budgets in the current month only: recurring expenses as booked plus
-     *                  the other spending extrapolated to the end of the month
+     *                  the other spending carried to the end of the month at a pace that starts
+     *                  from the previous months and follows the month's own as it goes by; null in
+     *                  the first days of a category without history
      * @param average   average monthly spending of the previous {@link #AVERAGE_MONTHS} months
      * @param previous  spending of the whole period before (last month, quarter or year)
      */
@@ -127,6 +134,8 @@ public final class BudgetCalculator {
         budgets.stream().filter(b -> b.period() != Period.MONTHLY).forEach(b -> longer.add(b.categoryId()));
         Map<Long, Map<YearMonth, BigDecimal>> byMonth = new HashMap<>();
         Map<Long, BigDecimal> spentRecurring = new HashMap<>();
+        // Spending not created by recurring rules, by month: the usual pace of a projection
+        Map<Long, Map<YearMonth, BigDecimal>> variableByMonth = new HashMap<>();
         SortedSet<String> unconverted = new TreeSet<>();
 
         for (Expense entry : expenses) {
@@ -144,6 +153,10 @@ public final class BudgetCalculator {
                     .merge(entryMonth, value.get(), (a, b) -> a.add(b, Money.CONTEXT));
             if (entryMonth.equals(month) && entry.recurring()) {
                 spentRecurring.merge(entry.categoryId(), value.get(), (a, b) -> a.add(b, Money.CONTEXT));
+            }
+            if (!entry.recurring()) {
+                variableByMonth.computeIfAbsent(entry.categoryId(), k -> new HashMap<>())
+                        .merge(entryMonth, value.get(), (a, b) -> a.add(b, Money.CONTEXT));
             }
         }
 
@@ -172,8 +185,12 @@ public final class BudgetCalculator {
                 }
             }
             BigDecimal percent = limit == null ? null : percent(categorySpent, limit);
+            BigDecimal history = sum(months, averageFrom, month.minusMonths(1));
+            BigDecimal usual = history.signum() == 0 ? null
+                    : sum(variableByMonth.getOrDefault(line.categoryId(), Map.of()), averageFrom, month.minusMonths(1))
+                    .divide(BigDecimal.valueOf(AVERAGE_MONTHS), Money.CONTEXT);
             BigDecimal projected = current && period == Period.MONTHLY
-                    ? project(categorySpent, spentRecurring.getOrDefault(line.categoryId(), BigDecimal.ZERO), today)
+                    ? project(categorySpent, spentRecurring.getOrDefault(line.categoryId(), BigDecimal.ZERO), usual, today)
                     : null;
             categories.add(new CategoryStatus(line.categoryId(), period, from, period.end(month),
                     limit == null ? null : Money.round(limit),
@@ -183,7 +200,7 @@ public final class BudgetCalculator {
                     percent,
                     state(percent),
                     projected == null ? null : Money.round(projected),
-                    average(sum(months, averageFrom, month.minusMonths(1))),
+                    average(history),
                     Money.round(previous)));
         }
         // Most used budgets first, so what needs attention is on top
@@ -231,13 +248,26 @@ public final class BudgetCalculator {
     }
 
     /**
-     * Recurring spending as booked (it will not repeat this month) plus the rest scaled to the
-     * whole month (days elapsed, today included).
+     * Recurring spending as booked (it will not repeat this month) plus the rest carried over the
+     * days left. The pace of the rest counts a usual month (the average spending outside recurring
+     * rules) as if it were as many days as the month has, beside the days already gone: on the 1st
+     * it is almost the usual pace, by the end of the month almost the month's own, and a month spent
+     * at the usual pace projects to the usual amount. Without history ({@code usual} null) the rest
+     * is scaled to the whole month, from {@link #FIRST_PROJECTION_DAY} on.
      */
-    private static BigDecimal project(BigDecimal spent, BigDecimal recurring, LocalDate today) {
+    public static BigDecimal project(BigDecimal spent, BigDecimal recurring, BigDecimal usual, LocalDate today) {
         BigDecimal variable = spent.subtract(recurring, Money.CONTEXT);
-        return recurring.add(variable.multiply(BigDecimal.valueOf(today.lengthOfMonth()))
-                .divide(BigDecimal.valueOf(today.getDayOfMonth()), Money.CONTEXT), Money.CONTEXT);
+        int day = today.getDayOfMonth();
+        int length = today.lengthOfMonth();
+        if (usual == null) {
+            if (day < FIRST_PROJECTION_DAY) {
+                return null;
+            }
+            return recurring.add(variable.multiply(BigDecimal.valueOf(length))
+                    .divide(BigDecimal.valueOf(day), Money.CONTEXT), Money.CONTEXT);
+        }
+        BigDecimal pace = variable.add(usual, Money.CONTEXT).divide(BigDecimal.valueOf((long) day + length), Money.CONTEXT);
+        return spent.add(pace.multiply(BigDecimal.valueOf((long) length - day)), Money.CONTEXT);
     }
 
     private static BigDecimal average(BigDecimal total) {
