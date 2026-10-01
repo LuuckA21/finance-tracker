@@ -88,6 +88,50 @@ class BudgetsIT {
     }
 
     @Test
+    void quarterlyAndYearlyBudgetsCompareTheirPeriodSoFar() throws Exception {
+        ApiClient client = login(testUsers.create("budget-periods", Role.USER));
+        long health = category(client, "Cassa malati");
+        long taxes = category(client, "Tasse");
+        assertEquals(200, client.put("/api/budgets/" + health, """
+                {"amount":4000,"currency":"CHF","period":"YEARLY"}""").getResponse().getStatus());
+        client.put("/api/budgets/" + taxes, """
+                {"amount":1000,"currency":"CHF","period":"QUARTERLY"}""");
+        assertEquals(400, client.put("/api/budgets/" + taxes, """
+                {"amount":1000,"currency":"CHF","period":"WEEKLY"}""").getResponse().getStatus());
+        assertEquals(List.of("YEARLY", "QUARTERLY"), json(client.get("/api/budgets"), "$[*].period"));
+
+        // The yearly premium in January; a detail's spending counts in its macro's quarterly budget
+        entry(client, "2026-01-15", "EXPENSE", health, 3600);
+        entry(client, "2026-08-10", "EXPENSE", health, 100);
+        entry(client, "2026-07-05", "EXPENSE", taxes, 600);
+        entry(client, "2026-08-05", "EXPENSE", category(client, "Imposte sul reddito"), 300);
+
+        MvcResult status = client.get("/api/budgets/status?month=2026-08");
+        // Not comparable with a month: out of the totals
+        assertEquals(0.0, ((Number) json(status, "$.budgeted")).doubleValue());
+        assertEquals(0.0, ((Number) json(status, "$.spent")).doubleValue());
+        assertEquals(0.0, ((Number) json(status, "$.unbudgeted")).doubleValue());
+        assertEquals("Assicurazioni › Cassa malati", json(status, "$.categories[0].name"));
+        assertEquals("YEARLY", json(status, "$.categories[0].period"));
+        assertEquals("2026-01", json(status, "$.categories[0].from"));
+        assertEquals("2026-12", json(status, "$.categories[0].to"));
+        assertEquals(3700.0, ((Number) json(status, "$.categories[0].spent")).doubleValue());
+        assertEquals(100.0, ((Number) json(status, "$.categories[0].monthSpent")).doubleValue());
+        assertEquals("WARNING", json(status, "$.categories[0].state"));
+        assertEquals("Tasse", json(status, "$.categories[1].name"));
+        assertEquals("QUARTERLY", json(status, "$.categories[1].period"));
+        assertEquals("2026-07", json(status, "$.categories[1].from"));
+        assertEquals(900.0, ((Number) json(status, "$.categories[1].spent")).doubleValue());
+        assertEquals(300.0, ((Number) json(status, "$.categories[1].monthSpent")).doubleValue());
+
+        // Back to monthly: the same budget, now against August alone
+        client.put("/api/budgets/" + health, "{\"amount\":400,\"currency\":\"CHF\",\"period\":\"MONTHLY\"}");
+        status = client.get("/api/budgets/status?month=2026-08");
+        assertEquals(400.0, ((Number) json(status, "$.budgeted")).doubleValue());
+        assertEquals(100.0, ((Number) json(status, "$.spent")).doubleValue());
+    }
+
+    @Test
     void budgetsAreValidatedAndPrivate() throws Exception {
         ApiClient alice = login(testUsers.create("budget-alice", Role.USER));
         ApiClient bob = login(testUsers.create("budget-bob", Role.USER));

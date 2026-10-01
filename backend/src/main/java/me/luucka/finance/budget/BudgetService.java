@@ -29,17 +29,20 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class BudgetService {
 
-    public record BudgetResponse(long categoryId, BigDecimal amount, String currency) {
+    public record BudgetResponse(long categoryId, BigDecimal amount, String currency,
+                                 BudgetCalculator.Period period) {
         static BudgetResponse of(Budget b) {
-            return new BudgetResponse(b.getCategoryId(), b.getAmount(), b.getCurrency());
+            return new BudgetResponse(b.getCategoryId(), b.getAmount(), b.getCurrency(), b.getPeriod());
         }
     }
 
     /** Budget status of a category, with its name and colour for display. */
     public record CategoryStatusResponse(long categoryId, String name, String color, BigDecimal amount,
-                                         String currency, BigDecimal budget, BigDecimal spent, BigDecimal remaining,
+                                         String currency, BudgetCalculator.Period period, YearMonth from,
+                                         YearMonth to, BigDecimal budget, BigDecimal spent, BigDecimal monthSpent,
+                                         BigDecimal remaining,
                                          BigDecimal percent, BudgetCalculator.State state, BigDecimal projected,
-                                         BigDecimal average) {
+                                         BigDecimal average, BigDecimal previous) {
     }
 
     public record UnbudgetedResponse(long categoryId, String name, String color, BigDecimal spent,
@@ -76,11 +79,12 @@ public class BudgetService {
     }
 
     /**
-     * Creates or changes the monthly budget of one of the user's expense categories. A macro's budget
-     * covers its details too, so a macro and its details never both have one.
+     * Creates or changes the budget of one of the user's expense categories, for each month, quarter
+     * or year. A macro's budget covers its details too, so a macro and its details never both have one.
      */
     @Transactional
-    public BudgetResponse save(long userId, long categoryId, BigDecimal amount, String currency) {
+    public BudgetResponse save(long userId, long categoryId, BigDecimal amount, String currency,
+                               BudgetCalculator.Period period) {
         Category category = categories.get(userId, categoryId);
         if (category.getKind() != EntryKind.EXPENSE) {
             throw ApiException.badRequest("budget_expense_only", "Budgets apply to expense categories only");
@@ -99,6 +103,7 @@ public class BudgetService {
                 .orElseGet(() -> new Budget(userId, category.getId()));
         budget.setAmount(amount);
         budget.setCurrency(Currencies.normalize(currency));
+        budget.setPeriod(period);
         return BudgetResponse.of(budgets.save(budget));
     }
 
@@ -108,7 +113,10 @@ public class BudgetService {
                 .orElseThrow(() -> ApiException.notFound("Budget")));
     }
 
-    /** Spending of {@code month} (current month when null) against the budgets. */
+    /**
+     * Spending of {@code month} (current month when null) against the budgets: the month for a
+     * monthly one, its quarter or year so far for the others.
+     */
     @Transactional(readOnly = true)
     public StatusResponse status(long userId, YearMonth month) {
         LocalDate today = LocalDate.now(clock);
@@ -117,9 +125,10 @@ public class BudgetService {
 
         List<Budget> own = budgets.findByUserId(userId);
         List<BudgetCalculator.BudgetLine> lines = own.stream()
-                .map(b -> new BudgetCalculator.BudgetLine(b.getCategoryId(), b.getAmount(), b.getCurrency()))
+                .map(b -> new BudgetCalculator.BudgetLine(b.getCategoryId(), b.getAmount(), b.getCurrency(),
+                        b.getPeriod()))
                 .toList();
-        LocalDate from = selected.minusMonths(BudgetCalculator.AVERAGE_MONTHS).atDay(1);
+        LocalDate from = BudgetCalculator.firstMonth(selected).atDay(1);
         CategoryTree tree = categories.tree(userId);
         Set<Long> withBudget = own.stream().map(Budget::getCategoryId).collect(Collectors.toSet());
         List<BudgetCalculator.Expense> expenses = entries.findByUserIdAndDateBetween(userId, from,
@@ -135,9 +144,8 @@ public class BudgetService {
             CategoryTree.Node category = tree.node(c.categoryId());
             Budget budget = budgetById.get(c.categoryId());
             return new CategoryStatusResponse(c.categoryId(), name(tree, c.categoryId()), color(category),
-                    budget.getAmount(),
-                    budget.getCurrency(), c.budget(), c.spent(), c.remaining(), c.percent(), c.state(),
-                    c.projected(), c.average());
+                    budget.getAmount(), budget.getCurrency(), c.period(), c.from(), c.to(), c.budget(), c.spent(),
+                    c.monthSpent(), c.remaining(), c.percent(), c.state(), c.projected(), c.average(), c.previous());
         }).toList();
         List<UnbudgetedResponse> others = result.others().stream().map(o -> {
             return new UnbudgetedResponse(o.categoryId(), name(tree, o.categoryId()), color(tree.node(o.categoryId())),

@@ -12,6 +12,7 @@ import java.util.Set;
 import me.luucka.finance.core.budget.BudgetCalculator;
 import me.luucka.finance.core.budget.BudgetCalculator.BudgetLine;
 import me.luucka.finance.core.budget.BudgetCalculator.Expense;
+import me.luucka.finance.core.budget.BudgetCalculator.Period;
 import me.luucka.finance.core.budget.BudgetCalculator.State;
 import me.luucka.finance.core.fx.FxTable;
 import org.junit.jupiter.api.Test;
@@ -22,6 +23,8 @@ class BudgetCalculatorTest {
     private static final long RENT = 2;
     private static final long FUN = 3;
     private static final long TRAVEL = 4;
+    private static final long INSURANCE = 5;
+    private static final long TAXES = 6;
     private static final YearMonth SEPTEMBER = YearMonth.of(2026, 9);
     private static final FxTable FX = new FxTable("CHF").put("EUR", LocalDate.of(2026, 1, 1), new BigDecimal("0.95"));
 
@@ -114,5 +117,66 @@ class BudgetCalculatorTest {
         lines = List.of(new BudgetLine(FUN, new BigDecimal("63"), "CHF"));
         assertEquals(State.OK, BudgetCalculator.month(lines, entries, FX, SEPTEMBER, LocalDate.of(2026, 10, 1))
                 .categories().getFirst().state());
+    }
+
+    @Test
+    void periodsAreCalendarQuartersAndYears() {
+        assertEquals(YearMonth.of(2026, 7), Period.QUARTERLY.start(SEPTEMBER));
+        assertEquals(YearMonth.of(2026, 9), Period.QUARTERLY.end(YearMonth.of(2026, 7)));
+        assertEquals(YearMonth.of(2026, 10), Period.QUARTERLY.start(YearMonth.of(2026, 12)));
+        assertEquals(YearMonth.of(2026, 1), Period.YEARLY.start(SEPTEMBER));
+        assertEquals(YearMonth.of(2026, 12), Period.YEARLY.end(SEPTEMBER));
+        assertEquals(SEPTEMBER, Period.MONTHLY.start(SEPTEMBER));
+        assertEquals(SEPTEMBER, Period.MONTHLY.end(SEPTEMBER));
+    }
+
+    @Test
+    void quarterlyAndYearlyBudgetsCountTheirPeriodSoFar() {
+        List<Expense> entries = List.of(
+                // The yearly premium paid in January, a top-up in September; last year's for comparison
+                expense("2026-01-15", "3600", "CHF", INSURANCE),
+                expense("2026-09-10", "100", "CHF", INSURANCE),
+                expense("2025-01-20", "3500", "CHF", INSURANCE),
+                expense("2024-12-20", "999", "CHF", INSURANCE), // before last year: ignored
+                // Third quarter so far, and the second quarter for comparison
+                expense("2026-07-05", "600", "CHF", TAXES),
+                expense("2026-08-05", "300", "CHF", TAXES),
+                expense("2026-06-30", "999", "CHF", TAXES),
+                expense("2026-09-02", "300", "CHF", FOOD),
+                expense("2026-01-10", "999", "CHF", FOOD)); // monthly budget: only the last 3 months matter
+        List<BudgetLine> lines = List.of(
+                new BudgetLine(INSURANCE, new BigDecimal("4000"), "CHF", Period.YEARLY),
+                new BudgetLine(TAXES, new BigDecimal("1000"), "CHF", Period.QUARTERLY),
+                new BudgetLine(FOOD, new BigDecimal("450"), "CHF"));
+        var status = BudgetCalculator.month(lines, entries, FX, SEPTEMBER, LocalDate.of(2026, 10, 5));
+
+        var insurance = status.categories().stream().filter(c -> c.categoryId() == INSURANCE).findFirst().orElseThrow();
+        assertEquals(YearMonth.of(2026, 1), insurance.from());
+        assertEquals(YearMonth.of(2026, 12), insurance.to());
+        assertEquals(new BigDecimal("3700.00"), insurance.spent());
+        assertEquals(new BigDecimal("100.00"), insurance.monthSpent());
+        assertEquals(new BigDecimal("92.5"), insurance.percent());
+        assertEquals(State.WARNING, insurance.state());
+        assertEquals(new BigDecimal("3500.00"), insurance.previous());
+        assertNull(insurance.projected());
+
+        var taxes = status.categories().stream().filter(c -> c.categoryId() == TAXES).findFirst().orElseThrow();
+        assertEquals(YearMonth.of(2026, 7), taxes.from());
+        assertEquals(new BigDecimal("900.00"), taxes.spent());
+        assertEquals(new BigDecimal("0.00"), taxes.monthSpent());
+        assertEquals(new BigDecimal("999.00"), taxes.previous());
+        assertEquals(new BigDecimal("100.00"), taxes.remaining());
+
+        // Totals compare months with months: only the monthly budget is in them
+        assertEquals(new BigDecimal("450.00"), status.budgeted());
+        assertEquals(new BigDecimal("300.00"), status.spent());
+        assertEquals(new BigDecimal("0.00"), status.unbudgeted());
+
+        // In January the yearly premium is not "over" a monthly share: it is 90 % of the year
+        var january = BudgetCalculator.month(lines, entries, FX, YearMonth.of(2026, 1), LocalDate.of(2026, 10, 5));
+        var paid = january.categories().stream().filter(c -> c.categoryId() == INSURANCE).findFirst().orElseThrow();
+        assertEquals(new BigDecimal("3600.00"), paid.spent());
+        assertEquals(State.WARNING, paid.state());
+        assertEquals(new BigDecimal("3500.00"), paid.previous());
     }
 }

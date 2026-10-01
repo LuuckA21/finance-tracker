@@ -12,6 +12,7 @@ import jakarta.validation.constraints.NotNull;
 import me.luucka.finance.auth.AppPrincipal;
 import me.luucka.finance.common.ApiException;
 import me.luucka.finance.common.CurrencyCode;
+import me.luucka.finance.core.budget.BudgetCalculator;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -24,7 +25,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Monthly budgets per expense category and how the month's spending compares with them. */
+/** Budgets per expense category (monthly, quarterly or yearly) and how spending compares with them. */
 @RestController
 @RequestMapping("/api/budgets")
 public class BudgetController {
@@ -32,7 +33,9 @@ public class BudgetController {
     public record BudgetRequest(
             @NotNull @DecimalMin(value = "0.01") @DecimalMax("999999999999999")
             @Digits(integer = 15, fraction = 4) BigDecimal amount,
-            @NotNull @CurrencyCode String currency) {
+            @NotNull @CurrencyCode String currency,
+            /** Default {@code MONTHLY} */
+            BudgetCalculator.Period period) {
     }
 
     private static final YearMonth MIN_MONTH = YearMonth.of(1900, 1);
@@ -62,7 +65,8 @@ public class BudgetController {
     @PutMapping("/{categoryId}")
     public BudgetService.BudgetResponse save(@AuthenticationPrincipal AppPrincipal me, @PathVariable long categoryId,
                                              @Valid @RequestBody BudgetRequest body) {
-        return service.save(me.id(), categoryId, body.amount(), body.currency());
+        return service.save(me.id(), categoryId, body.amount(), body.currency(),
+                body.period() == null ? BudgetCalculator.Period.MONTHLY : body.period());
     }
 
     @DeleteMapping("/{categoryId}")
