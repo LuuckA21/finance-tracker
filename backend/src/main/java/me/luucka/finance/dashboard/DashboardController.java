@@ -33,6 +33,16 @@ public class DashboardController {
         return service.cashflowYear(me.id(), year);
     }
 
+    /** One category (a macro with its details) month by month in a year, against the year before. */
+    @GetMapping("/category-trend")
+    public DashboardService.CategoryTrendResponse categoryTrend(@AuthenticationPrincipal AppPrincipal me,
+                                                                @RequestParam long categoryId, @RequestParam int year) {
+        if (year < 1900 || year > 2200) {
+            throw ApiException.badRequest("invalid_year", "Year out of range");
+        }
+        return service.categoryTrend(me.id(), categoryId, year);
+    }
+
     /** Yearly totals across all years. */
     @GetMapping("/cashflow/years")
     public DashboardService.CashflowYearsResponse cashflowYears(@AuthenticationPrincipal AppPrincipal me) {
