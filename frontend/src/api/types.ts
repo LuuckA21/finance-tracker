@@ -171,6 +171,25 @@ export interface ImportPreviewRow {
   tags: string[]
   duplicate: boolean
   errors: ImportRowError[]
+  /** Where categoryId comes from: the file, or the rule rulePattern */
+  categorySource: 'FILE' | 'RULE' | null
+  rulePattern: string | null
+  /** Without a category, the one most often given to the same description in the past: a proposal */
+  suggestedCategoryId: number | null
+}
+
+/** Entries whose description contains the pattern (ignoring case, accents and punctuation) get the category */
+export interface CategoryRule {
+  id: number
+  pattern: string
+  categoryId: number
+}
+
+/** A category for a description: from the rule ruleId, or from past entries when it is null */
+export interface CategorySuggestion {
+  categoryId: number
+  ruleId: number | null
+  pattern: string | null
 }
 
 export interface ImportPreview {

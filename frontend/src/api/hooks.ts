@@ -9,6 +9,8 @@ import type {
   CashflowYear,
   CashflowYears,
   Category,
+  CategoryRule,
+  CategorySuggestion,
   BudgetStatus,
   Goal,
   GoalKind,
@@ -153,6 +155,38 @@ export function useDeleteCategory() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['categories'] }),
   })
 }
+
+// ---------------------------------------------------------------- category rules
+
+export const useCategoryRules = () =>
+  useQuery({ queryKey: ['category-rules'], queryFn: () => get<CategoryRule[]>('/api/category-rules') })
+
+export function useSaveCategoryRule() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (r: { id?: number; pattern: string; categoryId: number }) =>
+      r.id ? put<CategoryRule>(`/api/category-rules/${r.id}`, r) : post<CategoryRule>('/api/category-rules', r),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['category-rules'] }),
+  })
+}
+
+export function useDeleteCategoryRule() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => del(`/api/category-rules/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['category-rules'] }),
+  })
+}
+
+/** The category the rules or the past entries suggest for a description (null when none does). */
+export const useCategorySuggestion = (description: string, kind: CategoryKind, enabled: boolean) =>
+  useQuery({
+    queryKey: ['category-rules', 'suggest', description, kind],
+    queryFn: () => get<CategorySuggestion | undefined>(
+      `/api/category-rules/suggest?${new URLSearchParams({ description, kind })}`).then((s) => s ?? null),
+    enabled,
+    staleTime: 60_000,
+  })
 
 // ---------------------------------------------------------------- cash entries
 
