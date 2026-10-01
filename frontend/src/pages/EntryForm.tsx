@@ -1,12 +1,14 @@
 import { useState, type FormEvent } from 'react'
 import { ApiError, errorMessage } from '../api/client'
-import { useCategories, useMe, useSaveEntry, useTags } from '../api/hooks'
+import { useCategories, useCategorySuggestion, useMe, useSaveEntry, useTags } from '../api/hooks'
 import type { CashEntry, EntryKind } from '../api/types'
 import { TagInput } from '../components/TagInput'
 import { TransferFields } from '../components/TransferFields'
 import { Button, ErrorAlert, Field, Modal, Segmented } from '../components/ui'
 import { useI18n } from '../i18n'
 import { COMMON_CURRENCIES, parseDecimal, today } from '../lib/format'
+import { normalizeText } from '../lib/rules'
+import { useDebounced } from '../lib/useDebounced'
 import { CategoryOptions } from '../components/CategoryOptions'
 
 let lastCurrency: string | null = null
@@ -38,6 +40,13 @@ function EntryForm({ entry, onDone }: { entry: CashEntry | null; onDone: () => v
   const isTransfer = kind === 'TRANSFER'
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  // Until the user picks a category, the rules or the past entries may suggest one from the description
+  const [categoryTouched, setCategoryTouched] = useState(entry !== null)
+  const settled = useDebounced(description.trim(), 400)
+  const asking = !isTransfer && categoryId === '' && !categoryTouched && normalizeText(settled).length >= 3
+  const found = useCategorySuggestion(settled, kind === 'INCOME' ? 'INCOME' : 'EXPENSE', asking).data
+  const suggestion = asking && found && categories.some((c) => c.id === found.categoryId && c.kind === kind) ? found : null
+  const chosenCategory = categoryId !== '' ? categoryId : suggestion?.categoryId ?? ''
 
 
   async function submit(e: FormEvent, again = false) {
@@ -48,7 +57,7 @@ function EntryForm({ entry, onDone }: { entry: CashEntry | null; onDone: () => v
       setFieldErrors({ amount: t('entryForm.amountRequired') })
       return
     }
-    if (!isTransfer && categoryId === '') {
+    if (!isTransfer && chosenCategory === '') {
       setFieldErrors({ categoryId: t('entryForm.categoryRequired') })
       return
     }
@@ -62,7 +71,7 @@ function EntryForm({ entry, onDone }: { entry: CashEntry | null; onDone: () => v
         id: entry?.id,
         date,
         kind,
-        categoryId: isTransfer || categoryId === '' ? null : categoryId,
+        categoryId: isTransfer || chosenCategory === '' ? null : chosenCategory,
         amount: parsed,
         currency: currency.toUpperCase(),
         description: description.trim() || null,
@@ -92,6 +101,7 @@ function EntryForm({ entry, onDone }: { entry: CashEntry | null; onDone: () => v
         onChange={(k) => {
           setKind(k)
           setCategoryId('')
+          setCategoryTouched(false)
         }}
         options={[
           { value: 'EXPENSE', label: t('entryForm.expense') },
@@ -105,10 +115,11 @@ function EntryForm({ entry, onDone }: { entry: CashEntry | null; onDone: () => v
           {(id) => <input id={id} type="date" className="input" required value={date} onChange={(e) => setDate(e.target.value)} />}
         </Field>
         {!isTransfer && (
-          <Field label={t('entries.category')} error={fieldErrors.categoryId}>
+          <Field label={t('entries.category')} error={fieldErrors.categoryId}
+            hint={suggestion ? (suggestion.pattern ? t('entryForm.suggestedByRule', { pattern: suggestion.pattern }) : t('entryForm.suggestedByHistory')) : undefined}>
             {(id) => (
-              <select id={id} className="input" required value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : '')}>
+              <select id={id} className="input" required value={chosenCategory}
+                onChange={(e) => { setCategoryId(e.target.value ? Number(e.target.value) : ''); setCategoryTouched(true) }}>
                 <option value="">{t('entryForm.choose')}</option>
                 <CategoryOptions categories={categories} kind={kind === 'INCOME' ? 'INCOME' : 'EXPENSE'} />
               </select>

@@ -24,6 +24,13 @@ Self-hosted personal finance app for a small group of users (you and your family
   currency), on a macro (covering its details) or on some of its details, never both. The Budget page shows, for any month, what was spent, what is left, the categories
   close to (80 %) or over their limit, an end-of-month projection for the current month and the
   spending in categories without a budget, with a suggestion from the last 3 months' average.
+- **Category rules** – "the description contains *migros* → Groceries › Supermarket" (case, accents
+  and punctuation aside; the longest matching text wins), managed in Settings › Rules or created
+  from a row while reviewing an import (it then also categorizes the other rows it matches).
+  Imported rows the file gives no category the user has get the rule's category (and its type when
+  the file has none); a category the file names always wins. Without a rule, the category most often
+  given in the past to the same description (numbers aside) is proposed: pre-filled while writing an
+  entry, a proposal to confirm in the import review.
 - **Tags** – free labels on entries across categories ("Holidays 2026", "Wedding"): typed on
   the entry (existing ones suggested, case does not matter, up to 10 per entry), clickable to
   filter the list, with the totals of each tag (spent, received, transferred, period) and their
@@ -414,6 +421,7 @@ encrypted with it).
 |------|-----------|
 | Auth | `GET /api/auth/csrf`, `POST /api/auth/login`, `POST /api/auth/login/mfa`, `POST /api/auth/logout`, `GET /api/auth/me` |
 | Account | `PUT /api/account/password`, `PUT /api/account/settings` (partial: `baseCurrency`, `language` `IT\|EN\|DE\|FR`, `theme` `SYSTEM\|LIGHT\|DARK`), `GET /api/account/logins`, `POST /api/account/mfa/{setup,enable,disable,recovery-codes}` |
+| Category rules | `GET/POST /api/category-rules` (`{pattern, categoryId}`), `PUT/DELETE /api/category-rules/{id}`, `GET /api/category-rules/suggest?description&kind` (`{categoryId, ruleId, pattern}` from a rule, `ruleId` null from past entries; 204 when nothing fits) |
 | Categories | `GET/POST /api/categories` (`{name, kind, color, parentId}`: `parentId` null for a macro, a macro of the same kind for a detail), `PUT/DELETE /api/categories/{id}` (`{name, color, parentId}`; a macro with details cannot be deleted or moved under another) |
 | Entries | `GET /api/cash-entries?from&to&kind&categoryId&q&tagId&page&size` (each entry has `tags`: names; unknown names sent on save become new tags) (kind `INCOME\|EXPENSE\|TRANSFER`; transfers take `fromPositionId`/`toPositionId` instead of `categoryId`), `POST`, `PUT/DELETE /{id}`, `GET /export?filters` (CSV), `POST /import/preview` (multipart `file`), `POST /import` (`{entries:[…]}`) |
 | Recurring | `GET/POST /api/recurring-entries`, `PUT/DELETE /{id}` (frequency `DAILY\|WEEKLY\|MONTHLY\|QUARTERLY\|FOUR_MONTHLY\|SEMIANNUAL\|YEARLY`; `tags` are copied to the entries created) |

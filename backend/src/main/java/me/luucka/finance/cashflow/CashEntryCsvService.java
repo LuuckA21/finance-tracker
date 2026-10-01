@@ -26,8 +26,10 @@ import me.luucka.finance.core.csv.CsvReader;
 import me.luucka.finance.core.csv.CsvWriter;
 import me.luucka.finance.core.csv.EntryCsvFormat;
 import me.luucka.finance.core.csv.EntryCsvFormat.Column;
+import me.luucka.finance.core.rules.CategoryRules;
 import me.luucka.finance.position.AssetPosition;
 import me.luucka.finance.position.AssetPositionRepository;
+import me.luucka.finance.rule.CategoryRuleService;
 import me.luucka.finance.tag.TagService;
 import me.luucka.finance.user.AppUser;
 import me.luucka.finance.user.AppUserRepository;
@@ -53,10 +55,21 @@ public class CashEntryCsvService {
     private static final String BOM = "\uFEFF";
 
     /** One data row: the text as written in the file and, where it could be read, the values. */
+    /**
+     * @param categorySource      where {@code categoryId} comes from: {@code FILE}, {@code RULE} (the rule
+     *                            {@code rulePattern}), null without one
+     * @param suggestedCategoryId without a category, the one most often given to the same description
+     *                            in the past: a proposal the user confirms
+     */
     public record PreviewRow(int line, Map<String, String> raw, LocalDate date, EntryKind kind, Long categoryId,
                              BigDecimal amount, String currency, String description, Long fromPositionId,
-                             Long toPositionId, List<String> tags, boolean duplicate, List<String> errors) {
+                             Long toPositionId, List<String> tags, boolean duplicate, List<String> errors,
+                             String categorySource, String rulePattern, Long suggestedCategoryId) {
     }
+
+    /** Problems a rule can solve: the file gives no category the user has. */
+    private static final Set<String> UNCATEGORIZED = Set.of("missing_category", "unknown_category",
+            "unknown_subcategory");
 
     public record Preview(String delimiter, List<String> ignoredColumns, int total, int valid, int duplicates,
                           int invalid, List<PreviewRow> rows) {
@@ -68,16 +81,18 @@ public class CashEntryCsvService {
     private final AssetPositionRepository positions;
     private final AppUserRepository users;
     private final TagService tags;
+    private final CategoryRuleService rules;
 
     public CashEntryCsvService(CashEntryService entries, CashEntryRepository repository,
                                CategoryService categories, AssetPositionRepository positions,
-                               AppUserRepository users, TagService tags) {
+                               AppUserRepository users, TagService tags, CategoryRuleService rules) {
         this.entries = entries;
         this.repository = repository;
         this.categories = categories;
         this.positions = positions;
         this.users = users;
         this.tags = tags;
+        this.rules = rules;
     }
 
     // ------------------------------------------------------------------ export
@@ -194,6 +209,7 @@ public class CashEntryCsvService {
 
         String baseCurrency = user(userId).getBaseCurrency();
         CategoryNames byName = new CategoryNames(categories.owned(userId));
+        CategoryRules matcher = rules.matcher(userId);
         // Active positions first, so a name shared with an archived one picks the active one
         Map<String, List<AssetPosition>> positionsByName = positions.findByUserIdOrderByArchivedAscNameAsc(userId)
                 .stream().collect(Collectors.groupingBy(p -> EntryCsvFormat.fold(p.getName())));
@@ -202,7 +218,7 @@ public class CashEntryCsvService {
             if (record.fields().stream().allMatch(String::isBlank)) {
                 continue;
             }
-            rows.add(readRow(record, columns, byName, positionsByName, baseCurrency));
+            rows.add(readRow(record, columns, byName, positionsByName, baseCurrency, matcher));
         }
         if (rows.isEmpty()) {
             throw ApiException.badRequest("csv_empty", "The file has no rows below the header");
@@ -222,7 +238,8 @@ public class CashEntryCsvService {
 
     private static PreviewRow readRow(CsvReader.Row record, Map<Column, Integer> columns,
                                       CategoryNames byName,
-                                      Map<String, List<AssetPosition>> positionsByName, String baseCurrency) {
+                                      Map<String, List<AssetPosition>> positionsByName, String baseCurrency,
+                                      CategoryRules matcher) {
         Map<String, String> raw = new LinkedHashMap<>();
         for (Column column : Column.values()) {
             Integer index = columns.get(column);
@@ -303,6 +320,25 @@ public class CashEntryCsvService {
             }
         }
 
+        // The file wins: a rule only categorizes a row the file gives no category the user has; the
+        // past entries only propose one
+        String categorySource = categoryId == null ? null : "FILE";
+        String rulePattern = null;
+        Long suggestedCategoryId = null;
+        if (kind != EntryKind.TRANSFER && categoryId == null && !errors.contains("invalid_kind")
+                && errors.stream().anyMatch(UNCATEGORIZED::contains)) {
+            Optional<CategoryRules.Suggestion> suggestion = matcher.suggest(description, kind);
+            if (suggestion.isPresent() && suggestion.get().fromRule()) {
+                categoryId = suggestion.get().categoryId();
+                kind = suggestion.get().kind();
+                errors.removeAll(UNCATEGORIZED);
+                categorySource = "RULE";
+                rulePattern = suggestion.get().rule().pattern();
+            } else if (suggestion.isPresent()) {
+                suggestedCategoryId = suggestion.get().categoryId();
+            }
+        }
+
         List<String> tags = TagNames.parseCell(raw.getOrDefault("tags", "")).orElse(null);
         if (tags == null) {
             errors.add("invalid_tags");
@@ -310,7 +346,7 @@ public class CashEntryCsvService {
 
         return new PreviewRow(record.line(), raw, date, kind, categoryId, amount, currency,
                 description.isEmpty() ? null : description, fromPositionId, toPositionId,
-                tags == null ? List.of() : tags, false, errors);
+                tags == null ? List.of() : tags, false, errors, categorySource, rulePattern, suggestedCategoryId);
     }
 
     /**
@@ -392,7 +428,8 @@ public class CashEntryCsvService {
                     key(row.date(), row.kind(), row.amount(), row.currency(), row.description()));
             return duplicate ? new PreviewRow(row.line(), row.raw(), row.date(), row.kind(), row.categoryId(),
                     row.amount(), row.currency(), row.description(), row.fromPositionId(), row.toPositionId(),
-                    row.tags(), true, row.errors()) : row;
+                    row.tags(), true, row.errors(), row.categorySource(), row.rulePattern(),
+                    row.suggestedCategoryId()) : row;
         }).toList();
     }
 

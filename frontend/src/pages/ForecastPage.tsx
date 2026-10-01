@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { ApiError, errorMessage } from '../api/client'
 import { useCategories, useDeleteForecast, useForecastPreview, useForecasts, useMe, useSaveForecast, useTags } from '../api/hooks'
@@ -8,6 +8,7 @@ import { Badge, Button, Card, ErrorAlert, Field, Modal, PageHeader, Spinner } fr
 import { useI18n } from '../i18n'
 import { categoryPath, categoryTree } from '../lib/categories'
 import { money, monthName, monthShort, parseDecimal, signedMoney } from '../lib/format'
+import { useDebounced } from '../lib/useDebounced'
 import { ForecastItemForm } from './ForecastItemForm'
 
 /** A scenario as edited: the percentages as typed. */
@@ -33,16 +34,6 @@ function toInput(d: Draft): ForecastInput | null {
   const expenseGrowth = parseDecimal(d.expenseGrowth)
   if (incomeGrowth === null || expenseGrowth === null) return null
   return { ...d, name: d.name.trim(), incomeGrowth, expenseGrowth }
-}
-
-/** The value once it has not changed for `ms`: the preview follows the typing without a request per key. */
-function useDebounced(value: string | null, ms: number) {
-  const [settled, setSettled] = useState(value)
-  useEffect(() => {
-    const timer = setTimeout(() => setSettled(value), ms)
-    return () => clearTimeout(timer)
-  }, [value, ms])
-  return settled
 }
 
 /** A negative amount (something taken away) with its sign in front: −CHF 70.00 */

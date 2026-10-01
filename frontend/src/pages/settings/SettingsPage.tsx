@@ -27,12 +27,14 @@ import { COMMON_CURRENCIES, date, dateTime, number, parseDecimal, today } from '
 import { ChangePasswordForm } from './ChangePasswordForm'
 import { MfaSection } from './MfaSection'
 import { NotificationsTab } from './NotificationsTab'
+import { RulesTab } from './RulesTab'
 import { TagsTab } from './TagsTab'
 
 const TABS = [
   { id: 'account', label: 'settings.tabAccount' },
   { id: 'categorie', label: 'settings.tabCategories' },
   { id: 'etichette', label: 'settings.tabTags' },
+  { id: 'regole', label: 'settings.tabRules' },
   { id: 'notifiche', label: 'settings.tabNotifications' },
   { id: 'cambi', label: 'settings.tabFx' },
 ] as const
@@ -51,7 +53,7 @@ export function SettingsPage() {
           </NavLink>
         ))}
       </nav>
-      {tab === 'categorie' ? <CategoriesTab /> : tab === 'etichette' ? <TagsTab /> : tab === 'notifiche' ? <NotificationsTab /> : tab === 'cambi' ? <FxTab /> : <AccountTab />}
+      {tab === 'categorie' ? <CategoriesTab /> : tab === 'etichette' ? <TagsTab /> : tab === 'regole' ? <RulesTab /> : tab === 'notifiche' ? <NotificationsTab /> : tab === 'cambi' ? <FxTab /> : <AccountTab />}
     </>
   )
 }

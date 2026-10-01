@@ -15,6 +15,7 @@ const PAGES = [
   { path: '/aggiorna', heading: 'Aggiorna valori' },
   { path: '/impostazioni', heading: 'Impostazioni' },
   { path: '/impostazioni/categorie', heading: 'Impostazioni' },
+  { path: '/impostazioni/regole', heading: 'Impostazioni' },
   { path: '/impostazioni/cambi', heading: 'Impostazioni' },
   { path: '/impostazioni/notifiche', heading: 'Impostazioni' },
 ]

@@ -1,8 +1,8 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { Fragment, useMemo, useState, type FormEvent } from 'react'
 import { ChevronLeft, ChevronRight, Download, FileUp } from 'lucide-react'
 import { ApiError, errorMessage, saveBlob } from '../api/client'
 import { useCategories, useImportEntries, useImportPreview, useMe, usePositions } from '../api/hooks'
-import type { Category, EntryKind, ImportPreview, ImportPreviewRow, ImportRowError, Position } from '../api/types'
+import type { Category, CategoryRule, EntryKind, ImportPreview, ImportPreviewRow, ImportRowError, Position } from '../api/types'
 import { TagChip } from '../components/TagInput'
 import { transferOptions } from '../components/TransferFields'
 import { Badge, Button, ErrorAlert, Field, Modal, Segmented } from '../components/ui'
@@ -12,6 +12,8 @@ import { CategoryOptions } from '../components/CategoryOptions'
 import { PATH_SEPARATOR } from '../lib/categories'
 import { missingCategories, type MissingCategory } from '../lib/importCategories'
 import { MissingCategories } from './MissingCategories'
+import { RuleForm } from './settings/RulesTab'
+import { matchesPattern, patternFor } from '../lib/rules'
 
 type Mode = 'all' | 'review'
 
@@ -201,9 +203,13 @@ function ReviewStep({ preview, onStep }: { preview: ImportPreview; onStep: (step
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(0)
   const [onlyToCheck, setOnlyToCheck] = useState(false)
+  const [ruleFor, setRuleFor] = useState<number | null>(null)
   const [rows, setRows] = useState<ReviewRow[]>(() => preview.rows.map((source) => {
+    // The past entries' proposal fills the category; the row still waits for the user to include it
+    const proposal = source.categoryId === null && categories.some((c) => c.id === source.suggestedCategoryId && c.kind === source.kind)
+      ? source.suggestedCategoryId : null
     const row: ReviewRow = {
-      source, kind: source.kind, categoryId: source.categoryId, from: source.fromPositionId, to: source.toPositionId, include: false,
+      source, kind: source.kind, categoryId: source.categoryId ?? proposal, from: source.fromPositionId, to: source.toPositionId, include: false,
     }
     // A row with any problem waits for the user, even one the review can fix
     return { ...row, include: isReady(row, categories) && !source.duplicate && source.errors.length === 0 }
@@ -218,6 +224,23 @@ function ReviewStep({ preview, onStep }: { preview: ImportPreview; onStep: (step
   const missing = useMemo(() => missingCategories(rows.map((r) => ({
     kind: r.kind, categoryId: r.categoryId, errors: r.source.errors, raw: r.source.raw,
   })), categories), [rows, categories])
+
+  /**
+   * A rule created while reviewing categorizes the other rows it matches that have no category
+   * yet (or only a proposal), and gives its type to those without one.
+   */
+  function ruleCreated(rule: CategoryRule) {
+    setRuleFor(null)
+    const category = categories.find((c) => c.id === rule.categoryId)
+    if (!category) return
+    setRows((all) => all.map((row) => {
+      const open = row.categoryId === null || (row.source.categoryId === null && row.categoryId === row.source.suggestedCategoryId)
+      if (!open || blocking(row.source).length > 0 || (row.kind !== null && row.kind !== category.kind)
+        || !matchesPattern(row.source.description, rule.pattern)) return row
+      const next = { ...row, kind: category.kind, categoryId: category.id }
+      return { ...next, include: isReady(next, categories) && !row.source.duplicate }
+    }))
+  }
 
   /** A category created while reviewing goes to the rows that name it (and are of its kind). */
   function created(group: MissingCategory | null, category: Category) {
@@ -304,7 +327,8 @@ function ReviewStep({ preview, onStep }: { preview: ImportPreview; onStep: (step
               const fatal = blocking(row.source)
               const ready = isReady(row, categories)
               return (
-                <tr key={row.source.line} className={`border-b border-line align-top last:border-0 ${fatal.length > 0 ? 'bg-bad-soft/40' : ''}`}>
+                <Fragment key={row.source.line}>
+                <tr className={`border-b border-line align-top last:border-0 ${fatal.length > 0 ? 'bg-bad-soft/40' : ''}`}>
                   <td className="px-2 py-1.5">
                     <input type="checkbox" aria-label={t('import.includeLine', { line: row.source.line })}
                       checked={row.include && ready} disabled={!ready}
@@ -349,14 +373,37 @@ function ReviewStep({ preview, onStep }: { preview: ImportPreview; onStep: (step
                     )}
                   </td>
                   <td className="px-2 py-1.5">
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap items-center gap-1">
                       {row.source.duplicate && <Badge tone="accent">{t('import.duplicate')}</Badge>}
+                      {row.source.categorySource === 'RULE' && row.categoryId === row.source.categoryId && (
+                        <Badge>{t('import.byRule', { pattern: row.source.rulePattern ?? '' })}</Badge>
+                      )}
+                      {row.source.categoryId === null && row.categoryId !== null && row.categoryId === row.source.suggestedCategoryId && (
+                        <Badge>{t('import.byHistory')}</Badge>
+                      )}
+                      {canRemember(row) && ruleFor !== index && (
+                        <button type="button" className="text-xs text-accent hover:underline" onClick={() => setRuleFor(index)}>
+                          {t('import.createRule')}
+                        </button>
+                      )}
                       {row.source.errors.filter((e) => showError(e, row, ready)).map((e) => (
                         <Badge key={e} tone={FIXABLE.includes(e) ? 'neutral' : 'bad'}>{rowErrorText(e, row.source, t)}</Badge>
                       ))}
                     </div>
                   </td>
                 </tr>
+                {ruleFor === index && (
+                  <tr className="border-b border-line bg-surface-2">
+                    <td colSpan={8} className="px-3 py-3">
+                      <p className="mb-2 text-xs text-ink-2">{t('import.createRuleHelp')}</p>
+                      <div className="max-w-xl">
+                        <RuleForm rule={null} categories={categories} initialPattern={patternFor(row.source.description)}
+                          initialCategoryId={row.categoryId} onDone={ruleCreated} onCancel={() => setRuleFor(null)} />
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               )
             })}
           </tbody>
@@ -381,6 +428,12 @@ function ReviewStep({ preview, onStep }: { preview: ImportPreview; onStep: (step
       </div>
     </div>
   )
+}
+
+/** A row categorized by hand, with a description: worth a rule for the next imports. */
+function canRemember(row: ReviewRow) {
+  return row.kind !== 'TRANSFER' && row.kind !== null && row.categoryId !== null && row.categoryId !== row.source.categoryId
+    && row.categoryId !== row.source.suggestedCategoryId && patternFor(row.source.description).length > 0
 }
 
 /**
