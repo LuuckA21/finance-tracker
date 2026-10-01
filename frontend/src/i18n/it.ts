@@ -735,6 +735,8 @@ export const it = {
   'settings.tabTags': 'Etichette',
   'error.invalid_tags': 'Etichette non valide: al massimo 10 per movimento, 40 caratteri ciascuna, senza virgole.',
   'error.too_many_tags': 'Si possono avere al massimo 500 etichette.',
+  'error.too_many_categories': 'Si possono avere al massimo 500 categorie.',
+  'error.mfa_secret_unreadable': 'Il segreto della verifica in due passaggi non è leggibile (la chiave di cifratura del server è cambiata). Chiedi a un amministratore di reimpostare la verifica in due passaggi.',
   'error.tag_exists': 'Esiste già un\'etichetta con questo nome.',
   'import.error.invalid_tags': 'Etichette non valide',
   'import.helpTags': 'Etichette: separate da virgole nella colonna «etichette».',

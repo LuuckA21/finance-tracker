@@ -216,7 +216,7 @@ export interface ImportPreview {
 }
 
 /** ECB rate towards the base currency; manualRate is set when the user's own rate is used instead. */
-export interface CentralRate {
+interface CentralRate {
   currency: string
   rate: number
   date: string
@@ -356,7 +356,7 @@ export interface NetWorthSeries {
   unconvertedCurrencies: string[]
 }
 
-export interface PositionValue {
+interface PositionValue {
   positionId: number
   name: string
   symbol: string | null

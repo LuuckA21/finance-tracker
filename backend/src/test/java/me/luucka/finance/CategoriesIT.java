@@ -90,6 +90,20 @@ class CategoriesIT {
     }
 
     @Test
+    void anAccountHasAtMostFiveHundredCategories() throws Exception {
+        AppUser user = testUsers.create("catcap", Role.USER);
+        ApiClient client = login(user);
+        int existing = ((List<?>) json(client.get("/api/categories"), "$")).size();
+        jdbc.update("""
+                insert into category (user_id, name, kind, color)
+                select ?, 'Limite ' || g, 'EXPENSE', '#123456' from generate_series(1, ?) g""",
+                user.getId(), 500 - existing);
+        MvcResult refused = create(client, "Una di troppo", "EXPENSE", null);
+        assertEquals(400, refused.getResponse().getStatus());
+        assertEquals("too_many_categories", code(refused));
+    }
+
+    @Test
     void namesAreUniqueAmongMacrosAndUnderEachMacro() throws Exception {
         ApiClient client = login(testUsers.create("catnames", Role.USER));
         long housing = category(client, "Casa");

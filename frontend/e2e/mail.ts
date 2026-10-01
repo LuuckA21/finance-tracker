@@ -4,7 +4,7 @@ import path from 'node:path'
 import { expect } from '@playwright/test'
 
 /** Where the SMTP sink started by the Playwright config writes the messages it receives. */
-export const MAIL_DIR = process.env.E2E_MAIL_DIR ?? path.join(os.tmpdir(), 'finance-e2e-mail')
+const MAIL_DIR = process.env.E2E_MAIL_DIR ?? path.join(os.tmpdir(), 'finance-e2e-mail')
 
 export interface Mail {
   subject: string

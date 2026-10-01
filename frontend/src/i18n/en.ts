@@ -737,6 +737,8 @@ export const en: Messages = {
   'settings.tabTags': 'Tags',
   'error.invalid_tags': 'Invalid tags: at most 10 per transaction, 40 characters each, without commas.',
   'error.too_many_tags': 'You can have at most 500 tags.',
+  'error.too_many_categories': 'You can have at most 500 categories.',
+  'error.mfa_secret_unreadable': 'The two-step verification secret cannot be read (the server encryption key has changed). Ask an administrator to reset two-step verification.',
   'error.tag_exists': 'A tag with this name already exists.',
   'import.error.invalid_tags': 'Invalid tags',
   'import.helpTags': 'Tags: separated by commas in the “tags” column.',
