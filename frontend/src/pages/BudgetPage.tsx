@@ -2,10 +2,10 @@ import { useState, type FormEvent } from 'react'
 import { ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react'
 import { ApiError, errorMessage } from '../api/client'
 import { useBudgetStatus, useCategories, useDeleteBudget, useSaveBudget } from '../api/hooks'
-import type { BudgetState, BudgetStatus, Category } from '../api/types'
+import type { BudgetPeriod, BudgetState, BudgetStatus, Category } from '../api/types'
 import { CategoryOptions } from '../components/CategoryOptions'
-import { Button, Card, EmptyState, ErrorAlert, Field, MissingRatesNotice, Modal, PageHeader, Spinner, StatTile } from '../components/ui'
-import { useI18n } from '../i18n'
+import { Button, Card, EmptyState, ErrorAlert, Field, MissingRatesNotice, Modal, PageHeader, Segmented, Spinner, StatTile } from '../components/ui'
+import { useI18n, type MessageKey } from '../i18n'
 import { COMMON_CURRENCIES, money, monthName, parseDecimal, percent } from '../lib/format'
 
 type Row = BudgetStatus['categories'][number]
@@ -15,6 +15,7 @@ interface Draft {
   categoryId: number | null
   amount: string
   currency: string
+  period: BudgetPeriod
   /** Recent monthly average, in the base currency */
   average?: number
   base: string
@@ -23,6 +24,12 @@ interface Draft {
 
 const BAR: Record<BudgetState, string> = { OK: 'bg-good', WARNING: 'bg-warn-ink', OVER: 'bg-bad' }
 const TEXT: Record<BudgetState, string> = { OK: 'text-good', WARNING: 'text-warn-ink', OVER: 'text-bad' }
+const MONTHS: Record<BudgetPeriod, number> = { MONTHLY: 1, QUARTERLY: 3, YEARLY: 12 }
+const PERIODS: { value: BudgetPeriod; label: MessageKey; amount: MessageKey }[] = [
+  { value: 'MONTHLY', label: 'budget.periodMonthly', amount: 'budget.monthlyAmount' },
+  { value: 'QUARTERLY', label: 'budget.periodQuarterly', amount: 'budget.quarterlyAmount' },
+  { value: 'YEARLY', label: 'budget.periodYearly', amount: 'budget.yearlyAmount' },
+]
 
 function shiftMonth(month: string, delta: number) {
   const [y, m] = month.split('-').map(Number)
@@ -48,6 +55,8 @@ export function BudgetPage() {
   const currency = data?.baseCurrency ?? 'CHF'
   const shown = month ?? data?.month
   const taken = data?.categories.map((c) => c.categoryId) ?? []
+  const monthly = data?.categories.filter((c) => c.period === 'MONTHLY') ?? []
+  const longer = data?.categories.filter((c) => c.period !== 'MONTHLY') ?? []
   const conflicted = (id: number) => {
     const category = categories.find((c) => c.id === id)
     return category !== undefined && budgetConflict(category, categories, taken)
@@ -85,7 +94,7 @@ export function BudgetPage() {
                 <ChevronRight className="size-4" />
               </Button>
             </div>
-            <Button variant="primary" onClick={() => setDraft({ categoryId: null, amount: '', currency, base: currency, editing: false })}>
+            <Button variant="primary" onClick={() => setDraft({ categoryId: null, amount: '', currency, period: 'MONTHLY', base: currency, editing: false })}>
               <Plus className="size-4" /> {t('budget.new')}
             </Button>
           </>
@@ -97,26 +106,31 @@ export function BudgetPage() {
         <>
           <MissingRatesNotice currencies={data.unconvertedCurrencies} baseCurrency={currency} />
           <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <StatTile label={t('budget.total')} value={money(data.budgeted, currency, 0)} />
+            <StatTile label={t('budget.total')} value={money(data.budgeted, currency, 0)}
+              sub={longer.length > 0 ? t('budget.monthlyOnly') : undefined} />
             <StatTile label={t('budget.spent')} value={money(data.spent, currency, 0)}
               sub={data.budgeted > 0 ? t('budget.ofBudget', { percent: percent((data.spent / data.budgeted) * 100) }) : undefined} />
             <StatTile label={t('budget.remaining')} value={money(data.remaining, currency, 0)} tone={data.remaining >= 0 ? 'good' : 'bad'} />
             <StatTile label={t('budget.unbudgeted')} value={money(data.unbudgeted, currency, 0)} sub={t('budget.unbudgetedHint')} />
           </div>
 
-          <Card title={t('budget.categories')} className="mb-4">
-            {data.categories.length === 0 ? (
+          {data.categories.length === 0 ? (
+            <Card title={t('budget.categories')} className="mb-4">
               <EmptyState title={t('budget.emptyTitle')}>{t('budget.emptyHelp')}</EmptyState>
-            ) : (
+            </Card>
+          ) : [monthly, longer].map((rows, i) => rows.length > 0 && (
+            <Card key={i} className="mb-4"
+              title={i === 1 ? t('budget.periodBudgets') : longer.length > 0 ? t('budget.monthlyBudgets') : t('budget.categories')}>
+              {i === 1 && <p className="mb-1 text-xs text-muted">{t('budget.periodBudgetsHelp')}</p>}
               <ul className="flex flex-col divide-y divide-line">
-                {data.categories.map((row) => (
+                {rows.map((row) => (
                   <BudgetRow key={row.categoryId} row={row} currency={currency} currentMonth={data.currentMonth}
-                    onEdit={() => setDraft({ categoryId: row.categoryId, amount: String(row.amount), currency: row.currency, average: row.average, base: currency, editing: true })}
+                    onEdit={() => setDraft({ categoryId: row.categoryId, amount: String(row.amount), currency: row.currency, period: row.period, average: row.average, base: currency, editing: true })}
                     onDelete={() => onDelete(row)} />
                 ))}
               </ul>
-            )}
-          </Card>
+            </Card>
+          ))}
 
           {data.others.length > 0 && (
             <Card title={t('budget.others')}>
@@ -131,7 +145,7 @@ export function BudgetPage() {
                     <span className="flex flex-wrap items-center gap-3">
                       <span className="tabular">{money(o.spent, currency)}</span>
                       <span className="text-xs text-muted">{t('budget.average', { amount: money(o.average, currency) })}</span>
-                      <Button onClick={() => setDraft({ categoryId: conflicted(o.categoryId) ? null : o.categoryId, amount: suggestion(o.average), currency, average: o.average, base: currency, editing: false })}>
+                      <Button onClick={() => setDraft({ categoryId: conflicted(o.categoryId) ? null : o.categoryId, amount: suggestion(o.average), currency, period: 'MONTHLY', average: o.average, base: currency, editing: false })}>
                         {t('budget.set')}
                       </Button>
                     </span>
@@ -160,14 +174,20 @@ function BudgetRow({ row, currency, currentMonth, onEdit, onDelete }: {
   const { t } = useI18n()
   const width = Math.min(row.percent ?? 0, 100)
   const overProjected = currentMonth && row.projected !== null && row.budget !== null && row.projected > row.budget
+  const [fromYear, fromMonth] = row.from.split('-').map(Number)
   return (
     <li className="py-3">
       <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-        <span className="flex items-center gap-2 font-medium">
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium">
           <span className="size-2.5 rounded-full" style={{ background: row.color }} aria-hidden />
           {row.name}
+          {row.period !== 'MONTHLY' && (
+            <span className="whitespace-nowrap rounded-full bg-surface-2 px-2 py-0.5 text-xs font-normal text-ink-2">
+              {row.period === 'QUARTERLY' ? t('budget.quarterOf', { quarter: (fromMonth + 2) / 3, year: fromYear }) : t('budget.yearOf', { year: fromYear })}
+            </span>
+          )}
           {row.state !== 'OK' && (
-            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${row.state === 'OVER' ? 'bg-bad-soft text-bad' : 'bg-warn-soft text-warn-ink'}`}>
+            <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${row.state === 'OVER' ? 'bg-bad-soft text-bad' : 'bg-warn-soft text-warn-ink'}`}>
               {row.state === 'OVER' ? t('budget.over') : t('budget.warning')}
             </span>
           )}
@@ -195,12 +215,21 @@ function BudgetRow({ row, currency, currentMonth, onEdit, onDelete }: {
             ? t('budget.left', { amount: money(row.remaining, currency), percent: percent(row.percent) })
             : t('budget.exceeded', { amount: money(Math.abs(row.remaining ?? 0), currency), percent: percent(row.percent) })}
         </span>
-        <span className="flex flex-wrap gap-x-4">
-          {currentMonth && row.projected !== null && (
-            <span className={overProjected ? 'text-bad' : ''}>{t('budget.projected', { amount: money(row.projected, currency) })}</span>
-          )}
-          <span className="text-muted">{t('budget.average', { amount: money(row.average, currency) })}</span>
-        </span>
+        {row.period === 'MONTHLY' ? (
+          <span className="flex flex-wrap gap-x-4">
+            {currentMonth && row.projected !== null && (
+              <span className={overProjected ? 'text-bad' : ''}>{t('budget.projected', { amount: money(row.projected, currency) })}</span>
+            )}
+            <span className="text-muted">{t('budget.average', { amount: money(row.average, currency) })}</span>
+          </span>
+        ) : (
+          <span className="flex flex-wrap gap-x-4">
+            <span>{t('budget.thisMonth', { amount: money(row.monthSpent, currency) })}</span>
+            <span className="text-muted">
+              {t(row.period === 'QUARTERLY' ? 'budget.previousQuarter' : 'budget.previousYear', { amount: money(row.previous, currency) })}
+            </span>
+          </span>
+        )}
       </div>
     </li>
   )
@@ -223,8 +252,17 @@ function BudgetForm({ draft, taken, onDone }: { draft: Draft; taken: number[]; o
   const [categoryId, setCategoryId] = useState<number | ''>(draft.categoryId ?? '')
   const [amount, setAmount] = useState(draft.amount)
   const [currency, setCurrency] = useState(draft.currency)
+  const [period, setPeriod] = useState(draft.period)
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+
+  // A suggestion from the monthly average follows the period, until the amount is typed over
+  function changePeriod(next: BudgetPeriod) {
+    if (!draft.editing && draft.average && amount === suggestion(draft.average * MONTHS[period])) {
+      setAmount(suggestion(draft.average * MONTHS[next]))
+    }
+    setPeriod(next)
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -240,7 +278,7 @@ function BudgetForm({ draft, taken, onDone }: { draft: Draft; taken: number[]; o
     }
     setFieldErrors({})
     try {
-      await save.mutateAsync({ categoryId, amount: parsed, currency: currency.toUpperCase() })
+      await save.mutateAsync({ categoryId, amount: parsed, currency: currency.toUpperCase(), period })
       onDone()
     } catch (err) {
       setError(errorMessage(err))
@@ -261,8 +299,13 @@ function BudgetForm({ draft, taken, onDone }: { draft: Draft; taken: number[]; o
           </select>
         )}
       </Field>
+      <div>
+        <Segmented label={t('budget.period')} value={period} onChange={changePeriod}
+          options={PERIODS.map((p) => ({ value: p.value, label: t(p.label) }))} />
+        {period !== 'MONTHLY' && <p className="mt-2 text-xs text-ink-2">{t('budget.periodHelp')}</p>}
+      </div>
       <div className="grid grid-cols-2 gap-3">
-        <Field label={t('budget.monthlyAmount')} error={fieldErrors.amount}
+        <Field label={t(PERIODS.find((p) => p.value === period)!.amount)} error={fieldErrors.amount}
           hint={draft.average ? t('budget.average', { amount: money(draft.average, draft.base) }) : undefined}>
           {(id) => (
             <input id={id} className="input tabular" inputMode="decimal" required placeholder="0.00" autoFocus

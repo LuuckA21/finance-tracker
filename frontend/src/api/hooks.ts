@@ -12,6 +12,7 @@ import type {
   CategoryRule,
   CategoryTrend,
   CategorySuggestion,
+  BudgetPeriod,
   BudgetStatus,
   Goal,
   GoalKind,
@@ -446,7 +447,7 @@ export const useBudgetStatus = (month?: string) =>
 export function useSaveBudget() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ categoryId, ...body }: { categoryId: number; amount: number; currency: string }) =>
+    mutationFn: ({ categoryId, ...body }: { categoryId: number; amount: number; currency: string; period: BudgetPeriod }) =>
       put<unknown>(`/api/budgets/${categoryId}`, body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['budgets'] }),
   })
