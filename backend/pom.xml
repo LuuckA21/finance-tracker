@@ -13,7 +13,7 @@
 
     <groupId>me.luucka</groupId>
     <artifactId>finance-tracker</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>finance-tracker</name>
     <description>Self-hosted personal finance tracker: cash flow and net worth</description>
 

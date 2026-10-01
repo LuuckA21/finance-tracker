@@ -1,6 +1,8 @@
 # Finance Tracker
 
-Self-hosted personal finance app for a small group of users (you and your family):
+Self-hosted personal finance app for a small group of users (you and your family). Current release:
+**1.0.0**; what each release contains is in [CHANGELOG.md](CHANGELOG.md), and the running version is
+shown at the bottom of the menu.
 
 - **Cash flow** – record income and expenses (date, category, amount, currency, note) and see
   monthly and yearly dashboards: totals, savings rate, breakdown by category and by tag, and a
@@ -124,8 +126,9 @@ frontend/
   e2e/           Playwright end-to-end tests (real backend + PostgreSQL)
   default.conf.template   Nginx: SPA + reverse proxy + security headers
 docker-compose.yml, .env.example
-deploy.sh        update the code and restart the containers
-scripts/         backup.sh, restore.sh, install-backup.sh (Restic + systemd timer)
+deploy.sh        update the code (a branch or a release) and restart the containers
+CHANGELOG.md     what each release contains (the text of its GitHub release)
+scripts/         backup.sh, restore.sh, install-backup.sh (Restic + systemd timer), release-notes.sh
 ops/systemd/     backup service and timer (user units)
 ```
 
@@ -307,15 +310,33 @@ can send a test email from there.
 On the server, from the repository directory:
 
 ```bash
-./deploy.sh master      # switch to and deploy a branch
+./deploy.sh v1.0.0      # install exactly that release (or go back to it)
+./deploy.sh master      # switch to and deploy a branch (the latest code)
 ./deploy.sh             # update the current branch
 ```
 
-The script refuses local tracked changes, fetches `origin`, fast-forwards the branch, rebuilds and
-restarts the containers (`docker compose up -d --build --wait`) and waits until the backend is
-ready (`FINANCE_HEALTH_TIMEOUT`, seconds, default 300). Before updating the code it takes a local
+A release stays as it is until you deploy another one: read its notes (the GitHub release, or
+`CHANGELOG.md`) before installing it, since a major version may ask for something to do by hand.
+Going back to an older release is safe for the code, but not for a database already migrated by a
+newer one: restore the pre-deploy backup in that case (see [Backup and restore](#backup-and-restore)).
+
+The script refuses local tracked changes, fetches `origin` and its tags, checks out the release or
+fast-forwards the branch, rebuilds and restarts the containers
+(`docker compose up -d --build --wait`) and waits until the backend is ready
+(`FINANCE_HEALTH_TIMEOUT`, seconds, default 300). Before updating the code it takes a local
 database backup (`scripts/backup.sh --local --reason predeploy`); skip it with
 `FINANCE_SKIP_BACKUP=1`.
+
+### Publishing a release
+
+1. In a pull request: set the version in `backend/pom.xml` and `frontend/package.json`
+   (`npm version X.Y.Z --no-git-tag-version` updates the lock file too) and move the notes from
+   `## [Unreleased]` in `CHANGELOG.md` to a new `## [X.Y.Z] - date` section.
+2. Once it is merged and CI is green on `master`, tag that commit and push the tag:
+   `git tag vX.Y.Z origin/master && git push origin vX.Y.Z`.
+3. The Release workflow checks that the tag is on `master` and matches both versions
+   (`scripts/release-notes.sh vX.Y.Z` runs the same check locally), then publishes the GitHub
+   release with the changelog section as its notes.
 
 ## Backup and restore
 

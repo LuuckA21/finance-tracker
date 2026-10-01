@@ -96,6 +96,7 @@ export function Layout() {
       >
         <LogOut className="size-4" aria-hidden /> {t('nav.logout')}
       </button>
+      <p className="mt-2 px-3 text-xs text-muted">{t('nav.version', { version: import.meta.env.APP_VERSION })}</p>
     </div>
   )
 
