@@ -88,6 +88,81 @@ class DataIsolationIT {
         assertEquals(200, a.get("/api/positions/" + positionId).getResponse().getStatus());
     }
 
+    /**
+     * Another user's ids are refused wherever they can be sent: in paths, in request bodies (a parent
+     * category, a rule's or budget's category, a transfer's position, an imported row) and in filters.
+     */
+    @Test
+    void anotherUsersIdsAreRefusedInPathsBodiesAndFilters() throws Exception {
+        AppUser alice = testUsers.create("alice-ids", Role.USER);
+        AppUser mallory = testUsers.create("mallory-ids", Role.ADMIN);
+        ApiClient a = new ApiClient(mvc);
+        ApiClient m = new ApiClient(mvc);
+        assertEquals(200, a.login(alice.getUsername(), TestUsers.PASSWORD));
+        assertEquals(200, m.login(mallory.getUsername(), TestUsers.PASSWORD));
+
+        List<Integer> aliceMacros = json(a.get("/api/categories"),
+                "$[?(@.kind == 'EXPENSE' && @.parentId == null)].id");
+        int macro = aliceMacros.getFirst();
+        int position = json(a.post("/api/positions", """
+                {"name":"Conto","assetClass":"CASH","currency":"CHF"}"""), "$.id");
+        int snapshot = json(a.post("/api/positions/" + position + "/snapshots", """
+                {"date":"2026-01-31","quantity":1000,"unitPrice":1}"""), "$.id");
+        a.post("/api/cash-entries", """
+                {"date":"2026-01-10","kind":"EXPENSE","categoryId":%d,"amount":42,"currency":"CHF",
+                 "description":"Migros Zurigo"}""".formatted(macro));
+        List<Integer> malloryMacros = json(m.get("/api/categories"),
+                "$[?(@.kind == 'EXPENSE' && @.parentId == null)].id");
+        int ownMacro = malloryMacros.getFirst();
+        int ownPosition = json(m.post("/api/positions", """
+                {"name":"Mio","assetClass":"CASH","currency":"CHF"}"""), "$.id");
+
+        // Paths
+        assertEquals(404, m.put("/api/categories/" + macro, """
+                {"name":"Preso","color":"#123456","parentId":null}""").getResponse().getStatus());
+        assertEquals(404, m.put("/api/positions/" + position, """
+                {"name":"Preso","assetClass":"CASH","currency":"CHF"}""").getResponse().getStatus());
+        assertEquals(404, m.delete("/api/positions/" + position).getResponse().getStatus());
+        assertEquals(404, m.put("/api/positions/" + position + "/snapshots/" + snapshot, """
+                {"date":"2026-01-31","quantity":1,"unitPrice":1}""").getResponse().getStatus());
+        assertEquals(404, m.get("/api/dashboard/category-trend?categoryId=" + macro + "&year=2026")
+                .getResponse().getStatus());
+
+        // Bodies (a foreign parent reads as a parent that does not exist)
+        assertEquals(400, m.post("/api/categories", """
+                {"name":"Sotto","kind":"EXPENSE","color":"#123456","parentId":%d}""".formatted(macro))
+                .getResponse().getStatus());
+        assertEquals(400, m.put("/api/categories/" + ownMacro, """
+                {"name":"Sotto","color":"#123456","parentId":%d}""".formatted(macro)).getResponse().getStatus());
+        assertEquals(404, m.post("/api/category-rules", """
+                {"pattern":"migros","categoryId":%d}""".formatted(macro)).getResponse().getStatus());
+        assertEquals(404, m.put("/api/budgets/" + macro, """
+                {"amount":100,"currency":"CHF"}""").getResponse().getStatus());
+        assertEquals(404, m.post("/api/cash-entries", """
+                {"date":"2026-01-10","kind":"TRANSFER","fromPositionId":%d,"toPositionId":%d,"amount":1,
+                 "currency":"CHF"}""".formatted(position, ownPosition)).getResponse().getStatus());
+        assertEquals(404, m.post("/api/recurring-entries", """
+                {"kind":"EXPENSE","categoryId":%d,"amount":1,"currency":"CHF","frequency":"MONTHLY",
+                 "startDate":"2026-01-01"}""".formatted(macro)).getResponse().getStatus());
+        assertEquals(400, m.post("/api/cash-entries/import", """
+                {"entries":[{"date":"2026-01-10","kind":"EXPENSE","categoryId":%d,"amount":1,"currency":"CHF"}]}"""
+                .formatted(macro)).getResponse().getStatus());
+        assertEquals(404, m.post("/api/goals", """
+                {"name":"Suo","kind":"BALANCE","targetAmount":100,"currency":"CHF","positionIds":[%d]}"""
+                .formatted(position)).getResponse().getStatus());
+
+        // Filters and suggestions see only Mallory's own data
+        assertEquals(Integer.valueOf(0), json(m.get("/api/cash-entries?categoryId=" + macro), "$.totalElements"));
+        assertEquals(204, m.get("/api/category-rules/suggest?description=Migros%20Zurigo&kind=EXPENSE")
+                .getResponse().getStatus());
+
+        // Nothing of Alice's changed
+        assertEquals(Integer.valueOf(1), json(a.get("/api/cash-entries"), "$.totalElements"));
+        assertEquals(List.of(), json(a.get("/api/category-rules"), "$"));
+        assertEquals(List.of(), json(a.get("/api/budgets"), "$"));
+        assertEquals(1, ((List<?>) json(a.get("/api/positions/" + position + "/snapshots"), "$")).size());
+    }
+
     @Test
     void entryCategoryMustMatchKind() throws Exception {
         AppUser bob = testUsers.create("bob", Role.USER);

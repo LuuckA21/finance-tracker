@@ -738,6 +738,8 @@ export const fr: Messages = {
   'settings.tabTags': 'Étiquettes',
   'error.invalid_tags': 'Étiquettes non valables\u00a0: 10 au maximum par opération, 40 caractères chacune, sans virgule.',
   'error.too_many_tags': 'Vous pouvez avoir au maximum 500 étiquettes.',
+  'error.too_many_categories': 'Vous pouvez avoir au maximum 500 catégories.',
+  'error.mfa_secret_unreadable': 'Le secret de la validation en deux étapes est illisible (la clé de chiffrement du serveur a changé). Demandez à un administrateur de réinitialiser la validation en deux étapes.',
   'error.tag_exists': 'Une étiquette porte déjà ce nom.',
   'import.error.invalid_tags': 'Étiquettes non valables',
   'import.helpTags': 'Étiquettes\u00a0: séparées par des virgules dans la colonne «\u00a0étiquettes\u00a0».',

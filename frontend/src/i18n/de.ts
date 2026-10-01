@@ -737,6 +737,8 @@ export const de: Messages = {
   'settings.tabTags': 'Tags',
   'error.invalid_tags': 'Ungültige Tags: höchstens 10 pro Buchung, je 40 Zeichen, ohne Komma.',
   'error.too_many_tags': 'Es sind höchstens 500 Tags möglich.',
+  'error.too_many_categories': 'Es sind höchstens 500 Kategorien möglich.',
+  'error.mfa_secret_unreadable': 'Das Geheimnis der Zwei-Faktor-Authentifizierung ist nicht lesbar (der Verschlüsselungsschlüssel des Servers wurde geändert). Bitte die Administration, die Zwei-Faktor-Authentifizierung zurückzusetzen.',
   'error.tag_exists': 'Es gibt bereits einen Tag mit diesem Namen.',
   'import.error.invalid_tags': 'Ungültige Tags',
   'import.helpTags': 'Tags: in der Spalte „tags“, durch Kommas getrennt.',

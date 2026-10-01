@@ -20,7 +20,7 @@ export function adminUser(): User {
 }
 
 /** Calls the API like the app does: session cookie plus the CSRF token on writes. */
-export async function api(request: APIRequestContext, method: string, url: string, data?: unknown) {
+async function api(request: APIRequestContext, method: string, url: string, data?: unknown) {
   const headers: Record<string, string> = {}
   if (method !== 'GET') {
     const csrf = await request.get('/api/auth/csrf')

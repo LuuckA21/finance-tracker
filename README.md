@@ -157,7 +157,11 @@ ops/systemd/     backup service and timer (user units)
   only, a detail category under a macro of the same user and kind (never under another detail),
   and a deleted position just clears the link.
 - **Authorization**: every query is scoped by the owner id taken from the session; accessing
-  another user's record returns 404. Covered by `DataIsolationIT`.
+  another user's record returns 404, and another user's ids are refused inside request bodies too
+  (parent category, rule and budget category, transfer positions, imported rows, goal positions)
+  and match nothing in filters. Covered by `DataIsolationIT`.
+- **Limits per account**: 500 categories, 500 category rules, 500 tags, 50 savings goals, 50
+  forecast scenarios; list fields in requests are bounded as well.
 - **Headers**: strict CSP, `frame-ancestors 'none'`, `nosniff`, `no-referrer` (Nginx + Spring).
 - **CSV**: the import preview parses in memory and stores nothing; the confirmed rows are
   validated again like single entries and saved all or none, only with the user's own categories.

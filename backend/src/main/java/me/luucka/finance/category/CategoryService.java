@@ -25,6 +25,9 @@ public class CategoryService {
         }
     }
 
+    /** Categories an account can have, macros and details together (the defaults are about 50). */
+    static final int MAX_CATEGORIES = 500;
+
     private final CategoryRepository categories;
     private final CashEntryRepository entries;
     private final RecurringEntryRepository recurring;
@@ -61,6 +64,9 @@ public class CategoryService {
     public CategoryResponse create(long userId, String name, EntryKind kind, String color, Long parentId) {
         if (!kind.hasCategory()) {
             throw ApiException.badRequest("transfer_category", "Transfers have no categories");
+        }
+        if (categories.countByUserId(userId) >= MAX_CATEGORIES) {
+            throw ApiException.badRequest("too_many_categories", "At most " + MAX_CATEGORIES + " categories");
         }
         if (parentId != null) {
             parent(userId, parentId, kind, null);
