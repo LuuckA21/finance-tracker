@@ -88,10 +88,10 @@ class BudgetCalculatorTest {
                 new BudgetLine(TRAVEL, new BigDecimal("100"), "USD")), ENTRIES, FX, SEPTEMBER, LocalDate.of(2026, 9, 15));
 
         var fun = status.categories().stream().filter(c -> c.categoryId() == FUN).findFirst().orElseThrow();
-        // 50 spent in 15 of 30 days
-        assertEquals(new BigDecimal("100.00"), fun.projected());
+        // 50 spent in 15 of 30 days, 30 a month usually: (50 + 30) / (15 + 30) a day for 15 more days
+        assertEquals(new BigDecimal("76.67"), fun.projected());
 
-        // A recurring expense (rent) is counted once, only the rest is extrapolated
+        // A recurring expense (rent) is counted once, only the rest is extrapolated (no history: by days)
         var withRent = BudgetCalculator.month(List.of(new BudgetLine(RENT, new BigDecimal("2000"), "CHF")),
                 List.of(new Expense(LocalDate.of(2026, 9, 1), new BigDecimal("1800"), "CHF", RENT, true),
                         expense("2026-09-10", "30", "CHF", RENT)), FX, SEPTEMBER, LocalDate.of(2026, 9, 15));
@@ -178,5 +178,27 @@ class BudgetCalculatorTest {
         assertEquals(new BigDecimal("3600.00"), paid.spent());
         assertEquals(State.WARNING, paid.state());
         assertEquals(new BigDecimal("3500.00"), paid.previous());
+    }
+
+    @Test
+    void theProjectionStartsFromTheUsualPaceAndFollowsTheMonth() {
+        BigDecimal none = BigDecimal.ZERO;
+        // A large shop on 1 October, 400 a month usually: not 380 × 31, close to a usual month plus it
+        assertEquals(0, new BigDecimal("1111.25").compareTo(
+                BudgetCalculator.project(new BigDecimal("380"), none, new BigDecimal("400"), LocalDate.of(2026, 10, 1))));
+        // Spending at the usual pace projects to the usual amount
+        assertEquals(0, new BigDecimal("300").compareTo(
+                BudgetCalculator.project(new BigDecimal("150"), none, new BigDecimal("300"), LocalDate.of(2026, 9, 15))));
+        // On the last day the projection is what was spent
+        assertEquals(0, new BigDecimal("420").compareTo(
+                BudgetCalculator.project(new BigDecimal("420"), none, new BigDecimal("300"), LocalDate.of(2026, 9, 30))));
+        // Without history: nothing in the first days, then the month's own pace
+        assertNull(BudgetCalculator.project(new BigDecimal("380"), none, null, LocalDate.of(2026, 10, 1)));
+        assertNull(BudgetCalculator.project(new BigDecimal("60"), none, null, LocalDate.of(2026, 9, 6)));
+        assertEquals(0, new BigDecimal("300").compareTo(
+                BudgetCalculator.project(new BigDecimal("70"), none, null, LocalDate.of(2026, 9, 7))));
+        // Recurring spending is not carried forward
+        assertEquals(0, new BigDecimal("2100").compareTo(BudgetCalculator.project(new BigDecimal("1950"),
+                new BigDecimal("1800"), new BigDecimal("300"), LocalDate.of(2026, 9, 15))));
     }
 }
