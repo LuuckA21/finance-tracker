@@ -39,6 +39,11 @@ public interface CashEntryRepository extends JpaRepository<CashEntry, Long>, Jpa
             from CashEntry e join e.tagIds t where e.userId = :userId and e.date between :from and :to""")
     List<EntryTag> findEntryTagsBetween(Long userId, LocalDate from, LocalDate to);
 
+    @Query("""
+            select new me.luucka.finance.cashflow.DescribedEntry(e.description, e.categoryId, e.kind, e.date)
+            from CashEntry e where e.userId = :userId and e.categoryId is not null and e.description is not null""")
+    List<DescribedEntry> findDescribedEntries(Long userId);
+
     @Query("select distinct year(e.date) from CashEntry e where e.userId = :userId order by year(e.date)")
     List<Integer> findYearsWithEntries(Long userId);
 }
