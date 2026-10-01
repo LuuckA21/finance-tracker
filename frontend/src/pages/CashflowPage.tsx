@@ -61,11 +61,11 @@ export function CashflowPage() {
 
             <div className="mb-4 grid gap-4 lg:grid-cols-2">
               <Card title={t('cashflow.expenseByCategory')}>
-                <CategoryBars currency={currency} emptyText={t('cashflow.noExpenses')}
+                <CategoryBars currency={currency} year={year} emptyText={t('cashflow.noExpenses')}
                   rows={data.data.categories.filter((c) => c.kind === 'EXPENSE')} />
               </Card>
               <Card title={t('cashflow.incomeByCategory')}>
-                <CategoryBars currency={currency} emptyText={t('cashflow.noIncome')}
+                <CategoryBars currency={currency} year={year} emptyText={t('cashflow.noIncome')}
                   rows={data.data.categories.filter((c) => c.kind === 'INCOME')} />
               </Card>
             </div>

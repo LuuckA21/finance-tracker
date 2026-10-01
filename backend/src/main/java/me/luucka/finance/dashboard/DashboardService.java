@@ -21,11 +21,13 @@ import me.luucka.finance.cashflow.CashEntryRepository;
 import me.luucka.finance.cashflow.EntryTag;
 import me.luucka.finance.category.CategoryRepository;
 import me.luucka.finance.category.CategoryService;
+import me.luucka.finance.common.ApiException;
 import me.luucka.finance.core.AssetClass;
 import me.luucka.finance.core.EntryKind;
 import me.luucka.finance.core.cashflow.CashflowCalculator;
 import me.luucka.finance.core.cashflow.CashflowEntry;
 import me.luucka.finance.core.cashflow.CashflowTotals;
+import me.luucka.finance.core.cashflow.CategoryTrend;
 import me.luucka.finance.core.cashflow.DatedAmount;
 import me.luucka.finance.core.category.CategoryTree;
 import me.luucka.finance.core.fx.FxTable;
@@ -108,6 +110,28 @@ public class DashboardService {
     public record YearRow(int year, CashflowTotals totals) {
     }
 
+    /** A month of a category: the year's amount, the same month a year earlier, the year's amount per detail. */
+    public record TrendMonth(int month, BigDecimal amount, BigDecimal previous, Map<Long, BigDecimal> details) {
+    }
+
+    /** A detail of the category (the macro's own entries under the macro's id) over the year and the year before. */
+    public record TrendDetail(long categoryId, String name, BigDecimal amount, BigDecimal previous) {
+    }
+
+    /**
+     * One category's income or expenses month by month (a macro with its details), against the year
+     * before; {@code lastMonth} is the last month the year has had so far, {@code completedMonths} the
+     * months already over, {@code toDate} and {@code previousToDate} compare the year up to today with
+     * the year before up to the same day.
+     */
+    public record CategoryTrendResponse(String baseCurrency, int year, long categoryId, String name, String color,
+                                        EntryKind kind, Long parentId, int lastMonth, int completedMonths,
+                                        List<TrendMonth> months,
+                                        List<TrendDetail> details, BigDecimal total, BigDecimal previousTotal,
+                                        BigDecimal toDate, BigDecimal previousToDate, List<Integer> availableYears,
+                                        SortedSet<String> unconvertedCurrencies) {
+    }
+
     public record CashflowYearsResponse(String baseCurrency, List<YearRow> years,
                                         SortedSet<String> unconvertedCurrencies) {
     }
@@ -174,12 +198,7 @@ public class DashboardService {
         List<MonthRow> months = result.months().stream()
                 .map(m -> new MonthRow(m.month(), m.totals()))
                 .toList();
-        List<Integer> years = new ArrayList<>(entries.findYearsWithEntries(userId));
-        int currentYear = LocalDate.now(clock).getYear();
-        if (!years.contains(currentYear)) {
-            years.add(currentYear);
-        }
-        years.sort(null);
+        List<Integer> years = availableYears(userId);
         TagBreakdown.Result byTag = tagBreakdown(userId, tree, yearEntries, from, to, fx, result.totals());
         return new CashflowYearResponse(fx.baseCurrency(), year, months, result.totals(), rows, transfers,
                 byTag.tags(), byTag.matrices(), years, result.unconvertedCurrencies());
@@ -218,6 +237,33 @@ public class DashboardService {
         return node == null ? "#6b7280" : node.color();
     }
 
+    /** A category (with its details, for a macro) month by month in a year and the year before. */
+    public CategoryTrendResponse categoryTrend(long userId, long categoryId, int year) {
+        CategoryTree tree = CategoryService.tree(categories.findByUserIdOrderByKindAscNameAsc(userId));
+        CategoryTree.Node category = tree.node(categoryId);
+        if (category == null) {
+            throw ApiException.notFound("Category");
+        }
+        FxTable fx = fxService.table(userId);
+        Set<Long> ids = tree.withDetails(categoryId);
+        List<CategoryTrend.Entry> data = entries.findByUserIdAndDateBetween(userId, LocalDate.of(year - 1, 1, 1),
+                        LocalDate.of(year, 12, 31)).stream()
+                .filter(e -> e.getKind() != EntryKind.TRANSFER && e.getCategoryId() != null
+                        && ids.contains(e.getCategoryId()))
+                .map(e -> new CategoryTrend.Entry(e.getDate(), e.getCategoryId(), e.getAmount(), e.getCurrency()))
+                .toList();
+        CategoryTrend.Result r = CategoryTrend.of(data, fx, year, LocalDate.now(clock));
+        List<TrendDetail> details = r.parts().stream().map(p -> {
+            CategoryTree.Node node = tree.node(p.categoryId());
+            return new TrendDetail(p.categoryId(), node == null ? "?" : node.name(), p.amount(), p.previous());
+        }).toList();
+        return new CategoryTrendResponse(fx.baseCurrency(), year, categoryId, category.name(), category.color(),
+                category.kind(), category.parentId(), r.lastMonth(), r.completedMonths(),
+                r.months().stream().map(m -> new TrendMonth(m.month(), m.amount(), m.previous(), m.parts())).toList(),
+                details, r.total(), r.previousTotal(), r.toDate(), r.previousToDate(), availableYears(userId),
+                r.unconvertedCurrencies());
+    }
+
     /** Income and expenses of the year by tag, categories rolled up by macro; transfers stay out, as in the totals. */
     private TagBreakdown.Result tagBreakdown(long userId, CategoryTree tree, List<CashEntry> yearEntries,
                                              LocalDate from, LocalDate to, FxTable fx, CashflowTotals totals) {
@@ -237,6 +283,17 @@ public class DashboardService {
                     tree.macroId(e.getCategoryId()), e.getKind(), value, entryTags.getOrDefault(e.getId(), Set.of()))));
         }
         return TagBreakdown.of(items, tags.names(userId), totals);
+    }
+
+    /** Years with entries, and the current one. */
+    private List<Integer> availableYears(long userId) {
+        List<Integer> years = new ArrayList<>(entries.findYearsWithEntries(userId));
+        int currentYear = LocalDate.now(clock).getYear();
+        if (!years.contains(currentYear)) {
+            years.add(currentYear);
+        }
+        years.sort(null);
+        return years;
     }
 
     public CashflowYearsResponse cashflowYears(long userId) {

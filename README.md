@@ -4,7 +4,10 @@ Self-hosted personal finance app for a small group of users (you and your family
 
 - **Cash flow** – record income and expenses (date, category, amount, currency, note) and see
   monthly and yearly dashboards: totals, savings rate, breakdown by category and by tag, and a
-  table of categories × tags.
+  table of categories × tags. Each category (a macro with its details, or a single detail) also has
+  its own page: month by month split into its details against the same month of the year before,
+  the year so far against the same stretch of the year before, the monthly average and the details
+  over both years.
 - **Forecast** – income and expenses of a coming year, month by month, in saved scenarios. Each
   month starts from the same month of the base (the year before once it is over, until then the
   last 12 complete months), grows by a percentage for income and one for expenses, and adds extra
@@ -433,7 +436,7 @@ encrypted with it).
 | Forecasts | `GET/POST /api/forecasts`, `PUT/DELETE /api/forecasts/{id}` (`{name, year, incomeGrowth, expenseGrowth, excludedTagIds, excludedCategoryIds, items:[{description, kind, categoryId, amount, schedule: MONTHLY\|ONCE, startMonth, endMonth}]}`), `POST /api/forecasts/preview` (the same body, saved or not: the forecast month by month) |
 | Reports | `GET /api/reports/annual?year` (totals and categories against the year before, net worth and positions at the start and end, tags, largest expenses) |
 | Notifications | `GET/PUT /api/account/notifications` (`mailEnabled`, `email`, `pendingEmail`, `budgetAlerts`, `goalAlerts`, `monthlySummary`), `POST /email` (`{email}`: sends a code), `POST /email/confirm` (`{code}`), `DELETE /email`, `POST /test` |
-| Dashboards | `GET /api/dashboard/cashflow?year` (categories by macro with their `details`; with `tags`: income and expenses of each tag in the year, and `tagMatrices`: macro categories × tags), `/cashflow/years`, `/net-worth?granularity=MONTH\|YEAR&from=yyyy-MM&to=yyyy-MM`, `/net-worth/detail?date` |
+| Dashboards | `GET /api/dashboard/category-trend?categoryId&year` (a category month by month with its details, against the year before), `GET /api/dashboard/cashflow?year` (categories by macro with their `details`; with `tags`: income and expenses of each tag in the year, and `tagMatrices`: macro categories × tags), `/cashflow/years`, `/net-worth?granularity=MONTH\|YEAR&from=yyyy-MM&to=yyyy-MM`, `/net-worth/detail?date` |
 | Admin | `GET/POST /api/admin/users`, `PATCH/DELETE /{id}`, `POST /{id}/{reset-password,unlock,reset-mfa}`, `GET /api/admin/fx`, `POST /api/admin/fx/refresh`, `POST /api/admin/fx/history` (202, runs in background) |
 
 Errors are RFC 9457 problem details with a stable `code` (e.g. `invalid_credentials`,
