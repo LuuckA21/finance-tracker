@@ -113,7 +113,16 @@ server {
         try_files $uri =404;
     }
 
-    # SPA routes
+    # Web app manifests (one per language): their media type, revalidated like the SPA
+    location ~ "^/manifest-[a-z]{2}\.webmanifest$" {
+        types { application/manifest+json webmanifest; }
+        add_header Cache-Control "no-cache";
+        add_header X-Content-Type-Options "nosniff" always;
+        try_files $uri =404;
+    }
+
+    # SPA routes, and sw.js (the service worker): always revalidated, so a deploy reaches
+    # installed apps at once
     location / {
         add_header Cache-Control "no-cache";
         add_header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;

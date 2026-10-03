@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router'
 import { ApiError } from './api/client'
 import { App } from './App'
+import { registerServiceWorker } from './lib/pwa'
 import { initPreferences } from './preferences'
 import './index.css'
 
@@ -31,6 +32,9 @@ const queryClient = new QueryClient({
     },
   },
 })
+
+// Installable app: keeps the app's own files on the device (never the data)
+registerServiceWorker()
 
 // Rendering waits for the interface language, whose catalogue is loaded on demand
 initPreferences().then(() => {

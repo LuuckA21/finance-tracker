@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { ChevronLeft, ChevronRight, Download, FileUp, Pencil, Plus, Repeat, Trash2 } from 'lucide-react'
 import { download, errorMessage } from '../api/client'
 import { entryFilterParams, useCategories, useDeleteEntry, useEntries, usePositions, useTags, type EntryFilter } from '../api/hooks'
@@ -21,7 +22,9 @@ const PAGE_SIZE = 50
 export function EntriesPage() {
   const [filter, setFilter] = useState<EntryFilter>({ page: 0, size: PAGE_SIZE, kind: '', categoryId: '', q: '', tagId: '' })
   const [editing, setEditing] = useState<CashEntry | null>(null)
-  const [formOpen, setFormOpen] = useState(false)
+  // The installed app's "New entry" shortcut opens /movimenti?new=1
+  const [params, setParams] = useSearchParams()
+  const [formOpen, setFormOpen] = useState(() => params.has('new'))
   const entries = useEntries(filter)
   const categories = useCategories().data ?? NO_CATEGORIES
   const positions = usePositions().data ?? []
@@ -31,6 +34,10 @@ export function EntriesPage() {
   const [importOpen, setImportOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
   const { t } = useI18n()
+
+  useEffect(() => {
+    if (params.has('new')) setParams({}, { replace: true })
+  }, [params, setParams])
 
   const byId = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
   const update = (patch: Partial<EntryFilter>) => setFilter((f) => ({ ...f, ...patch, page: 0 }))

@@ -11,6 +11,10 @@ GitHub release.
 - Your data: download everything you entered as a ZIP (all records in `data.json`, the entries as
   CSV that can be imported again), and delete your own account with all of its data, in
   Settings › Account.
+- Installable app: add Finanze to the phone's home screen (or install it on a computer) to open
+  it full screen with its icon, with shortcuts to a new entry, the entries and the budgets. It
+  keeps only its own files on the device, never your data, and offers each new version with one
+  click.
 
 ## [1.1.0] - 2026-10-03
 

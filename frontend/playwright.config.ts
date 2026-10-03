@@ -27,6 +27,8 @@ export default defineConfig({
     timezoneId: 'Europe/Zurich',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
+    // The service worker would serve the app's files from its cache: only pwa.spec.ts lets it run
+    serviceWorkers: 'block',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
