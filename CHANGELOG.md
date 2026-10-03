@@ -7,6 +7,11 @@ GitHub release.
 
 ## [Unreleased]
 
+### Added
+- Passkeys: sign in with the device's lock (face, fingerprint or PIN), without username, password
+  or 2FA code. Add, rename and remove them in Settings › Account; adding one asks for the password
+  (and the 2FA code when 2FA is on). Needs `APP_PUBLIC_URL` set to the address you open the app at.
+
 ## [1.0.0] - 2026-10-01
 
 The first release: personal finances and net worth for a household, self-hosted with Docker.

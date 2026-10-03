@@ -3,6 +3,7 @@ import { NavLink, useParams } from 'react-router'
 import { History, Loader2, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { errorMessage } from '../../api/client'
 import {
+  useAuthConfig,
   useCategories,
   useCentralRates,
   useDeleteCategory,
@@ -26,6 +27,7 @@ import { categoryTree, macros } from '../../lib/categories'
 import { COMMON_CURRENCIES, date, dateTime, number, parseDecimal, today } from '../../lib/format'
 import { ChangePasswordForm } from './ChangePasswordForm'
 import { MfaSection } from './MfaSection'
+import { PasskeysSection } from './PasskeysSection'
 import { NotificationsTab } from './NotificationsTab'
 import { RulesTab } from './RulesTab'
 import { TagsTab } from './TagsTab'
@@ -62,10 +64,12 @@ export function SettingsPage() {
 
 function AccountTab() {
   const { t } = useI18n()
+  const passkeys = useAuthConfig().data?.passkeys ?? false
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <Card title={t('settings.preferences')}><PreferencesForm /></Card>
       <Card title={t('settings.baseCurrency')}><BaseCurrencyForm /></Card>
+      {passkeys && <Card title={t('settings.passkeys')}><PasskeysSection /></Card>}
       <Card title={t('settings.twoFactor')}><MfaSection /></Card>
       <Card title={t('settings.changePassword')}><ChangePasswordForm /></Card>
       <Card title={t('settings.recentLogins')}><LoginHistory /></Card>
@@ -148,7 +152,7 @@ function BaseCurrencyForm() {
 }
 
 const REASONS = [
-  'SUCCESS', 'MFA_REQUIRED', 'BAD_CREDENTIALS', 'BAD_MFA_CODE', 'RECOVERY_CODE_USED',
+  'SUCCESS', 'MFA_REQUIRED', 'BAD_CREDENTIALS', 'BAD_MFA_CODE', 'RECOVERY_CODE_USED', 'PASSKEY', 'BAD_PASSKEY',
   'LOCKED', 'DISABLED', 'RATE_LIMITED', 'UNKNOWN_USER',
 ]
 

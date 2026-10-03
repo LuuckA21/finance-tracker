@@ -143,6 +143,15 @@ ops/systemd/     backup service and timer (user units)
 - **Two-factor auth**: optional TOTP (RFC 6238) with QR enrolment; the secret is encrypted at rest
   with AES-256-GCM (`APP_ENCRYPTION_KEY`), codes cannot be replayed, 10 single-use recovery codes
   (stored as SHA-256 hashes).
+- **Passkeys** (WebAuthn, optional, needs `APP_PUBLIC_URL`): sign in with the device's lock (face,
+  fingerprint, PIN) without username, password or code. Discoverable credentials with user
+  verification required, so a passkey stands for both factors; bound to the domain of
+  `APP_PUBLIC_URL`, so a phishing site cannot use them. The server keeps only public keys and
+  checks origin, domain, a single-use challenge (5 min), the signature, the user handle (random,
+  not the account id) and the signature counter. Adding one needs the password, and the 2FA code
+  when 2FA is on; failures count towards the account lock. At most 10 per account. Failed passkey
+  sign-ins count towards the per-IP limit and are in the login history. An administrator resetting
+  a user's password or 2FA removes their passkeys too.
 - **Brute force**: generic error for every login failure (no user enumeration, constant-ish time),
   account lock after 5 failures for 15 min, per-IP limit on failed attempts, audit log of logins
   visible to the user. Simultaneous attempts on one account are all counted (no version-conflict
@@ -280,6 +289,9 @@ running on another host:
   internal address, set `DOCKERD_ROOTLESS_ROOTLESSKIT_PORT_DRIVER=slirp4netns` in a
   `~/.config/systemd/user/docker.service.d/` drop-in and restart Docker.
 - In NPM also enable "HSTS Enabled" on the SSL tab, so browsers never try plain HTTP again.
+- Set `APP_PUBLIC_URL` to the address you open the app at (e.g. `https://finanze.example.com`):
+  passkeys are bound to its domain and stay off without it, and emails link to it. Passkeys
+  created for one domain do not work on another: changing it means adding them again.
 - Container memory limits need the `memory` cgroup delegated to your user (default with systemd
   and cgroup v2): `docker info` must not warn "No memory limit support". A container that goes over
   its limit is restarted instead of taking memory from the other services on the server.
@@ -296,7 +308,7 @@ MAIL_SECURITY=STARTTLS        # STARTTLS (587), SSL (465) or NONE (a relay on th
 MAIL_USERNAME=finanze@example.com
 MAIL_PASSWORD=app-password
 MAIL_FROM="Finanze <finanze@example.com>"
-APP_PUBLIC_URL=https://finanze.example.com   # linked from the emails
+APP_PUBLIC_URL=https://finanze.example.com   # linked from the emails (and needed for passkeys)
 ```
 
 With STARTTLS the connection is refused if the server does not offer it (never plain text), and the
@@ -459,8 +471,8 @@ encrypted with it).
 
 | Area | Endpoints |
 |------|-----------|
-| Auth | `GET /api/auth/csrf`, `POST /api/auth/login`, `POST /api/auth/login/mfa`, `POST /api/auth/logout`, `GET /api/auth/me` |
-| Account | `PUT /api/account/password`, `PUT /api/account/settings` (partial: `baseCurrency`, `language` `IT\|EN\|DE\|FR`, `theme` `SYSTEM\|LIGHT\|DARK`), `GET /api/account/logins`, `POST /api/account/mfa/{setup,enable,disable,recovery-codes}` |
+| Auth | `GET /api/auth/csrf`, `GET /api/auth/config` (`passkeys`), `POST /api/auth/login`, `POST /api/auth/login/mfa`, `POST /api/auth/passkey/options`, `POST /api/auth/passkey` (`{credential}`), `POST /api/auth/logout`, `GET /api/auth/me` |
+| Account | `PUT /api/account/password`, `PUT /api/account/settings` (partial: `baseCurrency`, `language` `IT\|EN\|DE\|FR`, `theme` `SYSTEM\|LIGHT\|DARK`), `GET /api/account/logins`, `POST /api/account/mfa/{setup,enable,disable,recovery-codes}`, `GET /api/account/passkeys`, `POST /api/account/passkeys/options` (`{password, code?}`), `POST /api/account/passkeys` (`{name, credential}`), `PUT/DELETE /api/account/passkeys/{id}` |
 | Category rules | `GET/POST /api/category-rules` (`{pattern, categoryId}`), `PUT/DELETE /api/category-rules/{id}`, `GET /api/category-rules/suggest?description&kind` (`{categoryId, ruleId, pattern}` from a rule, `ruleId` null from past entries; 204 when nothing fits) |
 | Categories | `GET/POST /api/categories` (`{name, kind, color, parentId}`: `parentId` null for a macro, a macro of the same kind for a detail), `PUT/DELETE /api/categories/{id}` (`{name, color, parentId}`; a macro with details cannot be deleted or moved under another) |
 | Entries | `GET /api/cash-entries?from&to&kind&categoryId&q&tagId&page&size` (each entry has `tags`: names; unknown names sent on save become new tags) (kind `INCOME\|EXPENSE\|TRANSFER`; transfers take `fromPositionId`/`toPositionId` instead of `categoryId`), `POST`, `PUT/DELETE /{id}`, `GET /export?filters` (CSV), `POST /import/preview` (multipart `file`), `POST /import` (`{entries:[…]}`) |

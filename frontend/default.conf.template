@@ -16,7 +16,7 @@ map "$from_trusted_proxy:$http_x_forwarded_proto" $forwarded_proto {
 }
 
 # Throttle the endpoints reachable without a session, per client IP (resolved by real_ip below):
-# password and 2FA guessing, and session creation (each CSRF fetch stores a session row).
+# password, 2FA and passkey sign-ins, and session creation (each CSRF fetch stores a session row).
 # The backend also locks accounts and limits failures per IP; this caps the raw request rate.
 limit_req_zone $binary_remote_addr zone=ft_auth:1m rate=10r/m;
 limit_req_zone $binary_remote_addr zone=ft_session:1m rate=60r/m;
@@ -62,6 +62,14 @@ server {
             proxy_pass http://backend:8080;
         }
         location = /api/auth/login/mfa {
+            limit_req zone=ft_auth burst=10 nodelay;
+            proxy_pass http://backend:8080;
+        }
+        location = /api/auth/passkey {
+            limit_req zone=ft_auth burst=10 nodelay;
+            proxy_pass http://backend:8080;
+        }
+        location = /api/auth/passkey/options {
             limit_req zone=ft_auth burst=10 nodelay;
             proxy_pass http://backend:8080;
         }
