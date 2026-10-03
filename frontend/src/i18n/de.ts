@@ -42,6 +42,7 @@ export const de: Messages = {
 
   // Login
   'login.subtitle': 'Bei deinem Konto anmelden',
+  'login.accountDeleted': 'Dein Konto und alle seine Daten wurden gelöscht.',
   'login.mfaSubtitle': 'Zwei-Faktor-Authentifizierung',
   'login.username': 'Benutzername',
   'login.password': 'Passwort',
@@ -291,6 +292,15 @@ export const de: Messages = {
   'settings.passkeys': 'Passkeys',
   'settings.changePassword': 'Passwort ändern',
   'settings.recentLogins': 'Letzte Anmeldungen',
+  'settings.yourData': 'Deine Daten',
+  'accountData.exportHelp': 'Lade ein ZIP-Archiv mit allem herunter, was du erfasst hast: Buchungen, Kategorien, Tags, Regeln, Daueraufträge, Positionen mit ihren Werten, Budgets, Ziele, Prognosen und Einstellungen (in data.json), dazu die Buchungen als CSV, die sich wieder importieren lassen. Passwörter, Codes und geheime Schlüssel sind nicht enthalten.',
+  'accountData.export': 'Meine Daten herunterladen',
+  'accountData.deleteHelp': 'Du kannst dein Konto mit allen seinen Daten löschen. Wenn du sie behalten möchtest, lade sie vorher herunter.',
+  'accountData.delete': 'Konto löschen',
+  'accountData.deleteTitle': 'Konto löschen?',
+  'accountData.deleteWarning': 'Konto, Buchungen, Positionen, Budgets, Ziele und Einstellungen werden sofort gelöscht und lassen sich nicht wiederherstellen; sie bleiben nur in den Sicherungen des Servers, bis diese ersetzt werden. Du wirst auf allen Geräten abgemeldet.',
+  'accountData.typeUsername': 'Gib zur Bestätigung deinen Benutzernamen ein ({username})',
+  'accountData.deleteConfirm': 'Endgültig löschen',
   'settings.baseCurrencyHelp': 'Alle Dashboards werden in diese Währung umgerechnet. Die EZB-Kurse passen sich automatisch an; deine manuellen Kurse gelten für die Basiswährung: Wenn du sie änderst, musst du sie für die neue erneut erfassen.',
   'settings.noLogins': 'Keine Anmeldungen erfasst.',
   'settings.unknownBrowser': 'unbekannter Browser',

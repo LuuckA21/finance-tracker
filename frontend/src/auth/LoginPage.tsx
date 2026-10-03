@@ -21,7 +21,8 @@ export function LoginPage() {
   const { t } = useI18n()
   const passkeys = (useAuthConfig().data?.passkeys ?? false) && passkeysSupported()
 
-  const from = (location.state as { from?: string } | null)?.from ?? '/'
+  const state = location.state as { from?: string; accountDeleted?: boolean } | null
+  const from = state?.from ?? '/'
 
   async function finish() {
     await refreshCsrf()
@@ -98,6 +99,9 @@ export function LoginPage() {
           </div>
         </div>
 
+        {state?.accountDeleted && step === 'password' && (
+          <p role="status" className="mb-4 rounded-lg bg-accent-soft px-3 py-2 text-sm text-ink">{t('login.accountDeleted')}</p>
+        )}
         {step === 'password' ? (
           <form onSubmit={submitPassword} className="flex flex-col gap-4">
             <Field label={t('login.username')}>

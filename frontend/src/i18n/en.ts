@@ -42,6 +42,7 @@ export const en: Messages = {
 
   // Login
   'login.subtitle': 'Sign in to your account',
+  'login.accountDeleted': 'Your account and all of its data have been deleted.',
   'login.mfaSubtitle': 'Two-step verification',
   'login.username': 'Username',
   'login.password': 'Password',
@@ -291,6 +292,15 @@ export const en: Messages = {
   'settings.passkeys': 'Passkeys',
   'settings.changePassword': 'Change password',
   'settings.recentLogins': 'Recent sign-ins',
+  'settings.yourData': 'Your data',
+  'accountData.exportHelp': 'Download a ZIP archive with everything you entered: entries, categories, tags, rules, recurring entries, positions with their values, budgets, goals, forecasts and settings (in data.json), plus the entries as CSV, which can be imported again. Passwords, codes and secret keys are not included.',
+  'accountData.export': 'Download my data',
+  'accountData.deleteHelp': 'You can delete your account with all of its data. If you want to keep it, download it first.',
+  'accountData.delete': 'Delete the account',
+  'accountData.deleteTitle': 'Delete the account?',
+  'accountData.deleteWarning': 'Account, entries, positions, budgets, goals and settings are deleted at once and cannot be recovered; they remain only in the server\'s backups until those are replaced. You will be signed out on every device.',
+  'accountData.typeUsername': 'To confirm, type your username ({username})',
+  'accountData.deleteConfirm': 'Delete permanently',
   'settings.baseCurrencyHelp': 'All dashboards are converted to this currency. ECB rates adapt automatically; your manual rates are tied to the base currency: if you change it, enter them again towards the new one.',
   'settings.noLogins': 'No sign-ins recorded.',
   'settings.unknownBrowser': 'unknown browser',

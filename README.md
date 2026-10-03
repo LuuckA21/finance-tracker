@@ -85,6 +85,14 @@ shown at the bottom of the menu.
   and shared by all users. A user's own manual rates take priority over them.
 - **Per-user preferences** – interface language (Italian, English, German, French) and theme (system, light,
   dark) are saved to the account and follow the user on every device.
+- **Your data, to take or to delete** – Settings › Account downloads everything of the user as a
+  ZIP: `data.json` (account, settings, categories, tags, rules, entries, recurring rules,
+  positions and their records, own exchange rates, budgets, goals, forecasts, passkey names and
+  the login history, linked by id; `format` and `formatVersion` say what it is) and the entries
+  as CSV in the import format. Secrets are left out (password and recovery code hashes, the 2FA
+  secret, passkey keys). Users can also delete their own account with all of its data (password,
+  the 2FA code when 2FA is on, and the username typed again); administrators can delete any other
+  account the same way from the user list.
 - **Personal categories in two levels** – like first- and second-level cost centres: macro
   categories ("Casa") and, under them, optional detail categories ("Affitto", "Energia"). An entry
   sits on a macro or on a detail; filters on a macro take in its details, and the Income & expenses
@@ -152,6 +160,10 @@ ops/systemd/     backup service and timer (user units)
   when 2FA is on; failures count towards the account lock. At most 10 per account. Failed passkey
   sign-ins count towards the per-IP limit and are in the login history. An administrator resetting
   a user's password or 2FA removes their passkeys too.
+- **Deleting an account** removes the user and every row that belongs to them (the database
+  cascades from the user), ends all of their sessions and cannot be undone; the data stays only in
+  the backups until they rotate out. The last enabled administrator cannot delete their account.
+  A wrong password or code counts towards the account lock.
 - **Brute force**: generic error for every login failure (no user enumeration, constant-ish time),
   account lock after 5 failures for 15 min, per-IP limit on failed attempts, audit log of logins
   visible to the user. Simultaneous attempts on one account are all counted (no version-conflict
@@ -472,7 +484,7 @@ encrypted with it).
 | Area | Endpoints |
 |------|-----------|
 | Auth | `GET /api/auth/csrf`, `GET /api/auth/config` (`passkeys`), `POST /api/auth/login`, `POST /api/auth/login/mfa`, `POST /api/auth/passkey/options`, `POST /api/auth/passkey` (`{credential}`), `POST /api/auth/logout`, `GET /api/auth/me` |
-| Account | `PUT /api/account/password`, `PUT /api/account/settings` (partial: `baseCurrency`, `language` `IT\|EN\|DE\|FR`, `theme` `SYSTEM\|LIGHT\|DARK`), `GET /api/account/logins`, `POST /api/account/mfa/{setup,enable,disable,recovery-codes}`, `GET /api/account/passkeys`, `POST /api/account/passkeys/options` (`{password, code?}`), `POST /api/account/passkeys` (`{name, credential}`), `PUT/DELETE /api/account/passkeys/{id}` |
+| Account | `PUT /api/account/password`, `PUT /api/account/settings` (partial: `baseCurrency`, `language` `IT\|EN\|DE\|FR`, `theme` `SYSTEM\|LIGHT\|DARK`), `GET /api/account/logins`, `POST /api/account/mfa/{setup,enable,disable,recovery-codes}`, `GET /api/account/passkeys`, `POST /api/account/passkeys/options` (`{password, code?}`), `POST /api/account/passkeys` (`{name, credential}`), `PUT/DELETE /api/account/passkeys/{id}`, `GET /api/account/export` (ZIP), `POST /api/account/delete` (`{password, code?}`, 204, ends the session) |
 | Category rules | `GET/POST /api/category-rules` (`{pattern, categoryId}`), `PUT/DELETE /api/category-rules/{id}`, `GET /api/category-rules/suggest?description&kind` (`{categoryId, ruleId, pattern}` from a rule, `ruleId` null from past entries; 204 when nothing fits) |
 | Categories | `GET/POST /api/categories` (`{name, kind, color, parentId}`: `parentId` null for a macro, a macro of the same kind for a detail), `PUT/DELETE /api/categories/{id}` (`{name, color, parentId}`; a macro with details cannot be deleted or moved under another) |
 | Entries | `GET /api/cash-entries?from&to&kind&categoryId&q&tagId&page&size` (each entry has `tags`: names; unknown names sent on save become new tags) (kind `INCOME\|EXPENSE\|TRANSFER`; transfers take `fromPositionId`/`toPositionId` instead of `categoryId`), `POST`, `PUT/DELETE /{id}`, `GET /export?filters` (CSV), `POST /import/preview` (multipart `file`), `POST /import` (`{entries:[…]}`) |

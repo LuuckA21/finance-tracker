@@ -17,13 +17,18 @@ import me.luucka.finance.user.AppUserRepository;
 import me.luucka.finance.user.Language;
 import me.luucka.finance.user.LoginEvent;
 import me.luucka.finance.user.LoginEventRepository;
+import me.luucka.finance.user.Role;
 import me.luucka.finance.user.Theme;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AccountService {
+
+    private static final Logger log = LoggerFactory.getLogger(AccountService.class);
 
     public record LoginEventResponse(java.time.Instant at, String ipAddress, String userAgent, boolean success,
                                      String reason) {
@@ -129,6 +134,35 @@ public class AccountService {
             throw reauthGuard.failure(userId, ApiException.badRequest("invalid_mfa_code", "Invalid code"));
         }
         mfaService.disable(userId);
+    }
+
+    /**
+     * Deletes the user's own account and, by cascade, all of their data, after checking the
+     * password and, when 2FA is on, a second factor. Every session of the user ends, this one too.
+     * The last enabled administrator cannot leave.
+     */
+    @Transactional
+    public void deleteAccount(long userId, String password, String code, HttpServletRequest request) {
+        AppUser user = load(userId);
+        reauthGuard.ensureNotLocked(user);
+        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+            throw reauthGuard.failure(userId, ApiException.badRequest("invalid_current_password", "Password is wrong"));
+        }
+        if (user.isTotpEnabled() && (code == null || code.isBlank()
+                || mfaService.verifySecondFactor(userId, code) == MfaService.Verification.INVALID)) {
+            throw reauthGuard.failure(userId, ApiException.badRequest("invalid_mfa_code", "Invalid code"));
+        }
+        String username = user.getUsername();
+        users.delete(user);
+        users.flush();
+        // Counted after the delete, like the administrators' own checks; rolls the delete back
+        if (users.countByRoleAndEnabledTrue(Role.ADMIN) == 0) {
+            throw ApiException.badRequest("last_admin", "At least one enabled administrator is required");
+        }
+        HttpSession session = request.getSession(false);
+        sessionRevoker.revokeAllExcept(username, session == null ? null : session.getId());
+        authSession.destroy(request);
+        log.info("Account '{}' deleted by its owner", username);
     }
 
     private AppUser load(long userId) {

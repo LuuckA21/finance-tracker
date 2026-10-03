@@ -28,6 +28,7 @@ import { COMMON_CURRENCIES, date, dateTime, number, parseDecimal, today } from '
 import { ChangePasswordForm } from './ChangePasswordForm'
 import { MfaSection } from './MfaSection'
 import { PasskeysSection } from './PasskeysSection'
+import { AccountDataSection } from './AccountDataSection'
 import { NotificationsTab } from './NotificationsTab'
 import { RulesTab } from './RulesTab'
 import { TagsTab } from './TagsTab'
@@ -73,6 +74,7 @@ function AccountTab() {
       <Card title={t('settings.twoFactor')}><MfaSection /></Card>
       <Card title={t('settings.changePassword')}><ChangePasswordForm /></Card>
       <Card title={t('settings.recentLogins')}><LoginHistory /></Card>
+      <Card title={t('settings.yourData')}><AccountDataSection /></Card>
     </div>
   )
 }

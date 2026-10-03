@@ -40,6 +40,7 @@ export const it = {
 
   // Login
   'login.subtitle': 'Accedi al tuo account',
+  'login.accountDeleted': 'Il tuo account e tutti i suoi dati sono stati eliminati.',
   'login.mfaSubtitle': 'Verifica in due passaggi',
   'login.username': 'Nome utente',
   'login.password': 'Password',
@@ -289,6 +290,15 @@ export const it = {
   'settings.passkeys': 'Passkey',
   'settings.changePassword': 'Cambia password',
   'settings.recentLogins': 'Accessi recenti',
+  'settings.yourData': 'I tuoi dati',
+  'accountData.exportHelp': 'Scarica un archivio ZIP con tutto quello che hai inserito: movimenti, categorie, etichette, regole, ricorrenti, posizioni con i valori, budget, obiettivi, previsioni e impostazioni (in data.json), più i movimenti in CSV, che si possono importare di nuovo. Password, codici e chiavi segrete non sono inclusi.',
+  'accountData.export': 'Scarica i miei dati',
+  'accountData.deleteHelp': 'Puoi eliminare il tuo account con tutti i suoi dati. Se vuoi conservarli, scaricali prima.',
+  'accountData.delete': 'Elimina l\'account',
+  'accountData.deleteTitle': 'Eliminare l\'account?',
+  'accountData.deleteWarning': 'Account, movimenti, posizioni, budget, obiettivi e impostazioni vengono eliminati subito e non si possono recuperare; restano solo nelle copie di backup del server finché non vengono sostituite. Verrai disconnesso da tutti i dispositivi.',
+  'accountData.typeUsername': 'Per confermare scrivi il tuo nome utente ({username})',
+  'accountData.deleteConfirm': 'Elimina definitivamente',
   'settings.baseCurrencyHelp': 'Tutte le dashboard sono convertite in questa valuta. I cambi BCE si adattano da soli; i tuoi tassi manuali sono legati alla valuta di base: se la cambi, andranno inseriti verso la nuova.',
   'settings.noLogins': 'Nessun accesso registrato.',
   'settings.unknownBrowser': 'browser sconosciuto',
