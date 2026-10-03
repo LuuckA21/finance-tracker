@@ -35,6 +35,10 @@ public class AssetPosition {
     @Column(length = 32)
     private String symbol;
 
+    /** IBAN of a bank account, normalized (no spaces); null for other positions. */
+    @Column(length = 34)
+    private String iban;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "asset_class", nullable = false, length = 16)
     private AssetClass assetClass;
@@ -95,6 +99,14 @@ public class AssetPosition {
 
     public void setSymbol(String symbol) {
         this.symbol = symbol;
+    }
+
+    public String getIban() {
+        return iban;
+    }
+
+    public void setIban(String iban) {
+        this.iban = iban;
     }
 
     public AssetClass getAssetClass() {

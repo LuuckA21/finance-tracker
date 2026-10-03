@@ -4,7 +4,7 @@ import { useMe, useSavePosition } from '../api/hooks'
 import type { AssetClass, Position } from '../api/types'
 import { Button, ErrorAlert, Field, Modal } from '../components/ui'
 import { useI18n } from '../i18n'
-import { ASSET_CLASSES, assetClassLabel, COMMON_CURRENCIES } from '../lib/format'
+import { ASSET_CLASSES, assetClassLabel, COMMON_CURRENCIES, formatIban } from '../lib/format'
 
 export function PositionFormModal({ position, open, onClose, onSaved }: {
   position: Position | null
@@ -26,6 +26,7 @@ function PositionForm({ position, onDone }: { position: Position | null; onDone:
   const { t } = useI18n()
   const [name, setName] = useState(position?.name ?? '')
   const [symbol, setSymbol] = useState(position?.symbol ?? '')
+  const [iban, setIban] = useState(position?.iban ? formatIban(position.iban) : '')
   const [assetClass, setAssetClass] = useState<AssetClass>(position?.assetClass ?? 'CASH')
   const [currency, setCurrency] = useState(position?.currency ?? me?.baseCurrency ?? 'CHF')
   const [notes, setNotes] = useState(position?.notes ?? '')
@@ -33,12 +34,17 @@ function PositionForm({ position, onDone }: { position: Position | null; onDone:
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
+  // Bank and pension accounts have one; a bank statement names the account by it
+  const hasIban = assetClass === 'CASH' || assetClass === 'PENSION'
+
   async function submit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     setFieldErrors({})
     try {
-      const saved = await save.mutateAsync({ id: position?.id, name, symbol, assetClass, currency, notes, archived })
+      const saved = await save.mutateAsync({
+        id: position?.id, name, symbol, assetClass, currency, notes, archived, iban: hasIban ? iban : '',
+      })
       onDone(saved)
     } catch (err) {
       setError(errorMessage(err))
@@ -72,6 +78,12 @@ function PositionForm({ position, onDone }: { position: Position | null; onDone:
       {assetClass !== 'CASH' && (
         <Field label={t('positionForm.symbol')} error={fieldErrors.symbol}>
           {(id) => <input id={id} className="input uppercase" maxLength={32} value={symbol} onChange={(e) => setSymbol(e.target.value)} />}
+        </Field>
+      )}
+      {hasIban && (
+        <Field label={t('positionForm.iban')} error={fieldErrors.iban} hint={t('positionForm.ibanHint')}>
+          {(id) => <input id={id} className="input uppercase" maxLength={50} autoComplete="off" spellCheck={false} value={iban}
+            placeholder="CH93 0076 2011 6238 5295 7" onChange={(e) => setIban(e.target.value)} />}
         </Field>
       )}
       <Field label={t('positionForm.notes')} error={fieldErrors.notes}>

@@ -80,6 +80,15 @@ shown at the bottom of the menu.
   `categoria` and the detail in `sottocategoria` (`subcategory`, `unterkategorie`,
   `sous-catégorie`); the import also reads a detail as `Casa › Affitto` (or `Casa > Affitto`) in the
   category column, or by its name alone when no macro has that name.
+- **Bank statements (camt.053)** – the same import reads the XML statement the Swiss banks offer in
+  e-banking (ISO 20022 camt.053, also camt.052 and camt.054, any version): credits become income,
+  debits expenses, dated on the booking day; the description is the counterparty and the payment's
+  message, else the bank's text. Collective bookings whose transactions carry their own amounts
+  are split into them. Your rules categorize the rows (the bank's credit or debit decides the
+  type), the past entries propose a category, duplicates are flagged, and pending bookings are
+  shown but not imported. A bank or pension position can hold its IBAN: the statement's account
+  is recognized by it, and its closing balance can become the position's value on that day (same
+  currency, not overdrawn), in the review or at once with everything else.
 - **Multi-currency** – each entry/position keeps its own currency; dashboards convert to the
   user's base currency with the ECB reference rates, downloaded automatically every working day
   and shared by all users. A user's own manual rates take priority over them.
@@ -205,6 +214,10 @@ ops/systemd/     backup service and timer (user units)
   quotes rejected), control and bidi characters stripped. The export prefixes text starting with
   `= + - @` with `'` so spreadsheets never run it as a formula (CSV injection); importing the export
   removes the prefix again. Nginx allows 4 MB only on the two import paths (1 MB elsewhere).
+- **Bank statements (XML)**: parsed with no DTD at all, so no entity expansion and no external
+  files or URLs (XXE); same size and row limits as the CSV, texts stripped of control and bidi
+  characters and cut to the description length. The statement's IBAN only matches the user's own
+  positions.
 - **Containers**: DB not published; backend read-only filesystem, non-root, all capabilities
   dropped; only the web container is exposed, bound to an address you choose. Memory and process
   limits on every container (`BACKEND_MEMORY` 768m, `DB_MEMORY` 512m, `WEB_MEMORY` 64m).
@@ -501,9 +514,9 @@ encrypted with it).
 | Account | `PUT /api/account/password`, `PUT /api/account/settings` (partial: `baseCurrency`, `language` `IT\|EN\|DE\|FR`, `theme` `SYSTEM\|LIGHT\|DARK`), `GET /api/account/logins`, `POST /api/account/mfa/{setup,enable,disable,recovery-codes}`, `GET /api/account/passkeys`, `POST /api/account/passkeys/options` (`{password, code?}`), `POST /api/account/passkeys` (`{name, credential}`), `PUT/DELETE /api/account/passkeys/{id}`, `GET /api/account/export` (ZIP), `POST /api/account/delete` (`{password, code?}`, 204, ends the session) |
 | Category rules | `GET/POST /api/category-rules` (`{pattern, categoryId}`), `PUT/DELETE /api/category-rules/{id}`, `GET /api/category-rules/suggest?description&kind` (`{categoryId, ruleId, pattern}` from a rule, `ruleId` null from past entries; 204 when nothing fits) |
 | Categories | `GET/POST /api/categories` (`{name, kind, color, parentId}`: `parentId` null for a macro, a macro of the same kind for a detail), `PUT/DELETE /api/categories/{id}` (`{name, color, parentId}`; a macro with details cannot be deleted or moved under another) |
-| Entries | `GET /api/cash-entries?from&to&kind&categoryId&q&tagId&page&size` (each entry has `tags`: names; unknown names sent on save become new tags) (kind `INCOME\|EXPENSE\|TRANSFER`; transfers take `fromPositionId`/`toPositionId` instead of `categoryId`), `POST`, `PUT/DELETE /{id}`, `GET /export?filters` (CSV), `POST /import/preview` (multipart `file`), `POST /import` (`{entries:[…]}`) |
+| Entries | `GET /api/cash-entries?from&to&kind&categoryId&q&tagId&page&size` (each entry has `tags`: names; unknown names sent on save become new tags) (kind `INCOME\|EXPENSE\|TRANSFER`; transfers take `fromPositionId`/`toPositionId` instead of `categoryId`), `POST`, `PUT/DELETE /{id}`, `GET /export?filters` (CSV), `POST /import/preview` (multipart `file`: CSV, or a camt.052/053/054 statement, answered with `format: CAMT` and the `statements` with their closing balance and matching position), `POST /import` (`{entries:[…]}`) |
 | Recurring | `GET/POST /api/recurring-entries`, `PUT/DELETE /{id}` (frequency `DAILY\|WEEKLY\|MONTHLY\|QUARTERLY\|FOUR_MONTHLY\|SEMIANNUAL\|YEARLY`; `tags` are copied to the entries created) |
-| Positions | `GET/POST /api/positions`, `GET/PUT/DELETE /{id}`, `GET/POST /{id}/snapshots`, `PUT/DELETE /{id}/snapshots/{sid}`, `POST /api/positions/snapshots/bulk` |
+| Positions | `GET/POST /api/positions` (optional `iban`, checked, one per position), `GET/PUT/DELETE /{id}`, `GET/POST /{id}/snapshots`, `PUT/DELETE /{id}/snapshots/{sid}`, `POST /api/positions/snapshots/bulk` |
 | FX | `GET/POST /api/fx-rates`, `DELETE /{id}` (manual rates), `GET /api/fx-rates/central?date` (ECB rates in the base currency on a day, default today) |
 | Budgets | `GET /api/budgets`, `PUT/DELETE /api/budgets/{categoryId}` (`{amount,currency,period}`, period `MONTHLY` (default), `QUARTERLY` or `YEARLY`), `GET /api/budgets/status?month=yyyy-MM` |
 | Tags | `GET /api/tags` (with totals in the base currency, also per category), `PUT/DELETE /api/tags/{id}` (`{name}`; deleting keeps the entries) |

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { setLanguage } from '../i18n'
 import {
-  change, compact, date, money, monthsAgo, number, parseDecimal, percent, periodLabel, signedMoney, signedPercent,
+  change, compact, date, formatIban, money, monthsAgo, number, parseDecimal, percent, periodLabel, signedMoney, signedPercent,
 } from './format'
 
 describe('parseDecimal', () => {
@@ -110,5 +110,12 @@ describe('dates', () => {
     expect(monthsAgo(1)).toBe('2026-02')
     expect(monthsAgo(3)).toBe('2025-12')
     expect(monthsAgo(15)).toBe('2024-12')
+  })
+})
+
+describe('formatIban', () => {
+  it('groups by four, whatever the spacing and case', () => {
+    expect(formatIban(' ch9300762011623852957 ')).toBe('CH93 0076 2011 6238 5295 7')
+    expect(formatIban('DE89 3704 0044 0532 0130 00')).toBe('DE89 3704 0044 0532 0130 00')
   })
 })

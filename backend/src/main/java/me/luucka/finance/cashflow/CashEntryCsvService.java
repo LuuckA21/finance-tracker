@@ -21,6 +21,7 @@ import me.luucka.finance.common.ApiException;
 import me.luucka.finance.core.Currencies;
 import me.luucka.finance.core.EntryKind;
 import me.luucka.finance.core.TagNames;
+import me.luucka.finance.core.camt.CamtParser;
 import me.luucka.finance.core.category.CategoryTree;
 import me.luucka.finance.core.csv.CsvReader;
 import me.luucka.finance.core.csv.CsvWriter;
@@ -38,7 +39,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * CSV export of income/expense entries and the read-only first step of an import.
+ * CSV export of income/expense entries and the read-only first step of an import, from a CSV or a
+ * bank statement (camt.053 and the like).
  * <p>
  * The import preview never writes anything and keeps nothing on the server: it parses the file,
  * matches categories among the user's own, flags duplicates and returns the rows. The client then
@@ -71,8 +73,21 @@ public class CashEntryCsvService {
     private static final Set<String> UNCATEGORIZED = Set.of("missing_category", "unknown_category",
             "unknown_subcategory");
 
-    public record Preview(String delimiter, List<String> ignoredColumns, int total, int valid, int duplicates,
-                          int invalid, List<PreviewRow> rows) {
+    /**
+     * An account in a bank statement: its closing balance and the position with its IBAN, which
+     * the client may update with that balance.
+     */
+    public record StatementInfo(String iban, String currency, LocalDate closingDate, BigDecimal closingBalance,
+                                Long positionId, String positionName, String positionCurrency) {
+    }
+
+    /**
+     * @param format     {@code CSV} or {@code CAMT} (a bank statement, camt.052/053/054)
+     * @param delimiter  of a CSV, null for a statement
+     * @param statements the accounts of a statement, empty for a CSV
+     */
+    public record Preview(String format, String delimiter, List<String> ignoredColumns, int total, int valid,
+                          int duplicates, int invalid, List<PreviewRow> rows, List<StatementInfo> statements) {
     }
 
     private final CashEntryService entries;
@@ -151,10 +166,10 @@ public class CashEntryCsvService {
     // ------------------------------------------------------------------ import preview
 
     /**
-     * Reads a CSV and reports every row with its problems; writes nothing.
+     * Reads a CSV or a bank statement (XML) and reports every row with its problems; writes nothing.
      *
      * @throws ApiException 400 when the file itself cannot be used (not text, malformed, too many
-     *                      rows or columns, required columns missing)
+     *                      rows or columns, required columns missing, not a statement)
      */
     @Transactional(readOnly = true)
     public Preview preview(long userId, byte[] content) {
@@ -163,6 +178,9 @@ public class CashEntryCsvService {
         }
         if (content.length > MAX_BYTES) {
             throw tooLarge();
+        }
+        if (CamtParser.looksLikeXml(content)) {
+            return previewStatement(userId, content);
         }
         List<CsvReader.Row> records;
         char delimiter;
@@ -227,8 +245,91 @@ public class CashEntryCsvService {
 
         int valid = (int) rows.stream().filter(r -> r.errors().isEmpty()).count();
         int duplicates = (int) rows.stream().filter(PreviewRow::duplicate).count();
-        return new Preview(delimiter == '\t' ? "tab" : String.valueOf(delimiter), ignored, rows.size(), valid,
-                duplicates, rows.size() - valid, rows);
+        return new Preview("CSV", delimiter == '\t' ? "tab" : String.valueOf(delimiter), ignored, rows.size(),
+                valid, duplicates, rows.size() - valid, rows, List.of());
+    }
+
+    /**
+     * A bank statement: credits are income, debits expenses, categorized by the user's rules (the
+     * bank's side decides the type); pending bookings are shown but cannot be imported.
+     */
+    private Preview previewStatement(long userId, byte[] content) {
+        List<CamtParser.Statement> statements;
+        try {
+            statements = CamtParser.parse(content, CashEntryService.MAX_IMPORT_ROWS, EntryCsvFormat.MAX_DESCRIPTION);
+        } catch (CamtParser.CamtException e) {
+            throw ApiException.badRequest(e.code(), e.getMessage());
+        }
+        String baseCurrency = user(userId).getBaseCurrency();
+        CategoryRules matcher = rules.matcher(userId);
+        List<PreviewRow> rows = new ArrayList<>();
+        List<StatementInfo> accounts = new ArrayList<>();
+        for (CamtParser.Statement statement : statements) {
+            for (CamtParser.Entry entry : statement.entries()) {
+                rows.add(statementRow(rows.size() + 1, entry, statement.currency(), baseCurrency, matcher));
+            }
+            AssetPosition position = statement.iban() == null ? null
+                    : positions.findByUserIdAndIban(userId, statement.iban()).orElse(null);
+            CamtParser.Balance closing = statement.closing();
+            accounts.add(new StatementInfo(statement.iban(), statement.currency(),
+                    closing == null ? null : closing.date(), closing == null ? null : closing.amount(),
+                    position == null ? null : position.getId(), position == null ? null : position.getName(),
+                    position == null ? null : position.getCurrency()));
+        }
+        rows = markDuplicates(userId, rows);
+        int valid = (int) rows.stream().filter(r -> r.errors().isEmpty()).count();
+        int duplicates = (int) rows.stream().filter(PreviewRow::duplicate).count();
+        return new Preview("CAMT", null, List.of(), rows.size(), valid, duplicates, rows.size() - valid, rows,
+                accounts);
+    }
+
+    private static PreviewRow statementRow(int line, CamtParser.Entry entry, String accountCurrency,
+                                           String baseCurrency, CategoryRules matcher) {
+        List<String> errors = new ArrayList<>();
+        if (entry.date() == null) {
+            errors.add("invalid_date");
+        }
+        if (entry.amount() == null) {
+            errors.add("invalid_amount");
+        }
+        String currencyText = entry.currency() != null ? entry.currency()
+                : accountCurrency != null ? accountCurrency : baseCurrency;
+        String currency = Currencies.isValid(currencyText) ? Currencies.normalize(currencyText) : null;
+        if (currency == null) {
+            errors.add("invalid_currency");
+        }
+        if (!entry.booked()) {
+            errors.add("camt_pending");
+        }
+        String description = entry.description() == null ? "" : entry.description();
+        Long categoryId = null;
+        String categorySource = null;
+        String rulePattern = null;
+        Long suggestedCategoryId = null;
+        if (entry.kind() == null) {
+            errors.add("invalid_kind");
+            errors.add("missing_category");
+        } else {
+            Optional<CategoryRules.Suggestion> suggestion = matcher.suggest(description, entry.kind());
+            if (suggestion.isPresent() && suggestion.get().fromRule()) {
+                categoryId = suggestion.get().categoryId();
+                categorySource = "RULE";
+                rulePattern = suggestion.get().rule().pattern();
+            } else {
+                errors.add("missing_category");
+                suggestedCategoryId = suggestion.map(CategoryRules.Suggestion::categoryId).orElse(null);
+            }
+        }
+        // What the file says, for the review to show next to an unreadable value
+        Map<String, String> raw = new LinkedHashMap<>();
+        raw.put("date", entry.date() == null ? "" : entry.date().toString());
+        raw.put("amount", entry.amount() == null ? ""
+                : (entry.kind() == EntryKind.EXPENSE ? "-" : "") + entry.amount().toPlainString());
+        raw.put("currency", currencyText == null ? "" : currencyText);
+        raw.put("description", description);
+        return new PreviewRow(line, raw, entry.date(), entry.kind(), categoryId, entry.amount(), currency,
+                description.isEmpty() ? null : description, null, null, List.of(), false, errors, categorySource,
+                rulePattern, suggestedCategoryId);
     }
 
     public static ApiException tooLarge() {

@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 import me.luucka.finance.common.ApiException;
 import me.luucka.finance.core.AssetClass;
 import me.luucka.finance.core.Currencies;
+import me.luucka.finance.core.Iban;
 import me.luucka.finance.core.Money;
 import me.luucka.finance.core.valuation.PositionHistory;
 import me.luucka.finance.core.valuation.ValuationSnapshot;
@@ -21,8 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class PositionService {
 
-    public record PositionData(String name, String symbol, AssetClass assetClass, String currency, String notes,
-                               boolean archived) {
+    /** {@code iban}: any spacing or case, checked; blank or null for none. */
+    public record PositionData(String name, String symbol, String iban, AssetClass assetClass, String currency,
+                               String notes, boolean archived) {
     }
 
     public record SnapshotData(LocalDate date, BigDecimal quantity, BigDecimal unitPrice, String note) {
@@ -40,10 +42,11 @@ public class PositionService {
     }
 
     /** A position with its latest snapshot ({@code null} when it has none yet). */
-    public record PositionResponse(long id, String name, String symbol, AssetClass assetClass, String currency,
-                                   String notes, boolean archived, SnapshotResponse latest) {
+    public record PositionResponse(long id, String name, String symbol, String iban, AssetClass assetClass,
+                                   String currency, String notes, boolean archived, SnapshotResponse latest) {
         static PositionResponse of(AssetPosition p, PositionSnapshot latest) {
-            return new PositionResponse(p.getId(), p.getName(), p.getSymbol(), p.getAssetClass(), p.getCurrency(),
+            return new PositionResponse(p.getId(), p.getName(), p.getSymbol(), p.getIban(), p.getAssetClass(),
+                    p.getCurrency(),
                     p.getNotes(), p.isArchived(), latest == null ? null : SnapshotResponse.of(latest));
         }
     }
@@ -100,6 +103,7 @@ public class PositionService {
     public PositionResponse create(long userId, PositionData data) {
         AssetPosition position = new AssetPosition(userId);
         apply(position, data);
+        requireUniqueIban(userId, position);
         return PositionResponse.of(positions.save(position), null);
     }
 
@@ -107,6 +111,7 @@ public class PositionService {
     public PositionResponse update(long userId, long id, PositionData data) {
         AssetPosition position = load(userId, id);
         apply(position, data);
+        requireUniqueIban(userId, position);
         return get(userId, id);
     }
 
@@ -187,6 +192,14 @@ public class PositionService {
         return result;
     }
 
+    /** An account statement must name one position only. */
+    private void requireUniqueIban(long userId, AssetPosition position) {
+        if (position.getIban() != null && positions.findByUserIdAndIban(userId, position.getIban())
+                .filter(other -> !other.getId().equals(position.getId())).isPresent()) {
+            throw ApiException.conflict("iban_taken", "Another position has this IBAN");
+        }
+    }
+
     private AssetPosition load(long userId, long id) {
         return positions.findByIdAndUserId(id, userId).orElseThrow(() -> ApiException.notFound("Position"));
     }
@@ -194,6 +207,9 @@ public class PositionService {
     private static void apply(AssetPosition position, PositionData data) {
         position.setName(data.name().trim());
         position.setSymbol(blankToNull(data.symbol()));
+        String iban = blankToNull(data.iban());
+        position.setIban(iban == null ? null : Iban.normalize(iban)
+                .orElseThrow(() -> ApiException.badRequest("invalid_iban", "Not a valid IBAN")));
         position.setAssetClass(data.assetClass());
         position.setCurrency(Currencies.normalize(data.currency()));
         position.setNotes(blankToNull(data.notes()));

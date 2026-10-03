@@ -129,3 +129,8 @@ export function parseDecimal(input: string): number | null {
   const n = Number(cleaned)
   return Number.isFinite(n) ? n : null
 }
+
+/** An IBAN in groups of four, as printed: CH93 0076 2011 6238 5295 7. */
+export function formatIban(iban: string): string {
+  return iban.replace(/\s+/g, '').toUpperCase().replace(/(.{4})/g, '$1 ').trim()
+}

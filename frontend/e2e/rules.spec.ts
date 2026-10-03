@@ -42,7 +42,7 @@ test('category rules: create one, get suggestions while writing, and categorize 
     '03.08.2026;Uscita;;4.50;CHF;Edicola Centrale 12',
     '04.08.2026;Uscita;;3.20;CHF;EDICOLA STAZIONE',
   ].join('\r\n')
-  await page.getByRole('button', { name: 'Importa CSV' }).click()
+  await page.getByRole('button', { name: 'Importa', exact: true }).click()
   await dialog.getByLabel('File CSV').setInputFiles({ name: 'banca.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) })
   await dialog.getByRole('radio', { name: 'Rivedi riga per riga' }).click()
   await dialog.getByRole('button', { name: 'Analizza file' }).click()

@@ -104,7 +104,7 @@ public class AccountExportService {
                        last_generated as "lastGenerated", active, created_at as "createdAt"
                 from recurring_entry r where user_id = ?"""));
         root.set("positions", list(userId, """
-                select id, name, symbol, asset_class as "assetClass", currency, notes, archived,
+                select id, name, symbol, iban, asset_class as "assetClass", currency, notes, archived,
                        created_at as "createdAt"
                 from asset_position where user_id = ?"""));
         root.set("positionRecords", list(userId, """
