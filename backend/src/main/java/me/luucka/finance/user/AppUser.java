@@ -70,6 +70,10 @@ public class AppUser {
     @Column(name = "last_login_at")
     private Instant lastLoginAt;
 
+    /** The id passkeys store for this user (WebAuthn user handle), created with the first passkey. */
+    @Column(name = "webauthn_user_handle", unique = true)
+    private byte[] webauthnUserHandle;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -125,6 +129,14 @@ public class AppUser {
 
     public Long getId() {
         return id;
+    }
+
+    public byte[] getWebauthnUserHandle() {
+        return webauthnUserHandle;
+    }
+
+    public void setWebauthnUserHandle(byte[] webauthnUserHandle) {
+        this.webauthnUserHandle = webauthnUserHandle;
     }
 
     public String getUsername() {

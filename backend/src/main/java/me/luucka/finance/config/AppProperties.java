@@ -16,6 +16,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param session        login session settings
  * @param fx             exchange rate settings
  * @param mail           outgoing email (notifications); disabled without a host
+ * @param publicUrl      the address users open the app at (passkeys are bound to its domain);
+ *                       passkeys are off while it is empty
  */
 @ConfigurationProperties("app")
 public record AppProperties(
@@ -25,7 +27,8 @@ public record AppProperties(
         Login login,
         Session session,
         Fx fx,
-        Mail mail) {
+        Mail mail,
+        String publicUrl) {
 
     public record BootstrapAdmin(String username, String password, Language language) {
     }
