@@ -3,6 +3,9 @@ export const it = {
   // App
   'app.name': 'Finanze',
   'app.serverUnreachable': 'Impossibile contattare il server. Riprova più tardi.',
+  'pwa.description': 'Entrate, uscite e patrimonio della famiglia',
+  'pwa.updateReady': 'È disponibile una nuova versione.',
+  'pwa.update': 'Aggiorna',
 
   // Common
   'common.loading': 'Caricamento…',

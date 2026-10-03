@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router'
 import { LoginPage } from './auth/LoginPage'
 import { RequireAuth } from './auth/RequireAuth'
 import { Layout } from './components/Layout'
+import { UpdateBanner } from './components/UpdateBanner'
 
 // Pages are separate chunks, downloaded on first visit (Layout shows a spinner meanwhile)
 const OverviewPage = lazy(() => import('./pages/OverviewPage').then((m) => ({ default: m.OverviewPage })))
@@ -29,28 +30,31 @@ function AdminOnly({ children }: { children: ReactNode }) {
 
 export function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route element={<RequireAuth />}>
-        <Route element={<Layout />}>
-          <Route index element={<OverviewPage />} />
-          <Route path="movimenti" element={<EntriesPage />} />
-          <Route path="ricorrenti" element={<RecurringPage />} />
-          <Route path="flussi" element={<CashflowPage />} />
-          <Route path="flussi/categoria/:id" element={<CategoryTrendPage />} />
-          <Route path="previsione" element={<ForecastPage />} />
-          <Route path="riepilogo" element={<AnnualReportPage />} />
-          <Route path="budget" element={<BudgetPage />} />
-          <Route path="obiettivi" element={<GoalsPage />} />
-          <Route path="patrimonio" element={<NetWorthPage />} />
-          <Route path="posizioni" element={<PositionsPage />} />
-          <Route path="posizioni/:id" element={<PositionDetailPage />} />
-          <Route path="aggiorna" element={<BulkUpdatePage />} />
-          <Route path="impostazioni/:tab?" element={<SettingsPage />} />
-          <Route path="admin/utenti" element={<AdminOnly><AdminUsersPage /></AdminOnly>} />
+    <>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route element={<RequireAuth />}>
+          <Route element={<Layout />}>
+            <Route index element={<OverviewPage />} />
+            <Route path="movimenti" element={<EntriesPage />} />
+            <Route path="ricorrenti" element={<RecurringPage />} />
+            <Route path="flussi" element={<CashflowPage />} />
+            <Route path="flussi/categoria/:id" element={<CategoryTrendPage />} />
+            <Route path="previsione" element={<ForecastPage />} />
+            <Route path="riepilogo" element={<AnnualReportPage />} />
+            <Route path="budget" element={<BudgetPage />} />
+            <Route path="obiettivi" element={<GoalsPage />} />
+            <Route path="patrimonio" element={<NetWorthPage />} />
+            <Route path="posizioni" element={<PositionsPage />} />
+            <Route path="posizioni/:id" element={<PositionDetailPage />} />
+            <Route path="aggiorna" element={<BulkUpdatePage />} />
+            <Route path="impostazioni/:tab?" element={<SettingsPage />} />
+            <Route path="admin/utenti" element={<AdminOnly><AdminUsersPage /></AdminOnly>} />
+          </Route>
         </Route>
-      </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <UpdateBanner />
+    </>
   )
 }

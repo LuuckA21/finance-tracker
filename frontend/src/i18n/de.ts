@@ -5,6 +5,9 @@ export const de: Messages = {
   // App
   'app.name': 'Finanzen',
   'app.serverUnreachable': 'Der Server ist nicht erreichbar. Bitte später erneut versuchen.',
+  'pwa.description': 'Einnahmen, Ausgaben und Vermögen des Haushalts',
+  'pwa.updateReady': 'Eine neue Version ist verfügbar.',
+  'pwa.update': 'Aktualisieren',
 
   // Common
   'common.loading': 'Wird geladen…',

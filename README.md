@@ -93,6 +93,14 @@ shown at the bottom of the menu.
   secret, passkey keys). Users can also delete their own account with all of its data (password,
   the 2FA code when 2FA is on, and the username typed again); administrators can delete any other
   account the same way from the user list.
+- **Installable app** – on a phone, "Add to Home Screen" (Safari › Share on iPhone; Chrome offers
+  it on Android, and on a computer with Chrome or Edge) installs Finanze with its icon; it opens
+  full screen, at once even on a slow network. Long-pressing the icon offers "New entry",
+  "Entries" and "Budget". The name and the shortcuts follow the user's language. The service
+  worker keeps only the app's own files, never data: requests to `/api/` always go to the server,
+  so without a session nothing can be read on the device, and offline the app opens but says it
+  cannot reach the server. After a deploy, an open app offers "A new version is available ·
+  Update". Needs HTTPS (or localhost).
 - **Personal categories in two levels** – like first- and second-level cost centres: macro
   categories ("Casa") and, under them, optional detail categories ("Affitto", "Energia"). An entry
   sits on a macro or on a detail; filters on a macro take in its details, and the Income & expenses
@@ -132,6 +140,8 @@ frontend/
   src/pages/     dashboards, entries, positions, bulk update, settings, admin (one chunk each)
   src/**/*.test.ts  Vitest unit tests
   e2e/           Playwright end-to-end tests (real backend + PostgreSQL)
+  pwa/           installable app: manifests per language and the service worker, built by a Vite plugin
+  public/icons/  app icons (from favicon.svg: plain, maskable, Apple touch)
   default.conf.template   Nginx: SPA + reverse proxy + security headers
 docker-compose.yml, .env.example
 deploy.sh        update the code (a branch or a release) and restart the containers
@@ -187,6 +197,8 @@ ops/systemd/     backup service and timer (user units)
 - **Limits per account**: 500 categories, 500 category rules, 500 tags, 50 savings goals, 50
   forecast scenarios; list fields in requests are bounded as well.
 - **Headers**: strict CSP, `frame-ancestors 'none'`, `nosniff`, `no-referrer` (Nginx + Spring).
+- **Service worker** (installable app): same origin only, it keeps the files of the build and
+  nothing else; `/api/` requests bypass it, so no API answer is ever cached on the device.
 - **CSV**: the import preview parses in memory and stores nothing; the confirmed rows are
   validated again like single entries and saved all or none, only with the user's own categories.
   Bounded parser (2 MB, 5000 rows, 30 columns, 1000 characters per value; binary files and broken
@@ -244,7 +256,9 @@ suite also runs against a database that already holds data. The admin credential
 dev profile's (`admin` / `dev-password-change-me`); set `E2E_ADMIN_USERNAME` / `E2E_ADMIN_PASSWORD`
 if you changed them. On a fresh database the first-login password change is done automatically.
 The tests cover sign-in with a temporary password, wrong credentials, 2FA enrolment and login,
-entries and transfers, CSV import/export, budgets, the four languages and a 360 px phone layout.
+entries and transfers, CSV import/export, budgets, the four languages, a 360 px phone layout and
+the installable app (manifest, service worker kept away from the data, offline start, updates).
+Only `pwa.spec.ts` lets the service worker run; the other tests block it.
 
 Integration tests start PostgreSQL with Testcontainers and exercise the real security chain:
 login/CSRF/session rotation, lockout, forced password change, session revocation, admin rules,

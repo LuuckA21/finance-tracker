@@ -40,6 +40,8 @@ export async function setLanguage(language: Language) {
   if (requested !== language) return
   document.documentElement.lang = language.toLowerCase()
   document.title = catalog['app.name']
+  // The installed app gets its name and shortcuts in this language (see pwa/plugin.ts)
+  document.querySelector('link[rel="manifest"]')?.setAttribute('href', `/manifest-${language.toLowerCase()}.webmanifest`)
   if (language === current) return
   current = language
   listeners.forEach((l) => l())
