@@ -7,6 +7,8 @@ GitHub release.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-03
+
 ### Added
 - Passkeys: sign in with the device's lock (face, fingerprint or PIN), without username, password
   or 2FA code. Add, rename and remove them in Settings › Account; adding one asks for the password
