@@ -7,6 +7,8 @@ GitHub release.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-03
+
 ### Added
 - Your data: download everything you entered as a ZIP (all records in `data.json`, the entries as
   CSV that can be imported again), and delete your own account with all of its data, in
