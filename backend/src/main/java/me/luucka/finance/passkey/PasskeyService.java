@@ -62,6 +62,8 @@ public class PasskeyService {
             new PublicKeyCredentialParameters(PublicKeyCredentialType.PUBLIC_KEY, COSEAlgorithmIdentifier.EdDSA),
             new PublicKeyCredentialParameters(PublicKeyCredentialType.PUBLIC_KEY, COSEAlgorithmIdentifier.RS256));
     private static final Base64.Encoder B64 = Base64.getUrlEncoder().withoutPadding();
+    /** The transports WebAuthn defines; anything else the browser reports is dropped. */
+    private static final Set<String> KNOWN_TRANSPORTS = Set.of("usb", "nfc", "ble", "smart-card", "hybrid", "internal");
 
     public record PasskeyResponse(long id, String name, Instant createdAt, Instant lastUsedAt, boolean synced) {
         static PasskeyResponse of(Passkey p) {
@@ -182,11 +184,10 @@ public class PasskeyService {
         if (passkeys.existsByCredentialId(credential.getCredentialId())) {
             throw ApiException.conflict("passkey_exists", "This passkey is already registered");
         }
-        String transports = data.getTransports() == null ? null : data.getTransports().stream()
-                .map(AuthenticatorTransport::getValue).sorted().collect(Collectors.joining(","));
+        String transports = transportsOf(data.getTransports());
         Passkey passkey = new Passkey(userId, credential.getCredentialId(), credentialDataConverter.convert(credential),
                 authData.getSignCount(), authData.isFlagUV(), authData.isFlagBE(), authData.isFlagBS(),
-                transports == null || transports.isEmpty() ? null : transports, name.strip());
+                transports, name.strip());
         return PasskeyResponse.of(passkeys.save(passkey));
     }
 
@@ -293,6 +294,19 @@ public class PasskeyService {
             d.put("transports", List.of(p.getTransports().split(",")));
         }
         return d;
+    }
+
+    /**
+     * The transports to keep, as stored: only the known ones (the list comes from the browser),
+     * sorted and comma separated; null when none is left.
+     */
+    static String transportsOf(Set<AuthenticatorTransport> reported) {
+        String known = reported == null ? "" : reported.stream()
+                .filter(t -> t != null && t.getValue() != null)
+                .map(AuthenticatorTransport::getValue)
+                .filter(KNOWN_TRANSPORTS::contains)
+                .distinct().sorted().collect(Collectors.joining(","));
+        return known.isEmpty() ? null : known;
     }
 
     private static Set<AuthenticatorTransport> transports(Passkey p) {
