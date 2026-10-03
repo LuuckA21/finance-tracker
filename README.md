@@ -332,11 +332,13 @@ database backup (`scripts/backup.sh --local --reason predeploy`); skip it with
 1. In a pull request: set the version in `backend/pom.xml` and `frontend/package.json`
    (`npm version X.Y.Z --no-git-tag-version` updates the lock file too) and move the notes from
    `## [Unreleased]` in `CHANGELOG.md` to a new `## [X.Y.Z] - date` section.
-2. Once it is merged and CI is green on `master`, tag that commit and push the tag:
-   `git tag vX.Y.Z origin/master && git push origin vX.Y.Z`.
-3. The Release workflow checks that the tag is on `master` and matches both versions
-   (`scripts/release-notes.sh vX.Y.Z` runs the same check locally), then publishes the GitHub
-   release with the changelog section as its notes.
+2. Once it is merged and CI is green on `master`, start **Actions › Release › Run workflow** on
+   `master`. It checks that `pom.xml`, `package.json` and the changelog agree on the version, tags
+   `master` as `vX.Y.Z` and publishes the GitHub release with the changelog section as its notes.
+   It refuses to run on another branch or for a version that is already tagged.
+3. Pushing a tag yourself works too (`git tag -a vX.Y.Z -m "Finanze vX.Y.Z" origin/master &&
+   git push origin vX.Y.Z`): the same workflow then publishes that tag, if it is on `master`.
+   `scripts/release-notes.sh vX.Y.Z` runs the same checks locally.
 
 ## Backup and restore
 
