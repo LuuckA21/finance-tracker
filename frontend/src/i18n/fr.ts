@@ -43,6 +43,7 @@ export const fr: Messages = {
 
   // Login
   'login.subtitle': 'Connectez-vous à votre compte',
+  'login.accountDeleted': 'Votre compte et toutes ses données ont été supprimés.',
   'login.mfaSubtitle': 'Validation en deux étapes',
   'login.username': 'Nom d’utilisateur',
   'login.password': 'Mot de passe',
@@ -292,6 +293,15 @@ export const fr: Messages = {
   'settings.passkeys': 'Clés d\'accès',
   'settings.changePassword': 'Changer le mot de passe',
   'settings.recentLogins': 'Connexions récentes',
+  'settings.yourData': 'Vos données',
+  'accountData.exportHelp': 'Téléchargez une archive ZIP avec tout ce que vous avez saisi\u00a0: opérations, catégories, étiquettes, règles, opérations récurrentes, positions avec leurs valeurs, budgets, objectifs, prévisions et réglages (dans data.json), plus les opérations en CSV, qui peuvent être importées à nouveau. Les mots de passe, codes et clés secrètes ne sont pas inclus.',
+  'accountData.export': 'Télécharger mes données',
+  'accountData.deleteHelp': 'Vous pouvez supprimer votre compte avec toutes ses données. Si vous souhaitez les conserver, téléchargez-les d\'abord.',
+  'accountData.delete': 'Supprimer le compte',
+  'accountData.deleteTitle': 'Supprimer le compte\u202f?',
+  'accountData.deleteWarning': 'Le compte, les opérations, les positions, les budgets, les objectifs et les réglages sont supprimés immédiatement et ne peuvent pas être récupérés\u202f; ils ne restent que dans les sauvegardes du serveur jusqu\'à leur remplacement. Vous serez déconnecté de tous vos appareils.',
+  'accountData.typeUsername': 'Pour confirmer, saisissez votre nom d\'utilisateur ({username})',
+  'accountData.deleteConfirm': 'Supprimer définitivement',
   'settings.baseCurrencyHelp': 'Tous les tableaux de bord sont convertis dans cette monnaie. Les taux BCE s’adaptent d’eux-mêmes\u202f; vos taux manuels sont liés à la monnaie de base\u00a0: si vous la changez, il faudra les saisir à nouveau pour la nouvelle.',
   'settings.noLogins': 'Aucune connexion enregistrée.',
   'settings.unknownBrowser': 'navigateur inconnu',

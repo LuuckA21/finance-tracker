@@ -12,6 +12,10 @@ import me.luucka.finance.auth.MfaService;
 import me.luucka.finance.common.CurrencyCode;
 import me.luucka.finance.user.Language;
 import me.luucka.finance.user.Theme;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,7 +26,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Self-service endpoints of the logged-in user: password, preferences, 2FA, login history.
+ * Self-service endpoints of the logged-in user: password, preferences, 2FA, login history, export
+ * of all their data and deletion of the account.
  */
 @RestController
 @RequestMapping("/api/account")
@@ -53,11 +58,22 @@ public class AccountController {
     public record RecoveryCodesResponse(List<String> recoveryCodes) {
     }
 
+    /** {@code code}: the 2FA or a recovery code, needed when 2FA is on. */
+    public record DeleteAccountRequest(
+            @NotBlank @Size(max = 128) String password,
+            @Size(max = 32) String code) {
+    }
+
+    private static final MediaType ZIP = MediaType.parseMediaType("application/zip");
+
     private final AccountService accountService;
+    private final AccountExportService exportService;
     private final MfaService mfaService;
 
-    public AccountController(AccountService accountService, MfaService mfaService) {
+    public AccountController(AccountService accountService, AccountExportService exportService,
+                             MfaService mfaService) {
         this.accountService = accountService;
+        this.exportService = exportService;
         this.mfaService = mfaService;
     }
 
@@ -99,6 +115,27 @@ public class AccountController {
     public ResponseEntity<Void> disableMfa(@AuthenticationPrincipal AppPrincipal me,
                                            @Valid @RequestBody DisableMfaRequest body) {
         accountService.disableMfa(me.id(), body.password(), body.code());
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Everything stored for the user, as a ZIP (see {@link AccountExportService}). */
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> export(@AuthenticationPrincipal AppPrincipal me) {
+        AccountExportService.Export export = exportService.export(me.id());
+        return ResponseEntity.ok()
+                .contentType(ZIP)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename(export.fileName()).build().toString())
+                .cacheControl(CacheControl.noStore())
+                .body(export.zip());
+    }
+
+    /** Deletes the account and all of its data; the session ends. */
+    @PostMapping("/delete")
+    public ResponseEntity<Void> deleteAccount(@AuthenticationPrincipal AppPrincipal me,
+                                              @Valid @RequestBody DeleteAccountRequest body,
+                                              HttpServletRequest request) {
+        accountService.deleteAccount(me.id(), body.password(), body.code(), request);
         return ResponseEntity.noContent().build();
     }
 }
