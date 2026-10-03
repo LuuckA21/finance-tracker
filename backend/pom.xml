@@ -19,6 +19,7 @@
 
     <properties>
         <java.version>25</java.version>
+        <webauthn4j.version>0.31.11.RELEASE</webauthn4j.version>
         <bouncycastle.version>1.86</bouncycastle.version>
     </properties>
 
@@ -51,6 +52,12 @@
             <!-- Persistent sessions: survive restarts and allow revoking a user's sessions -->
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-session-jdbc</artifactId>
+        </dependency>
+        <dependency>
+            <!-- WebAuthn (passkeys): checks registrations and sign-ins; Jackson 3 like Spring Boot -->
+            <groupId>com.webauthn4j</groupId>
+            <artifactId>webauthn4j-core</artifactId>
+            <version>${webauthn4j.version}</version>
         </dependency>
         <dependency>
             <!-- Required by Argon2PasswordEncoder -->

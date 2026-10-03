@@ -559,3 +559,13 @@ export interface CategoryTrend {
   availableYears: number[]
   unconvertedCurrencies: string[]
 }
+
+/** A passkey of the logged-in user */
+export interface Passkey {
+  id: number
+  name: string
+  createdAt: string
+  lastUsedAt: string | null
+  /** Synced across the user's devices (iCloud Keychain, Google Password Manager…) */
+  synced: boolean
+}

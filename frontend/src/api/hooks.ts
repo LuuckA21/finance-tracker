@@ -13,6 +13,7 @@ import type {
   CategoryTrend,
   CategorySuggestion,
   BudgetPeriod,
+  Passkey,
   BudgetStatus,
   Goal,
   GoalKind,
@@ -60,6 +61,31 @@ export function useChangePassword() {
   return useMutation({
     mutationFn: (body: { currentPassword: string; newPassword: string }) => put<Me>('/api/account/password', body),
     onSuccess: (me) => qc.setQueryData(['me'], me),
+  })
+}
+
+/** What the login page can offer (passkeys need a configured public address). */
+export const useAuthConfig = () =>
+  useQuery({ queryKey: ['auth-config'], queryFn: () => get<{ passkeys: boolean }>('/api/auth/config'), staleTime: Infinity })
+
+// ---------------------------------------------------------------- passkeys
+
+export const usePasskeys = () =>
+  useQuery({ queryKey: ['passkeys'], queryFn: () => get<Passkey[]>('/api/account/passkeys') })
+
+export function useRenamePasskey() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, name }: { id: number; name: string }) => put<Passkey>(`/api/account/passkeys/${id}`, { name }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['passkeys'] }),
+  })
+}
+
+export function useDeletePasskey() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => del(`/api/account/passkeys/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['passkeys'] }),
   })
 }
 

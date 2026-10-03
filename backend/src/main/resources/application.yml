@@ -66,6 +66,9 @@ management:
 app:
   # Name shown in authenticator apps
   totp-issuer: ${APP_TOTP_ISSUER:Finance Tracker}
+  # Address users open the app at, e.g. https://finanze.example.com: passkeys are bound to its
+  # domain (and off while it is empty); emails link to it too
+  public-url: ${APP_PUBLIC_URL:}
   # Base64-encoded 32-byte key used to encrypt TOTP secrets at rest. Generate with: openssl rand -base64 32
   encryption-key: ${APP_ENCRYPTION_KEY:}
   bootstrap-admin:

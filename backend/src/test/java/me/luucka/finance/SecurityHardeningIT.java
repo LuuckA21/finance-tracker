@@ -58,6 +58,17 @@ class SecurityHardeningIT {
     }
 
     @Test
+    void passkeysAreOffWithoutAPublicAddress() throws Exception {
+        ApiClient anonymous = new ApiClient(mvc);
+        assertEquals(Boolean.FALSE, json(anonymous.get("/api/auth/config"), "$.passkeys"));
+        anonymous.refreshCsrf();
+        assertEquals("passkeys_disabled", json(anonymous.post("/api/auth/passkey/options", null), "$.code"));
+        ApiClient user = login(testUsers.create("no-passkeys", Role.USER));
+        assertEquals("passkeys_disabled", json(user.post("/api/account/passkeys/options",
+                "{\"password\":\"%s\"}".formatted(TestUsers.PASSWORD)), "$.code"));
+    }
+
+    @Test
     void guessingTheCurrentPasswordLocksTheAccountAndEndsTheSession() throws Exception {
         AppUser user = testUsers.create("reauth", Role.USER);
         ApiClient stolen = login(user);

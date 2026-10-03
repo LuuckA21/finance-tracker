@@ -24,6 +24,8 @@ public class LoginEvent {
         BAD_CREDENTIALS,
         BAD_MFA_CODE,
         RECOVERY_CODE_USED,
+        PASSKEY,
+        BAD_PASSKEY,
         UNKNOWN_USER,
         LOCKED,
         DISABLED,

@@ -12,6 +12,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import me.luucka.finance.common.ApiException;
 import me.luucka.finance.config.AppProperties;
+import me.luucka.finance.passkey.PasskeyService;
 import me.luucka.finance.user.AppUser;
 import me.luucka.finance.user.AppUserRepository;
 import me.luucka.finance.user.LoginEvent;
@@ -54,19 +55,21 @@ public class AuthService {
     private final MfaService mfaService;
     private final LoginRateLimiter rateLimiter;
     private final AuthSession authSession;
+    private final PasskeyService passkeys;
     private final AppProperties.Login settings;
     private final Clock clock;
     private final String dummyHash;
 
     public AuthService(AppUserRepository users, LoginEventRepository loginEvents, PasswordEncoder passwordEncoder,
                        MfaService mfaService, LoginRateLimiter rateLimiter, AuthSession authSession,
-                       AppProperties properties, Clock clock) {
+                       PasskeyService passkeys, AppProperties properties, Clock clock) {
         this.users = users;
         this.loginEvents = loginEvents;
         this.passwordEncoder = passwordEncoder;
         this.mfaService = mfaService;
         this.rateLimiter = rateLimiter;
         this.authSession = authSession;
+        this.passkeys = passkeys;
         this.settings = properties.login();
         this.clock = clock;
         this.dummyHash = passwordEncoder.encode("timing-equalisation-dummy-password");
@@ -166,6 +169,33 @@ public class AuthService {
         complete(pending.userId(), request, response,
                 result == MfaService.Verification.RECOVERY_CODE ? Reason.RECOVERY_CODE_USED : Reason.SUCCESS,
                 refused -> new ApiException(HttpStatus.UNAUTHORIZED, "mfa_expired", "Login expired, please sign in again"));
+    }
+
+    /**
+     * Signs in with a passkey: the device verified its user, so it stands for both factors and
+     * no 2FA code follows. Failures count towards the per-IP limit, like wrong passwords.
+     */
+    public void loginWithPasskey(String credentialJson, HttpServletRequest request, HttpServletResponse response) {
+        if (rateLimiter.isBlocked(request.getRemoteAddr())) {
+            audit(null, "", request, false, Reason.RATE_LIMITED);
+            throw tooManyAttempts();
+        }
+        long userId;
+        try {
+            userId = passkeys.verifySignIn(credentialJson, request.getSession(false));
+        } catch (PasskeyService.Rejected e) {
+            rateLimiter.recordFailure(request.getRemoteAddr());
+            String name = e.userId() == null ? "" : users.findById(e.userId()).map(AppUser::getUsername).orElse("");
+            audit(e.userId(), name, request, false, Reason.BAD_PASSKEY);
+            log.warn("Rejected passkey sign-in from {}: {}", request.getRemoteAddr(), e.getMessage());
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "passkey_rejected", "The passkey was not accepted");
+        }
+        complete(userId, request, response, Reason.PASSKEY, refused -> {
+            rateLimiter.recordFailure(request.getRemoteAddr());
+            audit(refused.getId(), refused.getUsername(), request, false,
+                    refused.isEnabled() ? Reason.LOCKED : Reason.DISABLED);
+            return new ApiException(HttpStatus.UNAUTHORIZED, "passkey_rejected", "The passkey was not accepted");
+        });
     }
 
     public void logout(HttpServletRequest request) {

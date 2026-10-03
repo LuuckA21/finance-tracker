@@ -57,8 +57,9 @@ public class SecurityConfig {
                         // Plain (non-masked) token: the SPA reads it from a JSON endpoint, not from HTML
                         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler()))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.GET, "/api/auth/csrf").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/login/mfa", "/api/auth/logout")
+                        .requestMatchers(HttpMethod.GET, "/api/auth/csrf", "/api/auth/config").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/login/mfa", "/api/auth/logout",
+                                "/api/auth/passkey/options", "/api/auth/passkey")
                         .permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/error").permitAll()

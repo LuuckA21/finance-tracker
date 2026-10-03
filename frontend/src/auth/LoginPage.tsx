@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
-import { KeyRound, LockKeyhole } from 'lucide-react'
+import { Fingerprint, KeyRound, LockKeyhole } from 'lucide-react'
 import { ApiError, errorMessage, post, refreshCsrf } from '../api/client'
+import { useAuthConfig } from '../api/hooks'
 import { Button, ErrorAlert, Field } from '../components/ui'
 import { useI18n } from '../i18n'
+import { getPasskey, isCancelled, passkeysSupported, type RequestOptionsJSON } from '../lib/webauthn'
 
 export function LoginPage() {
   const [step, setStep] = useState<'password' | 'mfa'>('password')
@@ -17,6 +19,7 @@ export function LoginPage() {
   const location = useLocation()
   const qc = useQueryClient()
   const { t } = useI18n()
+  const passkeys = (useAuthConfig().data?.passkeys ?? false) && passkeysSupported()
 
   const from = (location.state as { from?: string } | null)?.from ?? '/'
 
@@ -42,6 +45,23 @@ export function LoginPage() {
       }
     } catch (err) {
       setError(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** No username: the device offers the passkeys it holds for this site. */
+  async function signInWithPasskey() {
+    setBusy(true)
+    setError(null)
+    try {
+      await refreshCsrf()
+      const options = await post<RequestOptionsJSON>('/api/auth/passkey/options')
+      const credential = await getPasskey(options)
+      await post('/api/auth/passkey', { credential })
+      await finish()
+    } catch (err) {
+      setError(isCancelled(err) ? t('passkey.cancelled') : errorMessage(err))
     } finally {
       setBusy(false)
     }
@@ -94,6 +114,16 @@ export function LoginPage() {
             </Field>
             <ErrorAlert message={error} />
             <Button type="submit" variant="primary" loading={busy}>{t('login.submit')}</Button>
+            {passkeys && (
+              <>
+                <div className="flex items-center gap-3 text-xs text-muted" aria-hidden>
+                  <span className="h-px flex-1 bg-line" />{t('login.or')}<span className="h-px flex-1 bg-line" />
+                </div>
+                <Button onClick={signInWithPasskey} disabled={busy}>
+                  <Fingerprint className="size-4" aria-hidden /> {t('login.passkey')}
+                </Button>
+              </>
+            )}
           </form>
         ) : (
           <form onSubmit={submitCode} className="flex flex-col gap-4">

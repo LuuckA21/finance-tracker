@@ -12,6 +12,7 @@ import me.luucka.finance.category.CategoryService;
 import me.luucka.finance.common.ApiException;
 import me.luucka.finance.core.security.PasswordPolicy;
 import me.luucka.finance.core.security.SecureTokens;
+import me.luucka.finance.passkey.PasskeyRepository;
 import me.luucka.finance.user.AppUser;
 import me.luucka.finance.user.AppUserRepository;
 import me.luucka.finance.user.Language;
@@ -49,17 +50,20 @@ public class UserAdminService {
     private final CategoryService categoryService;
     private final PasswordEncoder passwordEncoder;
     private final SessionRevoker sessionRevoker;
+    private final PasskeyRepository passkeys;
     private final SecureRandom random;
     private final Clock clock;
 
     public UserAdminService(AppUserRepository users, RecoveryCodeRepository recoveryCodes,
                             CategoryService categoryService, PasswordEncoder passwordEncoder,
-                            SessionRevoker sessionRevoker, SecureRandom random, Clock clock) {
+                            SessionRevoker sessionRevoker, PasskeyRepository passkeys, SecureRandom random,
+                            Clock clock) {
         this.users = users;
         this.recoveryCodes = recoveryCodes;
         this.categoryService = categoryService;
         this.passwordEncoder = passwordEncoder;
         this.sessionRevoker = sessionRevoker;
+        this.passkeys = passkeys;
         this.random = random;
         this.clock = clock;
     }
@@ -125,6 +129,8 @@ public class UserAdminService {
         user.setPasswordHash(passwordEncoder.encode(temporary));
         user.setPasswordChangeRequired(true);
         user.resetFailedLogins();
+        // A fresh start: passkeys would still open the account without the new password
+        passkeys.deleteByUser(id);
         sessionRevoker.revokeAll(user.getUsername());
         return new UserWithPassword(UserResponse.of(user, clock.instant()), temporary);
     }
@@ -141,6 +147,8 @@ public class UserAdminService {
         AppUser user = load(id);
         user.clearTotp();
         recoveryCodes.deleteAllForUser(id);
+        // Passkeys stand for both factors: a lost device must not keep working
+        passkeys.deleteByUser(id);
         sessionRevoker.revokeAll(user.getUsername());
         return UserResponse.of(user, clock.instant());
     }

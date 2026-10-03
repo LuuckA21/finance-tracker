@@ -41,7 +41,9 @@ export default defineConfig({
       command: 'sh -c "java -jar ../backend/target/finance-tracker-*.jar"',
       // TZ: the zone of the browser above and of docker-compose, so "today" is the same day for the
       // backend and the tests also between 22:00 and midnight UTC
-      env: { TZ: 'Europe/Zurich', MAIL_HOST: '127.0.0.1', MAIL_PORT: '2525', MAIL_SECURITY: 'NONE', MAIL_FROM: 'Finanze <e2e@example.test>' },
+      env: { TZ: 'Europe/Zurich', MAIL_HOST: '127.0.0.1', MAIL_PORT: '2525', MAIL_SECURITY: 'NONE', MAIL_FROM: 'Finanze <e2e@example.test>',
+        // Passkeys are bound to the address the browser opens (http is allowed on localhost)
+        APP_PUBLIC_URL: 'http://localhost:4173' },
       url: 'http://localhost:8080/actuator/health',
       reuseExistingServer: true,
       timeout: 120_000,
