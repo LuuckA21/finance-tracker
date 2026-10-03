@@ -1,12 +1,22 @@
 name: Release
 
-# Pushing a tag vX.Y.Z publishes the GitHub release, its notes taken from CHANGELOG.md.
+# Publishes the GitHub release of a version, its notes taken from CHANGELOG.md, in either way:
+# - started by hand (Actions > Release > Run workflow, on master): tags the current master with the
+#   version in the code (vX.Y.Z) and publishes it. The tag is pushed by this job, and a tag pushed
+#   by a workflow starts no other one, so tagging and publishing happen here together;
+# - pushing a tag vX.Y.Z yourself: publishes that tag.
 on:
   push:
     tags: ['v*.*.*']
+  workflow_dispatch:
 
 permissions:
   contents: write
+
+# One release at a time, never cancelled halfway
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -16,17 +26,40 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          # The whole history, to check that the tagged commit is on master
+          # The whole history and the tags, to check where the release comes from
           fetch-depth: 0
-      - name: Check the tag and read the notes
+      - name: Choose the tag
+        id: tag
         env:
-          TAG: ${{ github.ref_name }}
+          EVENT: ${{ github.event_name }}
+          PUSHED_TAG: ${{ github.ref_name }}
         run: |
-          git merge-base --is-ancestor "$GITHUB_SHA" origin/master \
-            || { echo "$TAG is not on master: release from master only"; exit 1; }
+          if [[ "$EVENT" == workflow_dispatch ]]; then
+            [[ "$GITHUB_REF" == refs/heads/master ]] \
+              || { echo "Run the release on master, not on $GITHUB_REF"; exit 1; }
+            TAG="$(scripts/release-notes.sh --tag)"
+            if git rev-parse --quiet --verify "refs/tags/$TAG" >/dev/null; then
+              echo "$TAG already exists: set the next version in the code and CHANGELOG.md first"
+              exit 1
+            fi
+          else
+            TAG="$PUSHED_TAG"
+            git merge-base --is-ancestor "$GITHUB_SHA" origin/master \
+              || { echo "$TAG is not on master: release from master only"; exit 1; }
+          fi
           scripts/release-notes.sh "$TAG" > "$RUNNER_TEMP/notes.md"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+      - name: Tag master
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Finanze $TAG" "$GITHUB_SHA"
+          git push origin "refs/tags/$TAG"
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ steps.tag.outputs.tag }}
         run: gh release create "$TAG" --verify-tag --title "Finanze $TAG" --notes-file "$RUNNER_TEMP/notes.md"
