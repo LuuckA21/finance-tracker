@@ -1,0 +1,65 @@
+name: Dependency audit
+
+# Known vulnerabilities (OSV database: GitHub advisories, NVD and the ecosystems' own) in the
+# libraries the app ships: the backend's runtime dependencies, as resolved by Maven, and the
+# frontend's npm packages. It runs on every change and every Monday, so an advisory published for a
+# library already in use shows up even when nothing changes here. A finding fails the job: update the
+# library (in backend/pom.xml a version property can override Spring Boot's until it ships the fix),
+# or, when it truly does not apply, list it in osv-scanner.toml with the reason and a review date.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: audit-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Pinned and checked: the scanner runs with the repository checked out
+  OSV_SCANNER_VERSION: 2.6.0
+  OSV_SCANNER_SHA256: ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108
+
+jobs:
+  osv:
+    name: Dependency audit (OSV)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: JDK version of the production image
+        id: java
+        run: scripts/java-version.sh backend/Dockerfile >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ steps.java.outputs.version }}
+          cache: maven
+
+      # The SBOM the build puts in the jar: exactly the runtime dependencies, test ones excluded
+      - name: Backend dependencies (CycloneDX SBOM)
+        working-directory: backend
+        run: ./mvnw -B -ntp -q generate-resources
+
+      - name: Install OSV-Scanner
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/osv-scanner" \
+            "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64"
+          echo "${OSV_SCANNER_SHA256}  $RUNNER_TEMP/osv-scanner" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/osv-scanner"
+
+      - name: Scan
+        run: |
+          "$RUNNER_TEMP/osv-scanner" scan source --config osv-scanner.toml \
+            --offline-vulnerabilities --download-offline-databases \
+            -L backend/target/classes/META-INF/sbom/application.cdx.json \
+            -L frontend/package-lock.json
