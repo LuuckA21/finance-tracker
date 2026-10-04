@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -75,14 +76,26 @@ public class CashEntryService {
      * {@code recurringEntryId} is set when a recurring rule created the entry; {@code tags} are the
      * names of its tags, sorted.
      */
+    /** {@code splitGroup}: shared by the parts of a split entry, null for an entry on its own. */
     public record EntryResponse(long id, LocalDate date, EntryKind kind, Long categoryId, BigDecimal amount,
                                 String currency, String description, Long recurringEntryId,
-                                Long fromPositionId, Long toPositionId, List<String> tags) {
+                                Long fromPositionId, Long toPositionId, List<String> tags, UUID splitGroup) {
         static EntryResponse of(CashEntry e, Map<Long, String> tagNames) {
             return new EntryResponse(e.getId(), e.getDate(), e.getKind(), e.getCategoryId(), e.getAmount(),
                     e.getCurrency(), e.getDescription(), e.getRecurringEntryId(), e.getFromPositionId(),
-                    e.getToPositionId(), tagNames(e, tagNames));
+                    e.getToPositionId(), tagNames(e, tagNames), e.getSplitGroup());
         }
+    }
+
+    /** Most parts of one split entry. */
+    public static final int MAX_SPLIT_PARTS = 20;
+
+    public record SplitPart(Long categoryId, BigDecimal amount) {
+    }
+
+    /** One payment shared among categories: what the parts have in common, and the parts. */
+    public record SplitData(LocalDate date, EntryKind kind, String currency, String description, List<String> tags,
+                            List<SplitPart> parts) {
     }
 
     /** Names of an entry's tags in alphabetical order, regardless of case. */
@@ -178,6 +191,9 @@ public class CashEntryService {
     @Transactional
     public EntryResponse update(long userId, long id, EntryData data) {
         CashEntry entry = entries.findByIdAndUserId(id, userId).orElseThrow(() -> ApiException.notFound("Entry"));
+        if (entry.getSplitGroup() != null && data.kind() == EntryKind.TRANSFER) {
+            throw ApiException.badRequest("split_transfer", "Transfers cannot be split");
+        }
         apply(userId, entry, data);
         return EntryResponse.of(entry, tags.names(userId));
     }
@@ -186,6 +202,83 @@ public class CashEntryService {
     public void delete(long userId, long id) {
         CashEntry entry = entries.findByIdAndUserId(id, userId).orElseThrow(() -> ApiException.notFound("Entry"));
         entries.delete(entry);
+    }
+
+    /**
+     * Creates the parts of a split entry: at least two, each with a category of the entry's kind.
+     *
+     * @param replaces an ordinary entry of the user that the parts take the place of (it is deleted
+     *                 in the same transaction), or null
+     */
+    @Transactional
+    public List<EntryResponse> createSplit(long userId, SplitData data, Long replaces) {
+        if (data.parts().size() < 2) {
+            throw ApiException.badRequest("split_parts", "A split entry has 2 to " + MAX_SPLIT_PARTS + " parts");
+        }
+        if (replaces != null) {
+            CashEntry replaced = entries.findByIdAndUserId(replaces, userId)
+                    .orElseThrow(() -> ApiException.notFound("Entry"));
+            if (replaced.getSplitGroup() != null) {
+                throw ApiException.badRequest("split_replace", "The entry is already part of a split entry");
+            }
+            entries.delete(replaced);
+        }
+        return saveParts(userId, data, UUID.randomUUID());
+    }
+
+    /** The parts of a split entry, in the order they were entered. */
+    @Transactional(readOnly = true)
+    public List<EntryResponse> split(long userId, UUID group) {
+        Map<Long, String> tagNames = tags.names(userId);
+        return parts(userId, group).stream().map(e -> EntryResponse.of(e, tagNames)).toList();
+    }
+
+    /**
+     * Replaces the parts of a split entry with the given ones; a single part turns it back into an
+     * ordinary entry.
+     */
+    @Transactional
+    public List<EntryResponse> updateSplit(long userId, UUID group, SplitData data) {
+        entries.deleteAll(parts(userId, group));
+        entries.flush();
+        return saveParts(userId, data, data.parts().size() == 1 ? null : group);
+    }
+
+    @Transactional
+    public void deleteSplit(long userId, UUID group) {
+        entries.deleteAll(parts(userId, group));
+    }
+
+    private List<CashEntry> parts(long userId, UUID group) {
+        List<CashEntry> parts = entries.findByUserIdAndSplitGroupOrderByIdAsc(userId, group);
+        if (parts.isEmpty()) {
+            throw ApiException.notFound("Entry");
+        }
+        return parts;
+    }
+
+    private List<EntryResponse> saveParts(long userId, SplitData data, UUID group) {
+        if (data.kind() == EntryKind.TRANSFER) {
+            throw ApiException.badRequest("split_transfer", "Transfers cannot be split");
+        }
+        if (data.parts().isEmpty() || data.parts().size() > MAX_SPLIT_PARTS) {
+            throw ApiException.badRequest("split_parts", "A split entry has 2 to " + MAX_SPLIT_PARTS + " parts");
+        }
+        Set<Long> tagIds = tags.resolver(userId).ids(data.tags());
+        List<CashEntry> saved = new ArrayList<>();
+        for (SplitPart part : data.parts()) {
+            EntryData entryData = new EntryData(data.date(), data.kind(), part.categoryId(), part.amount(),
+                    data.currency(), data.description(), null, null, data.tags());
+            CashEntry entry = new CashEntry(userId);
+            fill(entry, EntryTargets.resolve(data.kind(), part.categoryId(), null, null,
+                    id -> categories.find(userId, id), id -> positions.findByIdAndUserId(id, userId)), entryData);
+            entry.setTagIds(tagIds);
+            entry.setSplitGroup(group);
+            saved.add(entry);
+        }
+        entries.saveAll(saved);
+        Map<Long, String> tagNames = tags.names(userId);
+        return saved.stream().map(e -> EntryResponse.of(e, tagNames)).toList();
     }
 
     /** The ids of the entries matching the filter, newest first, at most {@link #MAX_BULK} of them. */

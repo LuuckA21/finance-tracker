@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
@@ -68,6 +69,10 @@ public class CashEntry {
     /** Rule that created the entry, if any (set to null when the rule is deleted). */
     @Column(name = "recurring_entry_id")
     private Long recurringEntryId;
+
+    /** Shared by the parts of a split entry (one payment, several categories); null otherwise. */
+    @Column(name = "split_group")
+    private UUID splitGroup;
 
     /** Ids of the user's tags on this entry. */
     @ElementCollection(fetch = FetchType.EAGER)
@@ -162,6 +167,14 @@ public class CashEntry {
 
     public void setRecurringEntryId(Long recurringEntryId) {
         this.recurringEntryId = recurringEntryId;
+    }
+
+    public UUID getSplitGroup() {
+        return splitGroup;
+    }
+
+    public void setSplitGroup(UUID splitGroup) {
+        this.splitGroup = splitGroup;
     }
 
     public Set<Long> getTagIds() {
