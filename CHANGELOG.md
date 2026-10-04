@@ -11,6 +11,11 @@ GitHub release.
 - Changes in bulk: select entries in the list, or all those matching the filters, and give them a
   category, add or remove tags, or delete them at once.
 
+### Security
+- Tomcat 11.0.26 and Jackson 3.1.7, ahead of Spring Boot, for published vulnerabilities (Tomcat:
+  access control and DIGEST authentication; Jackson: excessive resource use on crafted JSON).
+- Every change, and every week, the libraries are checked against the known vulnerabilities.
+
 ## [1.3.0] - 2026-10-04
 
 ### Added

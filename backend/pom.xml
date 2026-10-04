@@ -21,6 +21,10 @@
         <java.version>25</java.version>
         <webauthn4j.version>0.31.11.RELEASE</webauthn4j.version>
         <bouncycastle.version>1.86</bouncycastle.version>
+        <!-- Security fixes not yet in the Spring Boot release (found by the CI dependency audit):
+             drop each line once Spring Boot manages that version or a newer one -->
+        <tomcat.version>11.0.26</tomcat.version>
+        <jackson-bom.version>3.1.7</jackson-bom.version>
     </properties>
 
     <dependencies>
@@ -125,6 +129,12 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <!-- SBOM of the runtime dependencies (configured by the Spring Boot parent), in the
+                     jar under META-INF/sbom; CI checks it for known vulnerabilities -->
+                <groupId>org.cyclonedx</groupId>
+                <artifactId>cyclonedx-maven-plugin</artifactId>
             </plugin>
             <plugin>
                 <!-- Integration tests (*IT.java) need Docker for Testcontainers -->
