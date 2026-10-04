@@ -1,7 +1,7 @@
 # Finance Tracker
 
 Self-hosted personal finance app for a small group of users (you and your family). Current release:
-**1.2.0**; what each release contains is in [CHANGELOG.md](CHANGELOG.md), and the running version is
+**1.3.0**; what each release contains is in [CHANGELOG.md](CHANGELOG.md), and the running version is
 shown at the bottom of the menu.
 
 - **Cash flow** – record income and expenses (date, category, amount, currency, note) and see
