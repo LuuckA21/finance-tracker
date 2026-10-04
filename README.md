@@ -230,7 +230,13 @@ ops/systemd/     backup service and timer (user units)
 - **Containers**: DB not published; backend read-only filesystem, non-root, all capabilities
   dropped; only the web container is exposed, bound to an address you choose. Memory and process
   limits on every container (`BACKEND_MEMORY` 768m, `DB_MEMORY` 512m, `WEB_MEMORY` 64m).
-- **Dependencies**: Dependabot opens weekly PRs for Maven, npm, base images and Actions.
+- **Dependencies**: Dependabot opens weekly PRs for Maven, npm, base images and Actions. The
+  dependency audit (`.github/workflows/audit.yml`, on every change and every Monday) checks the
+  backend's runtime libraries (the CycloneDX SBOM Maven resolves, also in the jar under
+  `META-INF/sbom`) and the frontend's npm packages against the OSV database of known
+  vulnerabilities, with a pinned, checksum-verified OSV-Scanner; a finding fails it. A fix not yet
+  in Spring Boot is applied by overriding its version property in `backend/pom.xml`; a finding
+  that does not apply can be listed in `osv-scanner.toml` with a reason and a review date.
 
 ## Run locally (development)
 
