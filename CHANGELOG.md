@@ -7,6 +7,10 @@ GitHub release.
 
 ## [Unreleased]
 
+### Added
+- Changes in bulk: select entries in the list, or all those matching the filters, and give them a
+  category, add or remove tags, or delete them at once.
+
 ## [1.3.0] - 2026-10-04
 
 ### Added

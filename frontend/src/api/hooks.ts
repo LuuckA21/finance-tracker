@@ -294,6 +294,28 @@ export function useSaveEntry() {
   })
 }
 
+/** Several entries changed (category, tags) or deleted at once, all or none. */
+export interface BulkInput {
+  ids: number[]
+  action: 'UPDATE' | 'DELETE'
+  categoryId?: number | null
+  addTags?: string[]
+  removeTags?: string[]
+}
+
+export function useBulkEntries() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: (body: BulkInput) => post<{ updated: number; skipped: number }>('/api/cash-entries/bulk', body),
+    onSuccess: () => invalidate(),
+  })
+}
+
+/** The ids of every entry matching the filters (at most 5000), to select them all. */
+export function fetchEntryIds(filter: Omit<EntryFilter, 'page' | 'size'>) {
+  return get<{ ids: number[]; total: number }>(`/api/cash-entries/ids?${entryFilterParams(filter)}`)
+}
+
 export function useDeleteEntry() {
   const invalidate = useInvalidate()
   return useMutation({ mutationFn: (id: number) => del(`/api/cash-entries/${id}`), onSuccess: () => invalidate() })

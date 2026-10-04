@@ -3,6 +3,7 @@ package me.luucka.finance.cashflow;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -19,6 +20,7 @@ import me.luucka.finance.common.ApiException;
 import me.luucka.finance.common.PageResponse;
 import me.luucka.finance.core.Currencies;
 import me.luucka.finance.core.EntryKind;
+import me.luucka.finance.core.TagNames;
 import me.luucka.finance.position.AssetPosition;
 import me.luucka.finance.position.AssetPositionRepository;
 import me.luucka.finance.tag.TagService;
@@ -46,6 +48,27 @@ public class CashEntryService {
 
     /** Optional list filters; {@code null} means "no filter". */
     public record Filter(LocalDate from, LocalDate to, EntryKind kind, Long categoryId, String text, Long tagId) {
+    }
+
+    /** Most entries changed or deleted together (and ids listed for a filter). */
+    public static final int MAX_BULK = MAX_IMPORT_ROWS;
+
+    public enum BulkAction { UPDATE, DELETE }
+
+    /** {@code categoryId}, {@code addTags} and {@code removeTags} apply to {@code UPDATE} only. */
+    public record BulkData(List<Long> ids, BulkAction action, Long categoryId, List<String> addTags,
+                           List<String> removeTags) {
+    }
+
+    /**
+     * @param updated entries changed (or deleted)
+     * @param skipped entries the category does not fit: transfers and entries of the other kind
+     */
+    public record BulkResult(int updated, int skipped) {
+    }
+
+    /** At most {@link #MAX_BULK} ids, and how many entries match in all. */
+    public record Ids(List<Long> ids, long total) {
     }
 
     /**
@@ -163,6 +186,80 @@ public class CashEntryService {
     public void delete(long userId, long id) {
         CashEntry entry = entries.findByIdAndUserId(id, userId).orElseThrow(() -> ApiException.notFound("Entry"));
         entries.delete(entry);
+    }
+
+    /** The ids of the entries matching the filter, newest first, at most {@link #MAX_BULK} of them. */
+    @Transactional(readOnly = true)
+    public Ids ids(long userId, Filter filter) {
+        var first = PageRequest.of(0, MAX_BULK, Sort.by(Sort.Order.desc("date"), Sort.Order.desc("id")));
+        var page = entries.findAll(specification(userId, filter), first);
+        return new Ids(page.getContent().stream().map(CashEntry::getId).toList(), page.getTotalElements());
+    }
+
+    /**
+     * Changes or deletes the given entries together, all or none. A category goes to the entries
+     * of its kind only (the others are counted as skipped); tags are added to and removed from all
+     * of them, new names becoming new tags.
+     *
+     * @throws ApiException 404 when an entry or the category is not the user's, 400 when there is
+     *                      nothing to change or an entry would get more tags than allowed
+     */
+    @Transactional
+    public BulkResult bulk(long userId, BulkData data) {
+        Set<Long> ids = new LinkedHashSet<>(data.ids());
+        if (ids.isEmpty() || ids.size() > MAX_BULK) {
+            throw ApiException.badRequest("bulk_count", "Between 1 and " + MAX_BULK + " entries at a time");
+        }
+        List<CashEntry> found = entries.findByUserIdAndIdIn(userId, ids);
+        if (found.size() != ids.size()) {
+            throw ApiException.notFound("Entry");
+        }
+        if (data.action() == BulkAction.DELETE) {
+            entries.deleteAll(found);
+            return new BulkResult(found.size(), 0);
+        }
+
+        Category category = data.categoryId() == null ? null : categories.find(userId, data.categoryId())
+                .orElseThrow(() -> ApiException.notFound("Category"));
+        List<String> add = data.addTags() == null ? List.of() : data.addTags();
+        List<String> remove = data.removeTags() == null ? List.of() : data.removeTags();
+        if (category == null && add.isEmpty() && remove.isEmpty()) {
+            throw ApiException.badRequest("bulk_nothing", "Choose a category, or tags to add or remove");
+        }
+        Set<Long> addIds = tags.resolver(userId).ids(add);
+        Set<String> removeKeys = TagNames.normalizeAll(remove).orElseThrow(TagService::invalid).stream()
+                .map(TagNames::key).collect(Collectors.toSet());
+        Set<Long> removeIds = tags.names(userId).entrySet().stream()
+                .filter(e -> removeKeys.contains(TagNames.key(e.getValue())))
+                .map(Map.Entry::getKey).collect(Collectors.toSet());
+
+        int updated = 0;
+        int skipped = 0;
+        for (CashEntry entry : found) {
+            boolean changed = false;
+            if (category != null) {
+                if (entry.getKind() != category.getKind()) {
+                    skipped++;
+                } else if (!category.getId().equals(entry.getCategoryId())) {
+                    entry.setCategoryId(category.getId());
+                    changed = true;
+                }
+            }
+            Set<Long> next = new LinkedHashSet<>(entry.getTagIds());
+            next.removeAll(removeIds);
+            next.addAll(addIds);
+            if (!next.equals(entry.getTagIds())) {
+                if (next.size() > TagNames.MAX_PER_ENTRY) {
+                    throw TagService.invalid();
+                }
+                entry.setTagIds(next);
+                changed = true;
+            }
+            if (changed) {
+                updated++;
+            }
+        }
+        return new BulkResult(updated, skipped);
     }
 
     private void apply(long userId, CashEntry entry, EntryData data) {
