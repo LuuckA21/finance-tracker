@@ -1,6 +1,7 @@
 package me.luucka.finance.cashflow;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -11,6 +12,8 @@ import org.springframework.data.jpa.repository.Query;
 public interface CashEntryRepository extends JpaRepository<CashEntry, Long>, JpaSpecificationExecutor<CashEntry> {
 
     Optional<CashEntry> findByIdAndUserId(Long id, Long userId);
+
+    List<CashEntry> findByUserIdAndIdIn(Long userId, Collection<Long> ids);
 
     boolean existsByCategoryId(Long categoryId);
 

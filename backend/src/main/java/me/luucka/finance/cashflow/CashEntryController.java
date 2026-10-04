@@ -19,6 +19,7 @@ import me.luucka.finance.common.CurrencyCode;
 import me.luucka.finance.common.ReasonableDate;
 import me.luucka.finance.common.PageResponse;
 import me.luucka.finance.core.EntryKind;
+import me.luucka.finance.core.TagNames;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ContentDisposition;
@@ -72,6 +73,15 @@ public class CashEntryController {
     public record ImportResponse(int imported) {
     }
 
+    /** Entries to change or delete together; see {@link CashEntryService#bulk}. */
+    public record BulkRequest(
+            @NotEmpty @Size(max = CashEntryService.MAX_BULK) List<@NotNull Long> ids,
+            @NotNull CashEntryService.BulkAction action,
+            Long categoryId,
+            @Size(max = TagNames.MAX_PER_ENTRY) List<String> addTags,
+            @Size(max = TagNames.MAX_PER_ENTRY) List<String> removeTags) {
+    }
+
     private static final MediaType CSV = new MediaType("text", "csv", StandardCharsets.UTF_8);
 
     private final CashEntryService service;
@@ -116,6 +126,27 @@ public class CashEntryController {
                         .filename(csv.exportFileName(me.id(), LocalDate.now(clock))).build().toString())
                 .cacheControl(CacheControl.noStore())
                 .body(body);
+    }
+
+    /** The ids of the entries matching the list filters, to select them all. */
+    @GetMapping("/ids")
+    public CashEntryService.Ids ids(
+            @AuthenticationPrincipal AppPrincipal me,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) EntryKind kind,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) Long tagId) {
+        return service.ids(me.id(), new CashEntryService.Filter(from, to, kind, categoryId, q, tagId));
+    }
+
+    /** Changes (category, tags) or deletes several entries at once, all or none. */
+    @PostMapping("/bulk")
+    public CashEntryService.BulkResult bulk(@AuthenticationPrincipal AppPrincipal me,
+                                            @Valid @RequestBody BulkRequest body) {
+        return service.bulk(me.id(), new CashEntryService.BulkData(body.ids(), body.action(), body.categoryId(),
+                body.addTags(), body.removeTags()));
     }
 
     /** First import step: parses the file and reports every row; stores nothing. */

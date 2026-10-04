@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { ChevronLeft, ChevronRight, Download, FileUp, Pencil, Plus, Repeat, Trash2 } from 'lucide-react'
 import { download, errorMessage } from '../api/client'
-import { entryFilterParams, useCategories, useDeleteEntry, useEntries, usePositions, useTags, type EntryFilter } from '../api/hooks'
+import { entryFilterParams, fetchEntryIds, useBulkEntries, useCategories, useDeleteEntry, useEntries, usePositions, useTags, type EntryFilter } from '../api/hooks'
 import type { CashEntry, Category, EntryKind } from '../api/types'
 import { TagCategories } from '../components/TagCategories'
 import { TagChip } from '../components/TagInput'
@@ -12,6 +12,7 @@ import { useI18n } from '../i18n'
 import { date, money } from '../lib/format'
 import { EntryFormModal } from './EntryForm'
 import { ImportModal } from './EntryImport'
+import { BulkEditModal } from './BulkEntries'
 import { CategoryOptions } from '../components/CategoryOptions'
 
 /** Stable while categories load, so memoized lookups are not rebuilt on every render. */
@@ -33,6 +34,12 @@ export function EntriesPage() {
   const [error, setError] = useState<string | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
+  // Entries chosen for a change together; any change of the filters starts again
+  const [selected, setSelected] = useState<Set<number>>(() => new Set())
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [selectingAll, setSelectingAll] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+  const bulk = useBulkEntries()
   const { t } = useI18n()
 
   useEffect(() => {
@@ -40,13 +47,56 @@ export function EntriesPage() {
   }, [params, setParams])
 
   const byId = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
-  const update = (patch: Partial<EntryFilter>) => setFilter((f) => ({ ...f, ...patch, page: 0 }))
+  const update = (patch: Partial<EntryFilter>) => {
+    setFilter((f) => ({ ...f, ...patch, page: 0 }))
+    setSelected(new Set())
+  }
+
+  function toggle(ids: number[], on: boolean) {
+    setSelected((current) => {
+      const next = new Set(current)
+      ids.forEach((id) => (on ? next.add(id) : next.delete(id)))
+      return next
+    })
+  }
+
+  /** Every entry matching the filters, on all pages. */
+  async function selectAll() {
+    setError(null)
+    setSelectingAll(true)
+    try {
+      const { page: _page, size: _size, ...filters } = filter
+      const result = await fetchEntryIds(filters)
+      if (result.total > result.ids.length) {
+        setError(t('bulk.tooMany', { max: result.ids.length }))
+      } else {
+        setSelected(new Set(result.ids))
+      }
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setSelectingAll(false)
+    }
+  }
+
+  async function onBulkDelete() {
+    if (!confirm(t('bulk.confirmDelete', { count: selected.size }))) return
+    setError(null)
+    try {
+      const result = await bulk.mutateAsync({ ids: [...selected], action: 'DELETE' })
+      setSelected(new Set())
+      setNotice(t('bulk.deleted', { count: result.updated }))
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
 
   async function onDelete(entry: CashEntry) {
     if (!confirm(t('entries.confirmDelete'))) return
     try {
       setError(null)
       await remove.mutateAsync(entry.id)
+      toggle([entry.id], false)
     } catch (err) {
       setError(errorMessage(err))
     }
@@ -132,6 +182,29 @@ export function EntriesPage() {
         )}
 
         <ErrorAlert message={error} />
+        {notice && (
+          <p role="status" className="mb-3 flex items-center justify-between gap-3 rounded-lg bg-accent-soft px-3 py-2 text-sm">
+            <span>{notice}</span>
+            <button type="button" className="text-xs text-accent hover:underline" onClick={() => setNotice(null)}>{t('common.close')}</button>
+          </p>
+        )}
+        {selected.size > 0 && page && (
+          <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm" role="region" aria-label={t('bulk.region')}>
+            <strong>{t('bulk.selected', { count: selected.size })}</strong>
+            {page.totalElements > selected.size && (
+              <Button variant="ghost" onClick={selectAll} loading={selectingAll}>{t('bulk.selectAll', { count: page.totalElements })}</Button>
+            )}
+            <span className="flex flex-1 flex-wrap justify-end gap-2">
+              <Button onClick={() => setSelected(new Set())}>{t('bulk.clear')}</Button>
+              <Button variant="danger" onClick={onBulkDelete} loading={bulk.isPending}>
+                <Trash2 className="size-4" aria-hidden /> {t('bulk.delete')}
+              </Button>
+              <Button variant="primary" onClick={() => { setNotice(null); setBulkOpen(true) }}>
+                <Pencil className="size-4" aria-hidden /> {t('bulk.edit')}
+              </Button>
+            </span>
+          </div>
+        )}
 
         {entries.isPending ? <Spinner /> : !page || page.content.length === 0 ? (
           <EmptyState title={t('entries.emptyTitle')}>{t('entries.emptyHelp')}</EmptyState>
@@ -140,6 +213,11 @@ export function EntriesPage() {
             <table className="w-full min-w-[36rem] text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-xs text-muted">
+                  <th className="w-8 py-2 pl-4 sm:pl-2">
+                    <input type="checkbox" aria-label={t('bulk.selectPage')}
+                      checked={page.content.every((e) => selected.has(e.id))}
+                      onChange={(ev) => toggle(page.content.map((e) => e.id), ev.target.checked)} />
+                  </th>
                   <th className="px-4 py-2 font-medium sm:px-2">{t('common.date')}</th>
                   <th className="px-2 py-2 font-medium">{t('entries.category')}</th>
                   <th className="px-2 py-2 font-medium">{t('entries.description')}</th>
@@ -151,7 +229,11 @@ export function EntriesPage() {
                 {page.content.map((e) => {
                   const style = amountStyle(e.kind)
                   return (
-                    <tr key={e.id} className="border-b border-line last:border-0 hover:bg-surface-2">
+                    <tr key={e.id} className={`border-b border-line last:border-0 hover:bg-surface-2 ${selected.has(e.id) ? 'bg-accent-soft/40' : ''}`}>
+                      <td className="py-2 pl-4 sm:pl-2">
+                        <input type="checkbox" aria-label={t('bulk.selectEntry', { date: date(e.date), description: e.description ?? '' })}
+                          checked={selected.has(e.id)} onChange={(ev) => toggle([e.id], ev.target.checked)} />
+                      </td>
                       <td className="tabular px-4 py-2 text-ink-2 sm:px-2">{date(e.date)}</td>
                       <td className="px-2 py-2">
                         <EntryTarget kind={e.kind} categoryId={e.categoryId} from={e.fromPositionId} to={e.toPositionId}
@@ -216,6 +298,8 @@ export function EntriesPage() {
 
       <EntryFormModal entry={editing} open={formOpen} onClose={() => setFormOpen(false)} />
       <ImportModal open={importOpen} onClose={() => setImportOpen(false)} />
+      <BulkEditModal ids={[...selected]} categories={categories} open={bulkOpen} onClose={() => setBulkOpen(false)}
+        onDone={(message) => { setBulkOpen(false); setSelected(new Set()); setNotice(message) }} />
     </>
   )
 }

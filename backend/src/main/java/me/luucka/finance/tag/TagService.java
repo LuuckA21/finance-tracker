@@ -120,7 +120,7 @@ public class TagService {
         return tags.findByIdAndUserId(id, userId).orElseThrow(() -> ApiException.notFound("Tag"));
     }
 
-    static ApiException invalid() {
+    public static ApiException invalid() {
         return ApiException.badRequest("invalid_tags", "Tags: at most " + TagNames.MAX_PER_ENTRY + " per entry, "
                 + TagNames.MAX_LENGTH + " characters each, without commas");
     }
