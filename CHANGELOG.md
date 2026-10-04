@@ -7,6 +7,8 @@ GitHub release.
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-04
+
 ### Added
 - Bank statements: import the camt.053 XML file from your bank's e-banking like a CSV. Credits
   become income and debits expenses, your rules categorize them, duplicates and pending bookings
