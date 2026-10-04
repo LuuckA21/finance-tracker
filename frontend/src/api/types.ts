@@ -57,6 +57,8 @@ export interface CashEntry {
   toPositionId: number | null
   /** Tag names, sorted; unknown names become new tags when saving */
   tags: string[]
+  /** Shared by the parts of a split entry (one payment, several categories) */
+  splitGroup: string | null
 }
 
 export type Frequency = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'FOUR_MONTHLY' | 'SEMIANNUAL' | 'YEARLY'

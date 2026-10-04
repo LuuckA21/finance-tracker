@@ -93,7 +93,8 @@ public class AccountExportService {
                        trim_scale(amount) as amount, currency, description,
                        from_position_id as "fromPositionId", to_position_id as "toPositionId",
                        array(select tag_id from cash_entry_tag t where t.entry_id = e.id order by tag_id) as "tagIds",
-                       recurring_entry_id as "recurringId", created_at as "createdAt", updated_at as "updatedAt"
+                       recurring_entry_id as "recurringId", split_group as "splitGroup",
+                       created_at as "createdAt", updated_at as "updatedAt"
                 from cash_entry e where user_id = ?"""));
         root.set("recurring", list(userId, """
                 select id, kind, category_id as "categoryId", trim_scale(amount) as amount, currency, description,

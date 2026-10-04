@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
@@ -73,6 +74,29 @@ public class CashEntryController {
     public record ImportResponse(int imported) {
     }
 
+    public record SplitPartRequest(
+            @NotNull Long categoryId,
+            @NotNull @DecimalMin(value = "0.0001") @DecimalMax("999999999999999")
+            @Digits(integer = 15, fraction = 4) BigDecimal amount) {
+    }
+
+    /** One payment shared among categories: date, kind, currency, text and tags of all its parts. */
+    public record SplitRequest(
+            @NotNull @ReasonableDate LocalDate date,
+            @NotNull EntryKind kind,
+            @NotNull @CurrencyCode String currency,
+            @Size(max = 500) String description,
+            @Size(max = 50) List<@NotNull @Size(max = 100) String> tags,
+            @NotEmpty @Size(max = CashEntryService.MAX_SPLIT_PARTS) List<@NotNull @Valid SplitPartRequest> parts,
+            // On creation only: an ordinary entry the parts take the place of (it is deleted)
+            Long replaces) {
+
+        CashEntryService.SplitData toData() {
+            return new CashEntryService.SplitData(date, kind, currency, description, tags == null ? List.of() : tags,
+                    parts.stream().map(p -> new CashEntryService.SplitPart(p.categoryId(), p.amount())).toList());
+        }
+    }
+
     /** Entries to change or delete together; see {@link CashEntryService#bulk}. */
     public record BulkRequest(
             @NotEmpty @Size(max = CashEntryService.MAX_BULK) List<@NotNull Long> ids,
@@ -126,6 +150,34 @@ public class CashEntryController {
                         .filename(csv.exportFileName(me.id(), LocalDate.now(clock))).build().toString())
                 .cacheControl(CacheControl.noStore())
                 .body(body);
+    }
+
+    /** A payment split among categories: one entry per part, linked by their split group. */
+    @PostMapping("/split")
+    @ResponseStatus(HttpStatus.CREATED)
+    public List<CashEntryService.EntryResponse> createSplit(@AuthenticationPrincipal AppPrincipal me,
+                                                            @Valid @RequestBody SplitRequest body) {
+        return service.createSplit(me.id(), body.toData(), body.replaces());
+    }
+
+    @GetMapping("/split/{group}")
+    public List<CashEntryService.EntryResponse> split(@AuthenticationPrincipal AppPrincipal me,
+                                                      @PathVariable UUID group) {
+        return service.split(me.id(), group);
+    }
+
+    /** Replaces the parts; a single part makes it an ordinary entry again. */
+    @PutMapping("/split/{group}")
+    public List<CashEntryService.EntryResponse> updateSplit(@AuthenticationPrincipal AppPrincipal me,
+                                                            @PathVariable UUID group,
+                                                            @Valid @RequestBody SplitRequest body) {
+        return service.updateSplit(me.id(), group, body.toData());
+    }
+
+    @DeleteMapping("/split/{group}")
+    public ResponseEntity<Void> deleteSplit(@AuthenticationPrincipal AppPrincipal me, @PathVariable UUID group) {
+        service.deleteSplit(me.id(), group);
+        return ResponseEntity.noContent().build();
     }
 
     /** The ids of the entries matching the list filters, to select them all. */

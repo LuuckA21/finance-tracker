@@ -241,7 +241,7 @@ export function useEntries(filter: EntryFilter) {
   })
 }
 
-export type EntryInput = Omit<CashEntry, 'id' | 'recurringEntryId'> & { id?: number }
+export type EntryInput = Omit<CashEntry, 'id' | 'recurringEntryId' | 'splitGroup'> & { id?: number }
 
 /** Query string of the entry filters (without paging), for the list and the CSV export. */
 export function entryFilterParams(filter: Omit<EntryFilter, 'page' | 'size'>): URLSearchParams {
@@ -292,6 +292,41 @@ export function useSaveEntry() {
       id ? put<CashEntry>(`/api/cash-entries/${id}`, body) : post<CashEntry>('/api/cash-entries', body),
     onSuccess: () => invalidate(),
   })
+}
+
+/** The parts of a split entry: one payment shared among categories. */
+export const useSplit = (group: string | null) =>
+  useQuery({ queryKey: ['split', group], queryFn: () => get<CashEntry[]>(`/api/cash-entries/split/${group}`), enabled: group !== null })
+
+export interface SplitInput {
+  /** The split entry to change; a new one without it */
+  group?: string | null
+  /** On creation: an ordinary entry the parts take the place of */
+  replaces?: number | null
+  date: string
+  kind: 'INCOME' | 'EXPENSE'
+  currency: string
+  description: string | null
+  tags: string[]
+  parts: { categoryId: number; amount: number }[]
+}
+
+export function useSaveSplit() {
+  const invalidate = useInvalidate()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ group, ...body }: SplitInput) =>
+      group ? put<CashEntry[]>(`/api/cash-entries/split/${group}`, body) : post<CashEntry[]>('/api/cash-entries/split', body),
+    onSuccess: () => {
+      invalidate()
+      qc.removeQueries({ queryKey: ['split'] })
+    },
+  })
+}
+
+export function useDeleteSplit() {
+  const invalidate = useInvalidate()
+  return useMutation({ mutationFn: (group: string) => del(`/api/cash-entries/split/${group}`), onSuccess: () => invalidate() })
 }
 
 /** Several entries changed (category, tags) or deleted at once, all or none. */

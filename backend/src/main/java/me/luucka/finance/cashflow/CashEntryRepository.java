@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -14,6 +15,8 @@ public interface CashEntryRepository extends JpaRepository<CashEntry, Long>, Jpa
     Optional<CashEntry> findByIdAndUserId(Long id, Long userId);
 
     List<CashEntry> findByUserIdAndIdIn(Long userId, Collection<Long> ids);
+
+    List<CashEntry> findByUserIdAndSplitGroupOrderByIdAsc(Long userId, UUID splitGroup);
 
     boolean existsByCategoryId(Long categoryId);
 

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { ChevronLeft, ChevronRight, Download, FileUp, Pencil, Plus, Repeat, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, FileUp, Pencil, Plus, Repeat, Split, Trash2 } from 'lucide-react'
 import { download, errorMessage } from '../api/client'
-import { entryFilterParams, fetchEntryIds, useBulkEntries, useCategories, useDeleteEntry, useEntries, usePositions, useTags, type EntryFilter } from '../api/hooks'
+import { entryFilterParams, fetchEntryIds, useBulkEntries, useCategories, useDeleteEntry, useDeleteSplit, useEntries, usePositions, useTags, type EntryFilter } from '../api/hooks'
 import type { CashEntry, Category, EntryKind } from '../api/types'
 import { TagCategories } from '../components/TagCategories'
 import { TagChip } from '../components/TagInput'
@@ -40,6 +40,7 @@ export function EntriesPage() {
   const [selectingAll, setSelectingAll] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const bulk = useBulkEntries()
+  const removeSplit = useDeleteSplit()
   const { t } = useI18n()
 
   useEffect(() => {
@@ -91,11 +92,16 @@ export function EntriesPage() {
     }
   }
 
+  /** A part of a split entry goes with the whole payment. */
   async function onDelete(entry: CashEntry) {
-    if (!confirm(t('entries.confirmDelete'))) return
+    if (!confirm(t(entry.splitGroup ? 'split.confirmDelete' : 'entries.confirmDelete'))) return
     try {
       setError(null)
-      await remove.mutateAsync(entry.id)
+      if (entry.splitGroup) {
+        await removeSplit.mutateAsync(entry.splitGroup)
+      } else {
+        await remove.mutateAsync(entry.id)
+      }
       toggle([entry.id], false)
     } catch (err) {
       setError(errorMessage(err))
@@ -241,6 +247,11 @@ export function EntriesPage() {
                       </td>
                       <td className="max-w-64 px-2 py-2 text-ink-2">
                         <div className="truncate">
+                          {e.splitGroup !== null && (
+                            <Split className="mr-1.5 inline size-3.5 align-[-2px] text-muted" aria-label={t('split.part')}>
+                              <title>{t('split.part')}</title>
+                            </Split>
+                          )}
                           {e.recurringEntryId !== null && (
                             <Repeat className="mr-1.5 inline size-3.5 align-[-2px] text-muted" aria-label={t('recurring.generated')}>
                               <title>{t('recurring.generated')}</title>

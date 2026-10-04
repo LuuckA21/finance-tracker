@@ -10,6 +10,8 @@ GitHub release.
 ### Added
 - Changes in bulk: select entries in the list, or all those matching the filters, and give them a
   category, add or remove tags, or delete them at once.
+- Split entries: share one payment among several categories (a receipt with groceries and
+  household items); each part counts in its category, and the payment is edited as a whole.
 
 ### Security
 - Tomcat 11.0.26 and Jackson 3.1.7, ahead of Spring Boot, for published vulnerabilities (Tomcat:
