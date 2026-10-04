@@ -7,6 +7,11 @@ GitHub release.
 
 ## [Unreleased]
 
+### Security
+- The limit on failed sign-ins per address counts an IPv6 client by its /64 network, which it
+  could otherwise rotate addresses within, and a successful sign-in no longer clears the count.
+- The web container runs with a read-only filesystem, like the backend.
+
 ## [1.4.0] - 2026-10-04
 
 ### Added

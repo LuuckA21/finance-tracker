@@ -193,7 +193,8 @@ ops/systemd/     backup service and timer (user units)
   the backups until they rotate out. The last enabled administrator cannot delete their account.
   A wrong password or code counts towards the account lock.
 - **Brute force**: generic error for every login failure (no user enumeration, constant-ish time),
-  account lock after 5 failures for 15 min, per-IP limit on failed attempts, audit log of logins
+  account lock after 5 failures for 15 min, per-IP limit on failed attempts (an IPv6 client counts
+  by its /64 network, and a successful login does not clear the count), audit log of logins
   visible to the user. Simultaneous attempts on one account are all counted (no version-conflict
   loophole). Re-checks inside a session (change password, enable/disable 2FA, new
   recovery codes) count towards the same lock, and locking revokes every session, so a stolen
@@ -227,8 +228,8 @@ ops/systemd/     backup service and timer (user units)
   files or URLs (XXE); same size and row limits as the CSV, texts stripped of control and bidi
   characters and cut to the description length. The statement's IBAN only matches the user's own
   positions.
-- **Containers**: DB not published; backend read-only filesystem, non-root, all capabilities
-  dropped; only the web container is exposed, bound to an address you choose. Memory and process
+- **Containers**: DB not published; backend and web with a read-only filesystem, non-root, all
+  capabilities dropped; only the web container is exposed, bound to an address you choose. Memory and process
   limits on every container (`BACKEND_MEMORY` 768m, `DB_MEMORY` 512m, `WEB_MEMORY` 64m).
 - **Dependencies**: Dependabot opens weekly PRs for Maven, npm, base images and Actions. The
   dependency audit (`.github/workflows/audit.yml`, on every change and every Monday) checks the
