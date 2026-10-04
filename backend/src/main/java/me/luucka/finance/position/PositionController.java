@@ -36,6 +36,7 @@ public class PositionController {
     public record PositionRequest(
             @NotBlank @Size(max = 100) String name,
             @Size(max = 32) String symbol,
+            @Size(max = 50) String iban,
             @NotNull AssetClass assetClass,
             @NotNull @CurrencyCode String currency,
             @Size(max = 1000) String notes,
@@ -43,7 +44,8 @@ public class PositionController {
             Boolean archived) {
 
         PositionService.PositionData toData() {
-            return new PositionService.PositionData(name, symbol, assetClass, currency, notes, Boolean.TRUE.equals(archived));
+            return new PositionService.PositionData(name, symbol, iban, assetClass, currency, notes,
+                    Boolean.TRUE.equals(archived));
         }
     }
 

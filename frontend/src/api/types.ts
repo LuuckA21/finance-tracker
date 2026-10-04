@@ -148,6 +148,8 @@ export interface Position {
   id: number
   name: string
   symbol: string | null
+  /** IBAN of a bank account (no spaces): bank statements name the account by it */
+  iban: string | null
   assetClass: AssetClass
   currency: string
   notes: string | null
@@ -168,6 +170,7 @@ export type ImportRowError =
   | 'invalid_kind' | 'missing_category' | 'unknown_category' | 'unknown_subcategory' | 'ambiguous_category'
   | 'category_kind_mismatch'
   | 'unknown_position' | 'transfer_same_position' | 'invalid_tags'
+  | 'camt_pending'
 
 /** One CSV data row: raw text as in the file plus the values that could be read. */
 export interface ImportPreviewRow {
@@ -205,14 +208,28 @@ export interface CategorySuggestion {
   pattern: string | null
 }
 
+/** An account in a bank statement, with the position that has its IBAN (if any). */
+export interface StatementInfo {
+  iban: string | null
+  currency: string | null
+  closingDate: string | null
+  closingBalance: number | null
+  positionId: number | null
+  positionName: string | null
+  positionCurrency: string | null
+}
+
 export interface ImportPreview {
-  delimiter: string
+  /** CSV, or CAMT for a bank statement (camt.053 and the like) */
+  format: 'CSV' | 'CAMT'
+  delimiter: string | null
   ignoredColumns: string[]
   total: number
   valid: number
   duplicates: number
   invalid: number
   rows: ImportPreviewRow[]
+  statements: StatementInfo[]
 }
 
 /** ECB rate towards the base currency; manualRate is set when the user's own rate is used instead. */

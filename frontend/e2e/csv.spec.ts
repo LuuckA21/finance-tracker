@@ -11,7 +11,7 @@ const CSV = [
 
 test('import row by row: fix a category, skip a broken row, then export', async ({ signedIn: page }) => {
   await page.goto('/movimenti')
-  await page.getByRole('button', { name: 'Importa CSV' }).click()
+  await page.getByRole('button', { name: 'Importa', exact: true }).click()
   const dialog = page.locator('dialog[open]')
   await dialog.getByLabel('File CSV').setInputFiles({ name: 'movimenti.csv', mimeType: 'text/csv', buffer: Buffer.from(CSV) })
   await dialog.getByRole('radio', { name: 'Rivedi riga per riga' }).click()
@@ -52,7 +52,7 @@ test('importing the same file twice finds only duplicates', async ({ signedIn: p
   const file = { name: 'movimenti.csv', mimeType: 'text/csv', buffer: Buffer.from(CSV.split('\r\n').slice(0, 2).join('\r\n')) }
   await page.goto('/movimenti')
   for (const expected of ['Movimenti importati: 1.', 'Nessun movimento nuovo']) {
-    await page.getByRole('button', { name: 'Importa CSV' }).click()
+    await page.getByRole('button', { name: 'Importa', exact: true }).click()
     const dialog = page.locator('dialog[open]')
     await dialog.getByLabel('File CSV').setInputFiles(file)
     await dialog.getByRole('radio', { name: 'Importa tutto' }).click()
@@ -73,7 +73,7 @@ const NEW_CATEGORIES = [
 
 test('import row by row: create the categories the file names on the spot', async ({ signedIn: page }) => {
   await page.goto('/movimenti')
-  await page.getByRole('button', { name: 'Importa CSV' }).click()
+  await page.getByRole('button', { name: 'Importa', exact: true }).click()
   const dialog = page.locator('dialog[open]')
   await dialog.getByLabel('File CSV').setInputFiles({ name: 'nuove.csv', mimeType: 'text/csv', buffer: Buffer.from(NEW_CATEGORIES) })
   await dialog.getByRole('radio', { name: 'Rivedi riga per riga' }).click()

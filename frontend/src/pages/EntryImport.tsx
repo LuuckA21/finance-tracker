@@ -1,13 +1,13 @@
 import { Fragment, useMemo, useState, type FormEvent } from 'react'
 import { ChevronLeft, ChevronRight, Download, FileUp } from 'lucide-react'
 import { ApiError, errorMessage, saveBlob } from '../api/client'
-import { useCategories, useImportEntries, useImportPreview, useMe, usePositions } from '../api/hooks'
-import type { Category, CategoryRule, EntryKind, ImportPreview, ImportPreviewRow, ImportRowError, Position } from '../api/types'
+import { useCategories, useImportEntries, useImportPreview, useMe, usePositions, useUpdateBalances } from '../api/hooks'
+import type { Category, CategoryRule, EntryKind, ImportPreview, ImportPreviewRow, ImportRowError, Position, StatementInfo } from '../api/types'
 import { TagChip } from '../components/TagInput'
 import { transferOptions } from '../components/TransferFields'
 import { Badge, Button, ErrorAlert, Field, Modal, Segmented } from '../components/ui'
 import { useI18n, type Language, type MessageKey } from '../i18n'
-import { date, money } from '../lib/format'
+import { date, formatIban, money } from '../lib/format'
 import { CategoryOptions } from '../components/CategoryOptions'
 import { PATH_SEPARATOR } from '../lib/categories'
 import { missingCategories, type MissingCategory } from '../lib/importCategories'
@@ -45,9 +45,21 @@ type Step =
   | { name: 'select' }
   | { name: 'invalid'; preview: ImportPreview }
   | { name: 'review'; preview: ImportPreview }
-  | { name: 'done'; imported: number; skipped: number }
+  | { name: 'done'; imported: number; skipped: number; balances: string[]; balanceFailed?: boolean }
 
 const blocking = (row: ImportPreviewRow) => row.errors.filter((e) => !FIXABLE.includes(e))
+
+type UsableStatement = StatementInfo & { positionId: number; positionName: string; closingDate: string; closingBalance: number }
+
+/** A statement's closing balance can be the value of the position with its IBAN: same currency, not overdrawn. */
+function canUpdate(s: StatementInfo): s is UsableStatement {
+  return s.positionId !== null && s.positionName !== null && s.closingDate !== null && s.closingBalance !== null
+    && s.closingBalance >= 0 && s.currency !== null && s.positionCurrency === s.currency
+}
+
+function balanceUpdate(s: UsableStatement, note: string) {
+  return { positionId: s.positionId, date: s.closingDate, balance: s.closingBalance, note, name: s.positionName }
+}
 
 function isReady(row: ReviewRow, categories: Category[]) {
   if (blocking(row.source).length > 0 || row.kind === null) return false
@@ -78,7 +90,9 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
           <p className="rounded-lg bg-surface-2 px-3 py-3 text-sm">
             {step.imported === 0 ? t('import.nothingNew') : t('import.done', { count: step.imported })}
             {step.imported > 0 && step.skipped > 0 && <> {t('import.doneSkipped', { count: step.skipped })}</>}
+            {step.balances.length > 0 && <> {t('import.balancesUpdated', { names: step.balances.join(', ') })}</>}
           </p>
+          {step.balanceFailed && <ErrorAlert message={t('import.balanceFailed')} />}
           <div className="flex justify-end"><Button variant="primary" onClick={close}>{t('common.close')}</Button></div>
         </div>
       )}
@@ -91,6 +105,7 @@ function SelectStep({ onStep }: { onStep: (step: Step) => void }) {
   const categories = useCategories().data ?? []
   const preview = useImportPreview()
   const save = useImportEntries()
+  const balances = useUpdateBalances()
   const [file, setFile] = useState<File | null>(null)
   const [mode, setMode] = useState<Mode>('review')
   const [error, setError] = useState<string | null>(null)
@@ -115,7 +130,13 @@ function SelectStep({ onStep }: { onStep: (step: Step) => void }) {
       }
       const rows = result.rows.filter((r) => !r.duplicate)
       if (rows.length > 0) await save.mutateAsync(rows.map(toInput))
-      onStep({ name: 'done', imported: rows.length, skipped: result.rows.length - rows.length })
+      // Everything at once: the closing balances update their positions too
+      const updates = result.statements.filter(canUpdate).map((s) => balanceUpdate(s, t('import.balanceNote')))
+      const balanceFailed = updates.length > 0 && !(await balances.mutateAsync(updates).then(() => true, () => false))
+      onStep({
+        name: 'done', imported: rows.length, skipped: result.rows.length - rows.length,
+        balances: balanceFailed ? [] : updates.map((u) => u.name), balanceFailed,
+      })
     } catch (err) {
       setError(fileErrorMessage(err, t))
     }
@@ -143,6 +164,7 @@ function SelectStep({ onStep }: { onStep: (step: Step) => void }) {
           <li>{t('import.helpKind')}</li>
           <li>{t('import.helpTransfer')}</li>
           <li>{t('import.helpTags')}</li>
+          <li>{t('import.helpCamt')}</li>
         </ul>
         <button type="button" onClick={downloadTemplate} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline">
           <Download className="size-3.5" /> {t('import.template')}
@@ -150,7 +172,7 @@ function SelectStep({ onStep }: { onStep: (step: Step) => void }) {
       </div>
       <Field label={t('import.file')} hint={t('import.fileHint')}>
         {(id) => (
-          <input id={id} type="file" accept=".csv,text/csv" required className="input file:mr-3 file:rounded-md file:border-0 file:bg-surface-2 file:px-2 file:py-1 file:text-sm"
+          <input id={id} type="file" accept=".csv,.xml,text/csv,text/xml,application/xml" required className="input file:mr-3 file:rounded-md file:border-0 file:bg-surface-2 file:px-2 file:py-1 file:text-sm"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
         )}
       </Field>
@@ -161,7 +183,7 @@ function SelectStep({ onStep }: { onStep: (step: Step) => void }) {
       </div>
       <ErrorAlert message={error} />
       <div className="flex justify-end">
-        <Button type="submit" variant="primary" loading={preview.isPending || save.isPending} disabled={!file}>
+        <Button type="submit" variant="primary" loading={preview.isPending || save.isPending || balances.isPending} disabled={!file}>
           <FileUp className="size-4" /> {mode === 'review' ? t('import.analyze') : t('import.importAll')}
         </Button>
       </div>
@@ -200,8 +222,11 @@ function ReviewStep({ preview, onStep }: { preview: ImportPreview; onStep: (step
   const positions = usePositions().data ?? []
   const baseCurrency = useMe().data?.baseCurrency ?? 'CHF'
   const save = useImportEntries()
+  const balances = useUpdateBalances()
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(0)
+  // Closing balances of a bank statement, to set as the value of the positions with their IBAN
+  const [balanceOn, setBalanceOn] = useState<boolean[]>(() => preview.statements.map(canUpdate))
   const [onlyToCheck, setOnlyToCheck] = useState(false)
   const [ruleFor, setRuleFor] = useState<number | null>(null)
   const [rows, setRows] = useState<ReviewRow[]>(() => preview.rows.map((source) => {
@@ -221,6 +246,7 @@ function ReviewStep({ preview, onStep }: { preview: ImportPreview; onStep: (step
   const pages = Math.max(1, Math.ceil(visible.length / REVIEW_PAGE))
   const shown = visible.slice(page * REVIEW_PAGE, (page + 1) * REVIEW_PAGE)
   const selected = rows.filter((r) => r.include && isReady(r, categories))
+  const updates = preview.statements.flatMap((s, i) => (balanceOn[i] && canUpdate(s) ? [balanceUpdate(s, t('import.balanceNote'))] : []))
   const missing = useMemo(() => missingCategories(rows.map((r) => ({
     kind: r.kind, categoryId: r.categoryId, errors: r.source.errors, raw: r.source.raw,
   })), categories), [rows, categories])
@@ -275,15 +301,23 @@ function ReviewStep({ preview, onStep }: { preview: ImportPreview; onStep: (step
   async function submit() {
     setError(null)
     try {
-      await save.mutateAsync(selected.map((r) => toInput({
-        ...r.source, kind: r.kind, categoryId: r.kind === 'TRANSFER' ? null : r.categoryId,
-        fromPositionId: r.kind === 'TRANSFER' ? r.from : null, toPositionId: r.kind === 'TRANSFER' ? r.to : null,
-      })))
-      onStep({ name: 'done', imported: selected.length, skipped: rows.length - selected.length })
+      if (selected.length > 0) {
+        await save.mutateAsync(selected.map((r) => toInput({
+          ...r.source, kind: r.kind, categoryId: r.kind === 'TRANSFER' ? null : r.categoryId,
+          fromPositionId: r.kind === 'TRANSFER' ? r.from : null, toPositionId: r.kind === 'TRANSFER' ? r.to : null,
+        })))
+      }
     } catch (err) {
       const row = err instanceof ApiError && typeof err.row === 'number' ? selected[err.row] : undefined
       setError(row ? `${t('import.line', { line: row.source.line })}: ${errorMessage(err)}` : errorMessage(err))
+      return
     }
+    // The entries are in: a balance that fails is reported, not retried with them
+    const balanceFailed = updates.length > 0 && !(await balances.mutateAsync(updates).then(() => true, () => false))
+    onStep({
+      name: 'done', imported: selected.length, skipped: rows.length - selected.length,
+      balances: balanceFailed ? [] : updates.map((u) => u.name), balanceFailed,
+    })
   }
 
   return (
@@ -298,6 +332,10 @@ function ReviewStep({ preview, onStep }: { preview: ImportPreview; onStep: (step
         )}
       </div>
       <p className="text-xs text-ink-2">{t('import.reviewHelp')}</p>
+      {preview.statements.length > 0 && (
+        <Statements statements={preview.statements} on={balanceOn} baseCurrency={baseCurrency}
+          onChange={(index, value) => setBalanceOn((all) => all.map((v, i) => (i === index ? value : v)))} />
+      )}
       <MissingCategories missing={missing} categories={categories} onCreated={created} />
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <button type="button" className="text-accent hover:underline" onClick={() => selectAll(true)}>{t('import.selectReady')}</button>
@@ -422,10 +460,47 @@ function ReviewStep({ preview, onStep }: { preview: ImportPreview; onStep: (step
       <div className="flex flex-wrap items-center justify-end gap-3 border-t border-line pt-3">
         <span className="text-sm text-ink-2">{t('import.selected', { count: selected.length, total: rows.length })}</span>
         <Button onClick={() => onStep({ name: 'select' })}>{t('import.otherFile')}</Button>
-        <Button variant="primary" onClick={submit} loading={save.isPending} disabled={selected.length === 0}>
-          {t('import.importSelected', { count: selected.length })}
+        <Button variant="primary" onClick={submit} loading={save.isPending || balances.isPending}
+          disabled={selected.length === 0 && updates.length === 0}>
+          {selected.length === 0 && updates.length > 0 ? t('import.balanceOnly') : t('import.importSelected', { count: selected.length })}
         </Button>
       </div>
+    </div>
+  )
+}
+
+/** The accounts of a bank statement: closing balance, and the offer to set it on the position with the IBAN. */
+function Statements({ statements, on, baseCurrency, onChange }: {
+  statements: StatementInfo[]
+  on: boolean[]
+  baseCurrency: string
+  onChange: (index: number, value: boolean) => void
+}) {
+  const { t } = useI18n()
+  return (
+    <div className="flex flex-col gap-2">
+      {statements.map((s, i) => (
+        <div key={i} className="rounded-lg border border-line px-3 py-2 text-sm">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <span className="tabular font-medium">{s.iban ? formatIban(s.iban) : t('import.statementAccount')}</span>
+            {s.closingDate !== null && s.closingBalance !== null && (
+              <span className="text-ink-2">
+                {t('import.closingBalance', { date: date(s.closingDate), amount: money(s.closingBalance, s.currency ?? baseCurrency) })}
+              </span>
+            )}
+          </div>
+          {canUpdate(s) ? (
+            <label className="mt-1.5 flex items-center gap-2">
+              <input type="checkbox" checked={on[i]} onChange={(e) => onChange(i, e.target.checked)} />
+              {t('import.updateBalance', { name: s.positionName })}
+            </label>
+          ) : s.positionName !== null ? (
+            <p className="mt-1 text-xs text-muted">{t('import.balanceNotUsable', { name: s.positionName })}</p>
+          ) : s.iban !== null ? (
+            <p className="mt-1 text-xs text-muted">{t('import.noPositionForIban')}</p>
+          ) : null}
+        </div>
+      ))}
     </div>
   )
 }

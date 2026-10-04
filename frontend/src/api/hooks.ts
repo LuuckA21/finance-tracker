@@ -263,6 +263,19 @@ export function useImportPreview() {
   })
 }
 
+/** The closing balances of bank statements, as the value of the positions with their IBAN on that day. */
+export function useUpdateBalances() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: async (balances: { positionId: number; date: string; balance: number; note: string }[]) => {
+      for (const b of balances) {
+        await post<Snapshot>(`/api/positions/${b.positionId}/snapshots`, { date: b.date, quantity: b.balance, unitPrice: 1, note: b.note })
+      }
+    },
+    onSettled: () => invalidate(),
+  })
+}
+
 /** Second step: the confirmed rows, saved all together or not at all. */
 export function useImportEntries() {
   const invalidate = useInvalidate()
@@ -351,6 +364,8 @@ export interface PositionInput {
   currency: string
   notes: string
   archived: boolean
+  /** Empty for none */
+  iban: string
 }
 
 export function useSavePosition() {

@@ -10,4 +10,6 @@ public interface AssetPositionRepository extends JpaRepository<AssetPosition, Lo
     List<AssetPosition> findByUserIdOrderByArchivedAscNameAsc(Long userId);
 
     Optional<AssetPosition> findByIdAndUserId(Long id, Long userId);
+
+    Optional<AssetPosition> findByUserIdAndIban(Long userId, String iban);
 }
