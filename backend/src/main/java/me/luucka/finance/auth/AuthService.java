@@ -218,7 +218,6 @@ public class AuthService {
             user.setLastLoginAt(now);
         });
         authSession.establish(saved, request, response);
-        rateLimiter.reset(request.getRemoteAddr());
         audit(saved.getId(), saved.getUsername(), request, true, reason);
         log.info("User '{}' logged in from {}", saved.getUsername(), request.getRemoteAddr());
     }
