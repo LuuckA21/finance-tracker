@@ -7,10 +7,17 @@ GitHub release.
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-10-15
+
 ### Security
 - The limit on failed sign-ins per address counts an IPv6 client by its /64 network, which it
   could otherwise rotate addresses within, and a successful sign-in no longer clears the count.
 - The web container runs with a read-only filesystem, like the backend.
+- source-map-js 1.2.2, used only while building the app, for a published vulnerability (a crafted
+  source map could stall the build); nothing in the running app was exposed.
+
+### Changed
+- Frontend libraries updated (Vite 8.3.3, TanStack Query, lucide-react).
 
 ## [1.4.0] - 2026-10-04
 
