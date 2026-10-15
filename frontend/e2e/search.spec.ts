@@ -1,4 +1,12 @@
+import type { Page } from '@playwright/test'
 import { apiOk, expect, test, today } from './fixtures'
+
+/** "/" opens the search box once the page is idle: no dialog open (the shortcut waits for them to close). */
+async function openSearch(page: Page) {
+  await expect(page.locator('dialog[open]')).toHaveCount(0)
+  await page.keyboard.press('/')
+  await expect(page.getByRole('combobox', { name: 'Cerca' })).toBeFocused()
+}
 
 test('search box: "/" opens it, results open the entry, the position, the recurring entry and the goal', async ({ signedIn: page }) => {
   const request = page.request
@@ -17,9 +25,8 @@ test('search box: "/" opens it, results open the entry, the position, the recurr
 
   await page.goto('/')
   await expect(page.getByRole('button', { name: 'Cerca' })).toBeVisible()
-  await page.keyboard.press('/')
+  await openSearch(page)
   const box = page.getByRole('combobox', { name: 'Cerca' })
-  await expect(box).toBeFocused()
   await box.fill('coop')
   const results = page.getByRole('listbox', { name: 'Risultati della ricerca' })
   await expect(results.getByRole('group', { name: 'Movimenti' })).toContainText('Coop Pronto Bahnhof')
@@ -46,26 +53,27 @@ test('search box: "/" opens it, results open the entry, the position, the recurr
   await dialog.getByRole('button', { name: 'Chiudi' }).click()
 
   // A goal, by clicking
-  await page.keyboard.press('/')
+  await openSearch(page)
   await box.fill('vacanze c')
   await results.getByRole('option', { name: /Vacanze Coop/ }).click()
   await expect(dialog.getByRole('heading', { name: 'Modifica obiettivo' })).toBeVisible()
   await dialog.getByRole('button', { name: 'Chiudi' }).click()
 
   // A position by part of its IBAN
-  await page.keyboard.press('/')
+  await openSearch(page)
   await box.fill('0076 2011')
   await results.getByRole('option', { name: /Conto Coop/ }).click()
   await expect(page).toHaveURL(new RegExp(`/posizioni/${account.id}$`))
+  await expect(page.getByRole('heading', { name: 'Conto Coop' })).toBeVisible()
 
   // A tag lists its entries; an amount finds the entry
-  await page.keyboard.press('/')
+  await openSearch(page)
   await box.fill('vacanze')
   await results.getByRole('group', { name: 'Etichette' }).getByRole('option', { name: 'Vacanze' }).click()
   await expect(page).toHaveURL(/\/movimenti$/)
   await expect(page.getByLabel('Etichette', { exact: true })).toHaveValue(/\d+/)
   await expect(page.locator('tbody tr')).toHaveCount(1)
-  await page.keyboard.press('/')
+  await openSearch(page)
   await box.fill('45,20')
   await expect(results.getByRole('option')).toHaveCount(1)
   await expect(results).toContainText('Coop Pronto Bahnhof')
