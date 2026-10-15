@@ -281,6 +281,31 @@ public class CashEntryService {
         return saved.stream().map(e -> EntryResponse.of(e, tagNames)).toList();
     }
 
+    /** The first entries found, newest first, and how many match in all. */
+    public record Found(List<EntryResponse> entries, long total) {
+    }
+
+    /**
+     * Entries whose description contains {@code text} (regardless of case) or, when
+     * {@code amount} is given, of exactly that amount.
+     */
+    @Transactional(readOnly = true)
+    public Found search(long userId, String text, BigDecimal amount, int limit) {
+        String pattern = "%" + escapeLike(text.toLowerCase(Locale.ROOT)) + "%";
+        Specification<CashEntry> matching = (root, query, cb) -> {
+            Predicate found = cb.like(cb.lower(root.<String>get("description")), pattern, '\\');
+            if (amount != null) {
+                found = cb.or(found, cb.equal(root.get("amount"), amount));
+            }
+            return cb.and(cb.equal(root.get("userId"), userId), found);
+        };
+        var page = entries.findAll(matching,
+                PageRequest.of(0, limit, Sort.by(Sort.Order.desc("date"), Sort.Order.desc("id"))));
+        Map<Long, String> tagNames = tags.names(userId);
+        return new Found(page.getContent().stream().map(e -> EntryResponse.of(e, tagNames)).toList(),
+                page.getTotalElements());
+    }
+
     /** The ids of the entries matching the filter, newest first, at most {@link #MAX_BULK} of them. */
     @Transactional(readOnly = true)
     public Ids ids(long userId, Filter filter) {

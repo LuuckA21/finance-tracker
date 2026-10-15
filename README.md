@@ -77,6 +77,10 @@ shown at the bottom of the menu.
 - **Changes in bulk** – tick entries in the list (or all those matching the filters, up to 5000)
   and give them a category, add or remove tags, or delete them, all at once or not at all. A
   category goes to the entries of its kind only; the others and transfers are counted as skipped.
+- **Search** – one box for everything (the `/` key opens it, Ctrl/⌘+K too): entries by description
+  or by amount (45.20, 45,20), categories, tags, positions (also by ticker or part of the IBAN),
+  recurring entries and goals. A result opens where it belongs: the entry or the recurring entry
+  in its form, a goal, a position's page, or the entries of a category or tag.
 - **CSV import/export** – export the entries matching the current filters (Excel-friendly: UTF-8,
   `;`, ISO dates). Import either everything at once (valid rows, duplicates skipped, nothing saved
   if a row has problems) or row by row: include or exclude each row, fix type and category,
@@ -531,6 +535,7 @@ encrypted with it).
 | Category rules | `GET/POST /api/category-rules` (`{pattern, categoryId}`), `PUT/DELETE /api/category-rules/{id}`, `GET /api/category-rules/suggest?description&kind` (`{categoryId, ruleId, pattern}` from a rule, `ruleId` null from past entries; 204 when nothing fits) |
 | Categories | `GET/POST /api/categories` (`{name, kind, color, parentId}`: `parentId` null for a macro, a macro of the same kind for a detail), `PUT/DELETE /api/categories/{id}` (`{name, color, parentId}`; a macro with details cannot be deleted or moved under another) |
 | Entries | `GET /api/cash-entries?from&to&kind&categoryId&q&tagId&page&size` (each entry has `tags`: names; unknown names sent on save become new tags) (kind `INCOME\|EXPENSE\|TRANSFER`; transfers take `fromPositionId`/`toPositionId` instead of `categoryId`), `POST`, `PUT/DELETE /{id}`, `GET /export?filters` (CSV), `POST /import/preview` (multipart `file`: CSV, or a camt.052/053/054 statement, answered with `format: CAMT` and the `statements` with their closing balance and matching position), `POST /import` (`{entries:[…]}`), `GET /ids?filters` (`{ids, total}`, up to 5000), `POST /split` (`{date, kind, currency, description?, tags?, parts:[{categoryId, amount}], replaces?}`, 2–20 parts), `GET/PUT/DELETE /split/{group}` (PUT with one part joins it back), `POST /bulk` (`{ids, action: UPDATE\|DELETE, categoryId?, addTags?, removeTags?}` → `{updated, skipped}`, all or none) |
+| Search | `GET /api/search?q` (2–100 characters; `{entries, entriesTotal, categories, tags, positions, recurring, goals}`, the newest 8 entries and up to 5 of each other kind) |
 | Recurring | `GET/POST /api/recurring-entries`, `PUT/DELETE /{id}` (frequency `DAILY\|WEEKLY\|MONTHLY\|QUARTERLY\|FOUR_MONTHLY\|SEMIANNUAL\|YEARLY`; `tags` are copied to the entries created) |
 | Positions | `GET/POST /api/positions` (optional `iban`, checked, one per position), `GET/PUT/DELETE /{id}`, `GET/POST /{id}/snapshots`, `PUT/DELETE /{id}/snapshots/{sid}`, `POST /api/positions/snapshots/bulk` |
 | FX | `GET/POST /api/fx-rates`, `DELETE /{id}` (manual rates), `GET /api/fx-rates/central?date` (ECB rates in the base currency on a day, default today) |

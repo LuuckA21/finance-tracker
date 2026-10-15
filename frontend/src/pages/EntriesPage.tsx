@@ -14,6 +14,7 @@ import { EntryFormModal } from './EntryForm'
 import { ImportModal } from './EntryImport'
 import { BulkEditModal } from './BulkEntries'
 import { CategoryOptions } from '../components/CategoryOptions'
+import { useSearchHandoff } from '../lib/search'
 
 /** Stable while categories load, so memoized lookups are not rebuilt on every render. */
 const NO_CATEGORIES: Category[] = []
@@ -46,6 +47,21 @@ export function EntriesPage() {
   useEffect(() => {
     if (params.has('new')) setParams({}, { replace: true })
   }, [params, setParams])
+
+  // From the search box: an entry to open, or the entries of a category, a tag or a text
+  useSearchHandoff((handoff) => {
+    if (handoff.kind === 'entry') {
+      setEditing(handoff.entry)
+      setFormOpen(true)
+    } else if (handoff.kind === 'entries') {
+      const { categoryId = '', tagId = '', q = '' } = handoff.filter
+      setFilter({ page: 0, size: PAGE_SIZE, kind: '', categoryId, tagId, q })
+      setSelected(new Set())
+    } else {
+      return false
+    }
+    return true
+  })
 
   const byId = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
   const update = (patch: Partial<EntryFilter>) => {

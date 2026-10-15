@@ -978,4 +978,23 @@ export const en: Messages = {
   'trend.partialNote': 'The year is under way: “so far” runs from 1 January to today and is compared with the same stretch of the year before; the monthly average counts the completed months.',
   'trend.details': 'By detail',
   'trend.detail': 'Detail',
+
+  // Search box
+  'search.open': 'Search',
+  'search.placeholder': 'Transactions, categories, tags, positions…',
+  'search.hint': 'Type at least 2 characters: a name, a description, an IBAN or an amount such as 45.20.',
+  'search.loading': 'Searching…',
+  'search.error': 'The search failed. Please try again.',
+  'search.none': 'No results for “{text}”.',
+  'search.results': 'Search results',
+  'search.keys': '↑ ↓ to choose · Enter to open · Esc to close',
+  'search.entries': 'Transactions',
+  'search.allEntries': 'All {count} transactions with “{text}”',
+  'search.categories': 'Categories',
+  'search.tags': 'Tags',
+  'search.positions': 'Positions',
+  'search.archived': 'Archived',
+  'search.recurring': 'Recurring',
+  'search.goals': 'Goals',
+  'error.search_too_long': 'Search for at most 100 characters.',
 }

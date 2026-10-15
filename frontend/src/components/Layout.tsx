@@ -1,4 +1,4 @@
-import { Suspense, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router'
 import {
   ArrowLeftRight,
@@ -11,6 +11,7 @@ import {
   PiggyBank,
   RefreshCw,
   Repeat,
+  Search,
   Settings,
   Target,
   TrendingUp,
@@ -22,6 +23,7 @@ import {
 import { useMe } from '../api/hooks'
 import { useLogout } from '../auth/useLogout'
 import { useI18n, type MessageKey } from '../i18n'
+import { SearchDialog } from './SearchDialog'
 import { Spinner } from './ui'
 
 /**
@@ -54,7 +56,22 @@ export function Layout() {
   const me = useMe().data
   const logout = useLogout()
   const [open, setOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const { t } = useI18n()
+
+  // "/" opens the search box, as on many sites (Ctrl/⌘+K too), unless the user is typing somewhere
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const shortcut = (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey)
+        || (e.key.toLowerCase() === 'k' && (e.ctrlKey || e.metaKey))
+      if (!shortcut || e.defaultPrevented || isTyping(e.target) || document.querySelector('dialog[open]')) return
+      e.preventDefault()
+      setOpen(false)
+      setSearchOpen(true)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   // Administrators also manage the users, next to the settings
   const groups: readonly (readonly NavItem[])[] = me?.role === 'ADMIN'
@@ -107,6 +124,16 @@ export function Layout() {
         <aside className="sticky top-0 flex h-dvh flex-col justify-between gap-3 overflow-y-auto p-3">
           <div>
             <Brand />
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              aria-keyshortcuts="/"
+              className="mb-3 flex w-full items-center gap-2.5 rounded-lg border border-line px-3 py-2 text-sm text-muted hover:bg-surface-2 hover:text-ink"
+            >
+              <Search className="size-4" aria-hidden />
+              <span className="flex-1 text-left">{t('search.open')}</span>
+              <kbd className="rounded border border-line px-1.5 font-sans text-xs">/</kbd>
+            </button>
             {nav}
           </div>
           {account}
@@ -116,10 +143,16 @@ export function Layout() {
       {/* Mobile top bar */}
       <header className="sticky top-0 z-20 flex items-center justify-between border-b border-line bg-surface px-4 py-2 lg:hidden print:hidden">
         <Brand />
-        <button type="button" className="rounded-md p-2 text-ink-2" onClick={() => setOpen((v) => !v)}
-          aria-label={open ? t('nav.closeMenu') : t('nav.openMenu')} aria-expanded={open}>
-          {open ? <X className="size-5" /> : <Menu className="size-5" />}
-        </button>
+        <div className="flex items-center">
+          <button type="button" className="rounded-md p-2 text-ink-2" onClick={() => { setOpen(false); setSearchOpen(true) }}
+            aria-label={t('search.open')}>
+            <Search className="size-5" />
+          </button>
+          <button type="button" className="rounded-md p-2 text-ink-2" onClick={() => setOpen((v) => !v)}
+            aria-label={open ? t('nav.closeMenu') : t('nav.openMenu')} aria-expanded={open}>
+            {open ? <X className="size-5" /> : <Menu className="size-5" />}
+          </button>
+        </div>
       </header>
       {open && (
         <div className="fixed inset-x-0 top-[3.25rem] bottom-0 z-10 flex flex-col justify-between overflow-y-auto bg-surface p-3 lg:hidden print:hidden">
@@ -133,8 +166,15 @@ export function Layout() {
           <Outlet />
         </Suspense>
       </main>
+      <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   )
+}
+
+/** Whether a key press goes to a field the user is writing in. */
+function isTyping(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
 }
 
 function Brand() {

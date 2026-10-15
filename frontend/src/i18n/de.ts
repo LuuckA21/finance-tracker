@@ -978,4 +978,23 @@ export const de: Messages = {
   'trend.partialNote': 'Das Jahr läuft noch: „bisher“ reicht vom 1. Januar bis heute und wird mit demselben Zeitraum des Vorjahres verglichen; der Monatsdurchschnitt zählt die abgeschlossenen Monate.',
   'trend.details': 'Nach Unterkategorie',
   'trend.detail': 'Unterkategorie',
+
+  // Search box
+  'search.open': 'Suchen',
+  'search.placeholder': 'Buchungen, Kategorien, Tags, Positionen…',
+  'search.hint': 'Mindestens 2 Zeichen eingeben: einen Namen, eine Beschreibung, eine IBAN oder einen Betrag wie 45.20.',
+  'search.loading': 'Suche läuft…',
+  'search.error': 'Die Suche ist fehlgeschlagen. Bitte erneut versuchen.',
+  'search.none': 'Keine Ergebnisse für „{text}“.',
+  'search.results': 'Suchergebnisse',
+  'search.keys': '↑ ↓ zum Auswählen · Enter zum Öffnen · Esc zum Schliessen',
+  'search.entries': 'Buchungen',
+  'search.allEntries': 'Alle {count} Buchungen mit „{text}“',
+  'search.categories': 'Kategorien',
+  'search.tags': 'Tags',
+  'search.positions': 'Positionen',
+  'search.archived': 'Archiviert',
+  'search.recurring': 'Wiederkehrend',
+  'search.goals': 'Ziele',
+  'error.search_too_long': 'Höchstens 100 Zeichen suchen.',
 }

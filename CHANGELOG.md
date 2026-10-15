@@ -7,6 +7,11 @@ GitHub release.
 
 ## [Unreleased]
 
+### Added
+- Search: one box, opened with the `/` key, finds entries (by description or amount),
+  categories, tags, positions (also by IBAN), recurring entries and goals, and opens the one you
+  pick.
+
 ## [1.4.1] - 2026-10-15
 
 ### Security

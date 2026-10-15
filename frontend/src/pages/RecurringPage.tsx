@@ -7,6 +7,7 @@ import { TagChip, TagInput } from '../components/TagInput'
 import { amountStyle, EntryTarget, TransferFields, transferRoute } from '../components/TransferFields'
 import { Badge, Button, Card, EmptyState, ErrorAlert, Field, Modal, PageHeader, Segmented, Spinner } from '../components/ui'
 import { useI18n, type MessageKey } from '../i18n'
+import { useSearchHandoff } from '../lib/search'
 import { COMMON_CURRENCIES, date, money, parseDecimal, today } from '../lib/format'
 import { CategoryOptions } from '../components/CategoryOptions'
 import { categoryPath } from '../lib/categories'
@@ -28,6 +29,17 @@ export function RecurringPage() {
   const [error, setError] = useState<string | null>(null)
 
   const byId = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
+
+  // From the search box: the rule to open, once the rules are loaded
+  useSearchHandoff((handoff) => {
+    if (handoff.kind !== 'recurring' || !rules.data) return false
+    const rule = rules.data.find((r) => r.id === handoff.id)
+    if (rule) {
+      setEditing(rule)
+      setFormOpen(true)
+    }
+    return true
+  })
 
   async function toggle(rule: RecurringEntry) {
     setError(null)

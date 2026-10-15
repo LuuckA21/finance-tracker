@@ -35,6 +35,7 @@ import type {
   Page,
   Position,
   RecurringEntry,
+  SearchResult,
   Snapshot,
   Tags,
   UserWithPassword,
@@ -214,6 +215,21 @@ export const useCategorySuggestion = (description: string, kind: CategoryKind, e
       `/api/category-rules/suggest?${new URLSearchParams({ description, kind })}`).then((s) => s ?? null),
     enabled,
     staleTime: 60_000,
+  })
+
+// ---------------------------------------------------------------- search
+
+/** Shorter texts are not searched: one letter would match almost everything (as on the server). */
+export const SEARCH_MIN_LENGTH = 2
+
+/** The search box's results for a text; the previous results stay while the next ones load. */
+export const useSearch = (text: string) =>
+  useQuery({
+    queryKey: ['search', text],
+    queryFn: () => get<SearchResult>(`/api/search?${new URLSearchParams({ q: text })}`),
+    enabled: text.length >= SEARCH_MIN_LENGTH,
+    placeholderData: keepPreviousData,
+    staleTime: 10_000,
   })
 
 // ---------------------------------------------------------------- cash entries

@@ -979,4 +979,23 @@ export const fr: Messages = {
   'trend.partialNote': 'L\'année est en cours\u00a0: «\u00a0à ce jour\u00a0» va du 1er janvier à aujourd\'hui et se compare à la même période de l\'année précédente\u202f; la moyenne mensuelle compte les mois écoulés.',
   'trend.details': 'Par sous-catégorie',
   'trend.detail': 'Sous-catégorie',
+
+  // Search box
+  'search.open': 'Rechercher',
+  'search.placeholder': 'Opérations, catégories, étiquettes, positions…',
+  'search.hint': 'Saisissez au moins 2 caractères\u00a0: un nom, une description, un IBAN ou un montant comme 45.20.',
+  'search.loading': 'Recherche en cours…',
+  'search.error': 'La recherche a échoué. Réessayez.',
+  'search.none': 'Aucun résultat pour «\u00a0{text}\u00a0».',
+  'search.results': 'Résultats de la recherche',
+  'search.keys': '↑ ↓ pour choisir · Entrée pour ouvrir · Échap pour fermer',
+  'search.entries': 'Opérations',
+  'search.allEntries': 'Les {count} opérations avec «\u00a0{text}\u00a0»',
+  'search.categories': 'Catégories',
+  'search.tags': 'Étiquettes',
+  'search.positions': 'Positions',
+  'search.archived': 'Archivée',
+  'search.recurring': 'Récurrentes',
+  'search.goals': 'Objectifs',
+  'error.search_too_long': 'Recherchez au plus 100 caractères.',
 }
