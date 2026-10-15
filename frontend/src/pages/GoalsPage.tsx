@@ -7,6 +7,7 @@ import type { Goal, GoalKind, Position } from '../api/types'
 import { GoalProgress } from '../components/GoalProgress'
 import { Button, Card, EmptyState, ErrorAlert, Field, MissingRatesNotice, Modal, PageHeader, Segmented, Spinner } from '../components/ui'
 import { useI18n } from '../i18n'
+import { useSearchHandoff } from '../lib/search'
 import { COMMON_CURRENCIES, parseDecimal } from '../lib/format'
 
 /** Savings goals: a balance to reach on some positions, or a yearly amount to put into them. */
@@ -20,6 +21,14 @@ export function GoalsPage() {
   const [error, setError] = useState<string | null>(null)
   const byId = new Map(positions.map((p) => [p.id, p]))
   const missing = [...new Set((goals.data ?? []).flatMap((g) => g.unconvertedCurrencies))]
+
+  // From the search box: the goal to open, once the goals are loaded
+  useSearchHandoff((handoff) => {
+    if (handoff.kind !== 'goal' || !goals.data) return false
+    const goal = goals.data.find((g) => g.id === handoff.id)
+    if (goal) setEditing(goal)
+    return true
+  })
 
   async function onDelete(goal: Goal) {
     if (!confirm(t('goals.confirmDelete', { name: goal.name }))) return

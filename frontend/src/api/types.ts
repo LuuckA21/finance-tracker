@@ -588,3 +588,16 @@ export interface Passkey {
   /** Synced across the user's devices (iCloud Keychain, Google Password Manager…) */
   synced: boolean
 }
+
+/** The search box's results: the user's records matching a text, grouped by kind. */
+export interface SearchResult {
+  /** Newest first; entriesTotal counts all the matching ones */
+  entries: CashEntry[]
+  entriesTotal: number
+  /** parentName: the macro of a detail category, null for a macro */
+  categories: { id: number; name: string; kind: CategoryKind; color: string; parentName: string | null }[]
+  tags: { id: number; name: string }[]
+  positions: { id: number; name: string; symbol: string | null; assetClass: AssetClass; currency: string; archived: boolean }[]
+  recurring: { id: number; description: string; kind: EntryKind; amount: number; currency: string; frequency: Frequency; active: boolean }[]
+  goals: { id: number; name: string }[]
+}

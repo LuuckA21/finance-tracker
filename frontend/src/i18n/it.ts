@@ -976,4 +976,23 @@ export const it = {
   'trend.partialNote': 'L\'anno è in corso: «finora» va dal 1° gennaio a oggi ed è confrontato con lo stesso periodo dell\'anno precedente; la media mensile conta i mesi completi.',
   'trend.details': 'Per dettaglio',
   'trend.detail': 'Dettaglio',
+
+  // Search box
+  'search.open': 'Cerca',
+  'search.placeholder': 'Movimenti, categorie, etichette, posizioni…',
+  'search.hint': 'Scrivi almeno 2 caratteri: un nome, una descrizione, un IBAN o un importo come 45.20.',
+  'search.loading': 'Ricerca in corso…',
+  'search.error': 'La ricerca non è riuscita. Riprova.',
+  'search.none': 'Nessun risultato per «{text}».',
+  'search.results': 'Risultati della ricerca',
+  'search.keys': '↑ ↓ per scegliere · Invio per aprire · Esc per chiudere',
+  'search.entries': 'Movimenti',
+  'search.allEntries': 'Tutti i {count} movimenti con «{text}»',
+  'search.categories': 'Categorie',
+  'search.tags': 'Etichette',
+  'search.positions': 'Posizioni',
+  'search.archived': 'Archiviata',
+  'search.recurring': 'Ricorrenti',
+  'search.goals': 'Obiettivi',
+  'error.search_too_long': 'Cerca al massimo 100 caratteri.',
 }
